@@ -2,7 +2,6 @@ from collections import deque
 
 from tornado import gen
 from tornado.ioloop import IOLoop, PeriodicCallback
-from tornado.locks import Condition, Event
 from tornado.queues import Queue
 
 
@@ -103,8 +102,6 @@ class timed_window(Stream):
         self.buffer = []
         self.loop = loop or IOLoop.current()
         self.loop.add_callback(self.cb)
-        self.event = Event()
-        self.event.set()
         self.last = gen.moment
 
         Stream.__init__(self, child)
@@ -117,11 +114,9 @@ class timed_window(Stream):
     def cb(self):
         while True:
             L, self.buffer = self.buffer, []
-            self.event.clear()
             self.last = self.emit(L)
             yield self.last
             yield gen.sleep(self.interval)
-            self.event.set()
 
 
 def sink_to_list(x):
