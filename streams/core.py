@@ -20,12 +20,6 @@ class Stream(object):
         return sum([parent.update(x) for parent in self.parents], [])
 
 
-class Source(Stream):
-    @gen.coroutine
-    def put(self, x):
-        yield self.emit(x)
-
-
 class Sink(Stream):
     def __init__(self, child, func):
         self.func = func
