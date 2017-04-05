@@ -16,7 +16,9 @@ class Stream(object):
         self.parents.append(other)
 
     def emit(self, x):
-        return sum([parent.update(x) for parent in self.parents], [])
+        results = [parent.update(x) for parent in self.parents]
+        results = [r for r in results if r]
+        return sum(results, [])
 
 
 class Sink(Stream):
