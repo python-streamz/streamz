@@ -4,10 +4,12 @@ from time import time
 import pytest
 
 from distributed.utils_test import inc, double, gen_test
+from distributed.utils import tmpfile
 from tornado import gen
 from tornado.queues import Queue
 
 from ..core import *
+from ..sources import *
 
 
 def test_basic():
@@ -141,3 +143,24 @@ def test_timed_window_backpressure():
     stop = time()
 
     assert stop - start > 0.2
+
+
+def test_sink_to_file():
+    with tmpfile() as fn:
+        source = Stream()
+        with sink_to_file(fn, source) as f:
+            source.emit('a')
+            source.emit('b')
+
+        with open(fn) as f:
+            data = f.read()
+
+        assert data == 'a\nb\n'
+
+@gen_test()
+def test_counter():
+    source = Counter(interval=0.01)
+    L = sink_to_list(source)
+    yield gen.sleep(0.1)
+
+    assert L

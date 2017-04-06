@@ -119,9 +119,3 @@ class timed_window(Stream):
             self.last = self.emit(L)
             yield self.last
             yield gen.sleep(self.interval)
-
-
-def sink_to_list(x):
-    L = []
-    Sink(x, L.append)
-    return L
