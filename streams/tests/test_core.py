@@ -164,3 +164,64 @@ def test_counter():
     yield gen.sleep(0.1)
 
     assert L
+
+
+@gen_test()
+def test_rate_limit():
+    source = Stream()
+    a = rate_limit(0.05, source)
+    L = sink_to_list(a)
+
+    start = time()
+    for i in range(5):
+        yield source.emit(i)
+    stop = time()
+    assert stop - start > 0.1
+    assert len(L) == 5
+
+
+@gen_test()
+def test_delay():
+    source = Stream()
+    a = delay(0.02, source)
+    L = sink_to_list(a)
+
+    for i in range(5):
+        yield source.emit(i)
+
+    assert not L
+
+    yield gen.sleep(0.04)
+
+    assert len(L) < 5
+
+    yield gen.sleep(0.1)
+
+    assert len(L) == 5
+
+
+@gen_test()
+def test_buffer():
+    source = Stream()
+    a = map(inc, source)
+    b = buffer(10, a)
+    c = map(inc, b)
+    d = rate_limit(0.05, c)
+
+    L = sink_to_list(d)
+
+    start = time()
+    for i in range(10):
+        yield source.emit(i)
+    stop = time()
+
+    assert stop - start < 0.01
+    assert not L
+
+    start = time()
+    for i in range(5):
+        yield source.emit(i)
+    stop = time()
+
+    assert L
+    assert stop - start > 0.04

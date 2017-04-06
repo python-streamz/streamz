@@ -1,4 +1,5 @@
 from collections import deque
+from time import time
 
 from tornado import gen
 from tornado.ioloop import IOLoop, PeriodicCallback
@@ -6,9 +7,11 @@ from tornado.queues import Queue
 
 
 class Stream(object):
-    def __init__(self, child=None):
+    def __init__(self, child=None, **kwargs):
         self.parents = []
         self.child = child
+        if 'loop' in kwargs:
+            self.loop = kwargs.get('loop') or IOLoop.current()
         if child:
             self.child.add_parent(self)
 
@@ -17,7 +20,7 @@ class Stream(object):
 
     def emit(self, x):
         results = [parent.update(x) for parent in self.parents]
-        results = [r for r in results if r]
+        results = [r if type(r) is list else [r] for r in results if r]
         return sum(results, [])
 
 
@@ -30,7 +33,7 @@ class Sink(Stream):
     def update(self, x):
         result = self.func(x)
         if isinstance(result, gen.Future):
-            return [result]
+            return result
         else:
             return []
 
@@ -102,15 +105,15 @@ class timed_window(Stream):
     def __init__(self, interval, child, loop=None):
         self.interval = interval
         self.buffer = []
-        self.loop = loop or IOLoop.current()
-        self.loop.add_callback(self.cb)
         self.last = gen.moment
 
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, loop=loop)
+
+        self.loop.add_callback(self.cb)
 
     def update(self, x):
         self.buffer.append(x)
-        return [self.last]
+        return self.last
 
     @gen.coroutine
     def cb(self):
@@ -119,3 +122,63 @@ class timed_window(Stream):
             self.last = self.emit(L)
             yield self.last
             yield gen.sleep(self.interval)
+
+
+class delay(Stream):
+    def __init__(self, interval, child, loop=None):
+        self.interval = interval
+        self.queue = Queue()
+
+        Stream.__init__(self, child, loop=loop)
+
+        self.loop.add_callback(self.cb)
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            last = time()
+            x = yield self.queue.get()
+            yield self.emit(x)
+            duration = self.interval - (time() - last)
+            if duration > 0:
+                yield gen.sleep(duration)
+
+    def update(self, x):
+        return self.queue.put(x)
+
+
+class rate_limit(Stream):
+    def __init__(self, interval, child):
+        self.interval = interval
+        self.last = 0
+
+        Stream.__init__(self, child)
+
+    @gen.coroutine
+    def update(self, x):
+        now = time()
+        duration = self.interval - (time() - self.last)
+        self.last = now
+        if duration > 0:
+            yield gen.sleep(duration)
+        results = yield self.emit(x)
+        raise gen.Return(results)
+
+
+class buffer(Stream):
+    def __init__(self, n, child, loop=None):
+        self.child = child
+        self.queue = Queue(maxsize=n)
+
+        Stream.__init__(self, child, loop=loop)
+
+        self.loop.add_callback(self.cb)
+
+    def update(self, x):
+        return self.queue.put(x)
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            x = yield self.queue.get()
+            yield self.emit(x)
