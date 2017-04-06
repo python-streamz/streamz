@@ -10,14 +10,14 @@ from tornado import gen
 from tornado.queues import Queue
 
 from ..core import *
-from ..dask import *
+import streams.dask as ds
 from ..sources import *
 
 @gen_cluster(client=True)
 def test_scatter_gather(c, s, a, b):
     source = Stream()
-    a = scatter(source)
-    b = gather(a)
+    a = ds.scatter(source)
+    b = ds.gather(a)
 
     L1 = sink_to_list(a)
     L2 = sink_to_list(b)
@@ -33,3 +33,37 @@ def test_scatter_gather(c, s, a, b):
 
     results = yield c._gather(L1)
     assert results == L2 == list(range(50))
+
+
+@gen_cluster(client=True)
+def test_map(c, s, a, b):
+    source = Stream()
+    a = ds.map(inc, source)
+
+    L = sink_to_list(a)
+
+    for i in range(3):
+        source.emit(i)
+
+    assert len(L) == 3
+    assert all(isinstance(x, Future) for x in L)
+
+    results = yield c._gather(L)
+    assert results == [1, 2, 3]
+
+
+@gen_cluster(client=True)
+def test_scan(c, s, a, b):
+    source = Stream()
+    a = ds.scan(add, source, start=0)
+
+    L = sink_to_list(a)
+
+    for i in range(3):
+        source.emit(i)
+
+    assert len(L) == 3
+    assert all(isinstance(x, Future) for x in L)
+
+    results = yield c._gather(L)
+    assert results == [0, 1, 3]

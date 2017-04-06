@@ -67,3 +67,27 @@ class gather(Stream):
     def flush(self):
         while not self.queue.empty():
             yield self.condition.wait()
+
+
+class map(Stream):
+    def __init__(self, func, child, client=None):
+        self.client = client or default_client()
+        self.func = func
+
+        Stream.__init__(self, child)
+
+    def update(self, x):
+        return self.emit(self.client.submit(self.func, x))
+
+
+class scan(Stream):
+    def __init__(self, func, child, start=None, client=None):
+        self.client = client or default_client()
+        self.func = func
+        self.state = start
+
+        Stream.__init__(self, child)
+
+    def update(self, x):
+        self.state = self.client.submit(self.func, self.state, x)
+        return self.emit(self.state)
