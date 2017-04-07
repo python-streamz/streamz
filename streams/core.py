@@ -6,6 +6,9 @@ from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.queues import Queue
 
 
+no_default = '--no-default--'
+
+
 class Stream(object):
     def __init__(self, child=None, **kwargs):
         self.parents = []
@@ -23,9 +26,48 @@ class Stream(object):
         results = [r if type(r) is list else [r] for r in results if r]
         return sum(results, [])
 
+    def map(self, func):
+        return map(func, self)
+
+    def filter(self, predicate):
+        return filter(predicate, self)
+
+    def scan(self, func, start=no_default):
+        return scan(func, self, start=start)
+
+    def buffer(self, n, loop=None):
+        return buffer(n, self, loop=loop)
+
+    def partition(self, n):
+        return partition(n, self)
+
+    def sliding_window(self, n):
+        return sliding_window(n, self)
+
+    def timed_window(self, interval, loop=None):
+        return timed_window(interval, self, loop=loop)
+
+    def delay(self, interval, loop=None):
+        return delay(interval, self, loop=None)
+
+    def rate_limit(self, interval):
+        return rate_limit(interval, self)
+
+    def to_dask(self):
+        from .dask import DaskStream
+        return DaskStream(self)
+
+    def sink(self, func):
+        return Sink(func, self)
+
+    def sink_to_list(self):
+        L = []
+        Sink(L.append, self)
+        return L
+
 
 class Sink(Stream):
-    def __init__(self, child, func):
+    def __init__(self, func, child):
         self.func = func
 
         Stream.__init__(self, child)
@@ -62,14 +104,17 @@ class filter(Stream):
 
 
 class scan(Stream):
-    def __init__(self, func, child, start=None):
+    def __init__(self, func, child, start=no_default):
         self.func = func
         self.state = start
         Stream.__init__(self, child)
 
     def update(self, x):
-        self.state = self.func(self.state, x)
-        return self.emit(self.state)
+        if self.state is no_default:
+            self.state = x
+        else:
+            self.state = self.func(self.state, x)
+            return self.emit(self.state)
 
 
 class partition(Stream):

@@ -33,11 +33,11 @@ def sink_to_file(filename, child, mode='w', prefix='', suffix='\n', flush=False)
         if flush:
             file.flush()
 
-    sink = Sink(child, write)
+    sink = Sink(write, child)
     return file
 
 
 def sink_to_list(x):
     L = []
-    Sink(x, L.append)
+    Sink(L.append, x)
     return L

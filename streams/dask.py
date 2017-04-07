@@ -3,9 +3,28 @@ from tornado.locks import Condition
 from tornado.queues import Queue
 from tornado import gen
 
+from . import core
 from .core import Stream
 
-class scatter(Stream):
+
+class DaskStream(Stream):
+    def map(self, func):
+        return map(func, self)
+
+    def scan(self, func, start=core.no_default):
+        return scan(func, self, start=start)
+
+    def scatter(self, limit=10, client=None):
+        return scatter(self, limit=limit, client=client)
+
+    def gather(self, limit=10, client=None):
+        return gather(self, limit=limit, client=client)
+
+    def update(self, x):
+        return self.emit(x)
+
+
+class scatter(DaskStream):
     def __init__(self, child, limit=10, client=None):
         self.client = client or default_client()
         self.queue = Queue(maxsize=limit)
@@ -69,7 +88,7 @@ class gather(Stream):
             yield self.condition.wait()
 
 
-class map(Stream):
+class map(DaskStream):
     def __init__(self, func, child, client=None):
         self.client = client or default_client()
         self.func = func
@@ -80,8 +99,8 @@ class map(Stream):
         return self.emit(self.client.submit(self.func, x))
 
 
-class scan(Stream):
-    def __init__(self, func, child, start=None, client=None):
+class scan(DaskStream):
+    def __init__(self, func, child, start=core.no_default, client=None):
         self.client = client or default_client()
         self.func = func
         self.state = start
@@ -89,5 +108,8 @@ class scan(Stream):
         Stream.__init__(self, child)
 
     def update(self, x):
-        self.state = self.client.submit(self.func, self.state, x)
-        return self.emit(self.state)
+        if self.state is core.no_default:
+            self.state = x
+        else:
+            self.state = self.client.submit(self.func, self.state, x)
+            return self.emit(self.state)

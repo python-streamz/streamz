@@ -14,29 +14,24 @@ from ..sources import *
 
 def test_basic():
     source = Stream()
-    b1 = map(inc, source)
-    b2 = map(double, source)
+    b1 = source.map(inc)
+    b2 = source.map(double)
 
-    c = scan(add, b1, start=0)
+    c = b1.scan(add)
 
-    Lc = list()
-    sink_c = Sink(c, Lc.append)
-
-    Lb = list()
-    sink_b = Sink(b2, Lb.append)
+    Lc = c.sink_to_list()
+    Lb = b2.sink_to_list()
 
     for i in range(4):
         source.emit(i)
 
-    assert Lc == [1, 3, 6, 10]
+    assert Lc == [3, 6, 10]
     assert Lb == [0, 2, 4, 6]
 
 
 def test_filter():
     source = Stream()
-    a = filter(lambda x: x % 2 == 0, source)
-
-    L = sink_to_list(a)
+    L = source.filter(lambda x: x % 2 == 0).sink_to_list()
 
     for i in range(10):
         source.emit(i)
@@ -46,10 +41,7 @@ def test_filter():
 
 def test_partition():
     source = Stream()
-    a = partition(2, source)
-
-    L = []
-    sink = Sink(a, L.append)
+    L = source.partition(2).sink_to_list()
 
     for i in range(10):
         source.emit(i)
@@ -59,10 +51,7 @@ def test_partition():
 
 def test_sliding_window():
     source = Stream()
-    a = sliding_window(2, source)
-
-    L = []
-    sink = Sink(a, L.append)
+    L = source.sliding_window(2).sink_to_list()
 
     for i in range(10):
         source.emit(i)
@@ -73,12 +62,10 @@ def test_sliding_window():
 
 @gen_test()
 def test_backpressure():
-    loop = IOLoop.current()
-    source = Stream()
-    a = map(inc, source)
-    c = scan(add, a, start=0)
-
     q = Queue(maxsize=2)
+
+    source = Stream()
+    sink = source.map(inc).scan(add, start=0).sink(q.put)
 
     @gen.coroutine
     def read_from_q():
@@ -86,9 +73,7 @@ def test_backpressure():
             result = yield q.get()
             yield gen.sleep(0.1)
 
-    loop.add_callback(read_from_q)
-
-    sink = Sink(c, q.put)
+    IOLoop.current().add_callback(read_from_q)
 
     start = time()
     for i in range(5):
@@ -101,7 +86,7 @@ def test_backpressure():
 @gen_test()
 def test_timed_window():
     source = Stream()
-    a = timed_window(0.01, source)
+    a = source.timed_window(0.01)
 
     L = sink_to_list(a)
 
@@ -121,12 +106,10 @@ def test_timed_window():
 
 @gen_test()
 def test_timed_window_backpressure():
-    loop = IOLoop.current()
-    source = Stream()
-    a = timed_window(0.01, source)
-
     q = Queue(maxsize=1)
-    sink = Sink(a, q.put)
+
+    source = Stream()
+    sink = source.timed_window(0.01).sink(q.put)
 
     @gen.coroutine
     def read_from_q():
@@ -134,7 +117,7 @@ def test_timed_window_backpressure():
             result = yield q.get()
             yield gen.sleep(0.1)
 
-    loop.add_callback(read_from_q)
+    IOLoop.current().add_callback(read_from_q)
 
     start = time()
     for i in range(5):
@@ -157,10 +140,11 @@ def test_sink_to_file():
 
         assert data == 'a\nb\n'
 
+
 @gen_test()
 def test_counter():
     source = Counter(interval=0.01)
-    L = sink_to_list(source)
+    L = source.sink_to_list()
     yield gen.sleep(0.1)
 
     assert L
@@ -169,8 +153,7 @@ def test_counter():
 @gen_test()
 def test_rate_limit():
     source = Stream()
-    a = rate_limit(0.05, source)
-    L = sink_to_list(a)
+    L = source.rate_limit(0.05).sink_to_list()
 
     start = time()
     for i in range(5):
@@ -183,8 +166,7 @@ def test_rate_limit():
 @gen_test()
 def test_delay():
     source = Stream()
-    a = delay(0.02, source)
-    L = sink_to_list(a)
+    L = source.delay(0.02).sink_to_list()
 
     for i in range(5):
         yield source.emit(i)
@@ -203,12 +185,7 @@ def test_delay():
 @gen_test()
 def test_buffer():
     source = Stream()
-    a = map(inc, source)
-    b = buffer(10, a)
-    c = map(inc, b)
-    d = rate_limit(0.05, c)
-
-    L = sink_to_list(d)
+    L = source.map(inc).buffer(10).map(inc).rate_limit(0.05).sink_to_list()
 
     start = time()
     for i in range(10):

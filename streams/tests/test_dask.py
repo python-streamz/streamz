@@ -13,14 +13,15 @@ from ..core import *
 import streams.dask as ds
 from ..sources import *
 
+
 @gen_cluster(client=True)
 def test_scatter_gather(c, s, a, b):
     source = Stream()
-    a = ds.scatter(source)
-    b = ds.gather(a)
-
-    L1 = sink_to_list(a)
-    L2 = sink_to_list(b)
+    a = source.to_dask().scatter()
+    b = a.gather()
+    L1 = a.sink_to_list()
+    L2 = b.sink_to_list()
+    L3 = b.map(inc).sink_to_list()
 
     for i in range(50):
         yield source.emit(i)
@@ -34,13 +35,13 @@ def test_scatter_gather(c, s, a, b):
     results = yield c._gather(L1)
     assert results == L2 == list(range(50))
 
+    assert L3 == list(range(1, 51))
+
 
 @gen_cluster(client=True)
 def test_map(c, s, a, b):
     source = Stream()
-    a = ds.map(inc, source)
-
-    L = sink_to_list(a)
+    L = source.to_dask().map(inc).sink_to_list()
 
     for i in range(3):
         source.emit(i)
@@ -55,9 +56,7 @@ def test_map(c, s, a, b):
 @gen_cluster(client=True)
 def test_scan(c, s, a, b):
     source = Stream()
-    a = ds.scan(add, source, start=0)
-
-    L = sink_to_list(a)
+    L = source.to_dask().scan(add, start=0).sink_to_list()
 
     for i in range(3):
         source.emit(i)
