@@ -46,6 +46,9 @@ Now as you feed data into the source all of the operations trigger as necessary
 You can use the typical map/filter/scan syntax.  Everything can have
 multiple subscribers at any point in the stream.
 
+Backpressure
+------------
+
 Additionally everything responds to backpressure, so if the sink blocks the
 source will block (although you can add in buffers if desired).  Additionally
 everything supports asynchronous workloads with Tornado coroutines, so you can
@@ -55,10 +58,10 @@ do async/await stuff if you prefer (or gen.coroutine/yield in Python 2).
 async def f(result):
     ... do non-blocking stuff with result ...
 
-stream.sink(f)
+stream.sink(f)  # f might impose waits like while a database ingests results
 
 for i in range(10):
-    await source.emit(i)
+    await source.emit(i)  # waiting at the sink is felt here at the source
 ```
 
 This means that if the sinks can't keep up then the sources will stop pushing
@@ -83,20 +86,20 @@ Less Trivial Example
 source = Source()
 output = open('out')
 
-s = source.map(json.loads)        # Parse JSON data
-          .timed_window(0.050)    # Batch into 50ms batches
+s = source.map(json.loads)        # Parse lines of JSON data
+          .timed_window(0.050)    # Collect data into into 50ms batches
           .filter(len)            # Remove any batches that didn't have data
           .to_dask().scatter()    # Send to cluster
           .map(pd.DataFrame)      # Convert to pandas dataframes on the cluster
-          .map(pd.DataFrame.sum)  # Sum rows of each batch
-          .scan(add)              # Maintain running sum of all data
+          .map(pd.DataFrame.sum)  # Sum rows of each batch on the custer
+          .scan(add)              # Maintain running sum of all data on the cluster
           .gather()               # Collect results back to local machine
           .map(str)               # Convert to string
           .sink(output.write)     # Write to file
 
-from kafka_library import KafkaReader
+from some_kafka_library import KafkaReader
 
-topic = KafkaReader('data')
+topic = KafkaReader().subscribe('data')
 
 while True:
     for line in topic:
@@ -122,3 +125,13 @@ grow if use cases arrive.  Here are some obvious things that are missing:
     through operations like map
 4.  Multi-stream operations like zip and joins
 5.  More APIs for common endpoints like Kafka
+
+
+Some things I like
+------------------
+
+1.  It's small
+2.  It scales down and is very lightweight.  Common operations can be used
+    without concurrency, without event loops, without Dask.  Nothing but pure
+    Python.
+3.  I think that it can probably combine well with Dask to do very large things
