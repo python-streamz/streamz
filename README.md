@@ -102,3 +102,23 @@ while True:
     for line in topic:
         source.emit(line)
 ```
+
+
+What's missing?
+---------------
+
+This is still a toy library.  It has never been used for anything.  So
+presumably many things are wrong.  I've tried to build a simple system that can
+grow if use cases arrive.  Here are some obvious things that are missing:
+
+1.  A lot of API.  I recommend looking at the Rx or Flink APIs to get a sense
+    of what people often need.
+2.  Integration to collections like lists, numpy arrays, or pandas dataframes.
+    For example we should be able to think about streams of lists of things.
+    In this case `seq_stream.map(func)` would apply the function across every
+    element in the constituent lists.
+3.  Thinking about time.  It would be nice to be able to annotate elements with
+    things like event and processing time, and have this information pass
+    through operations like map
+4.  Multi-stream operations like zip and joins
+5.  More APIs for common endpoints like Kafka
