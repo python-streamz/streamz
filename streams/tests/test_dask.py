@@ -13,14 +13,12 @@ from ..core import *
 import streams.dask as ds
 from ..sources import *
 
+
 @gen_cluster(client=True)
 def test_scatter_gather(c, s, a, b):
     source = Stream()
-    a = ds.scatter(source)
-    b = ds.gather(a)
-
-    L1 = sink_to_list(a)
-    L2 = sink_to_list(b)
+    L1 = source.scatter(source).sink_to_list()
+    L2 = a.gather().sink_to_list()
 
     for i in range(50):
         yield source.emit(i)

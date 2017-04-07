@@ -23,9 +23,44 @@ class Stream(object):
         results = [r if type(r) is list else [r] for r in results if r]
         return sum(results, [])
 
+    def map(self, func):
+        return map(func, self)
+
+    def filter(self, predicate):
+        return filter(predicate, self)
+
+    def scan(self, func, start=None):
+        return scan(func, self, start=start)
+
+    def buffer(self, n, loop=None):
+        return buffer(n, self, loop=loop)
+
+    def partition(self, n):
+        return partition(n, self)
+
+    def sliding_window(self, n):
+        return sliding_window(n, self)
+
+    def timed_window(self, interval, loop=None):
+        return timed_window(interval, self, loop=loop)
+
+    def delay(self, interval, loop=None):
+        return delay(interval, self, loop=None)
+
+    def rate_limit(self, interval):
+        return rate_limit(interval, self)
+
+    def sink(self, func):
+        return Sink(func, self)
+
+    def sink_to_list(self):
+        L = []
+        Sink(L.append, self)
+        return L
+
 
 class Sink(Stream):
-    def __init__(self, child, func):
+    def __init__(self, func, child):
         self.func = func
 
         Stream.__init__(self, child)
