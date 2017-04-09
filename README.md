@@ -8,6 +8,7 @@ Other projects you should probably consider instead:
 
 1.  [RxPY](https://github.com/ReactiveX/RxPY)
 2.  [Flink](https://flink.apache.org/)
+3.  [Beam](https://beam.apache.org/get-started/quickstart-py/)
 
 
 Basic Explanation
