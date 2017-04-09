@@ -10,11 +10,14 @@ no_default = '--no-default--'
 
 
 class Stream(object):
-    def __init__(self, child=None, **kwargs):
+    def __init__(self, child=None, children=None, **kwargs):
         self.parents = []
-        self.child = child
-        if 'loop' in kwargs:
-            self.loop = kwargs.get('loop') or IOLoop.current()
+        if children is not None:
+            self.children = children
+        else:
+            self.children = [child]
+        if kwargs.get('loop'):
+            self._loop = kwargs.get('loop')
         if child:
             self.child.add_parent(self)
 
@@ -25,6 +28,28 @@ class Stream(object):
         results = [parent.update(x) for parent in self.parents]
         results = [r if type(r) is list else [r] for r in results if r]
         return sum(results, [])
+
+    @property
+    def child(self):
+        if len(self.children) != 1:
+            raise ValueError("Stream has multiple children")
+        else:
+            return self.children[0]
+
+    @property
+    def loop(self):
+        try:
+            return self._loop
+        except AttributeError:
+            pass
+        for child in self.children:
+            if child:
+                loop = self.child.loop
+                if loop:
+                    self._loop = loop
+                    return loop
+        self._loop = IOLoop.current()
+        return self._loop
 
     def map(self, func):
         return map(func, self)
@@ -212,7 +237,6 @@ class rate_limit(Stream):
 
 class buffer(Stream):
     def __init__(self, n, child, loop=None):
-        self.child = child
         self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, child, loop=loop)

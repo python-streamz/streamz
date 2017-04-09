@@ -9,12 +9,11 @@ def inc(x):
 
 class Counter(Stream):
     def __init__(self, interval, step=inc, loop=None):
-        self.loop = loop or IOLoop.current()
         self.interval = interval
         self.x = 0
         self.step = step
 
-        Stream.__init__(self)
+        Stream.__init__(self, loop=loop)
         self.loop.add_callback(self.cb)
 
     @gen.coroutine
