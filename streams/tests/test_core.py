@@ -1,3 +1,4 @@
+from datetime import timedelta
 from operator import add
 from time import time
 
@@ -7,6 +8,8 @@ from distributed.utils_test import inc, double, gen_test
 from distributed.utils import tmpfile
 from tornado import gen
 from tornado.queues import Queue
+
+import streams as s
 
 from ..core import *
 from ..sources import *
@@ -202,3 +205,39 @@ def test_buffer():
 
     assert L
     assert stop - start > 0.04
+
+
+def test_zip():
+    a = Stream()
+    b = Stream()
+    c = s.zip(a, b)
+
+    L = c.sink_to_list()
+
+    a.emit(1)
+    b.emit('a')
+    a.emit(2)
+    b.emit('b')
+
+    assert L == [(1, 'a'), (2, 'b')]
+
+
+@gen_test()
+def test_zip_timeout():
+    a = Stream()
+    b = Stream()
+    c = s.zip(a, b, maxsize=2)
+
+    L = c.sink_to_list()
+
+    a.emit(1)
+    a.emit(2)
+
+    future = a.emit(3)
+    with pytest.raises(gen.TimeoutError):
+        yield gen.with_timeout(timedelta(seconds=0.01), future)
+
+    b.emit('a')
+    yield future
+
+    assert L == [(1, 'a')]

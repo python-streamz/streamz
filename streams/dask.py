@@ -20,7 +20,7 @@ class DaskStream(Stream):
     def gather(self, limit=10, client=None):
         return gather(self, limit=limit, client=client)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.emit(x)
 
 
@@ -34,7 +34,7 @@ class scatter(DaskStream):
 
         self.client.loop.add_callback(self.cb)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.queue.put(x)
 
     @gen.coroutine
@@ -66,7 +66,7 @@ class gather(Stream):
 
         self.client.loop.add_callback(self.cb)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.queue.put(x)
 
     @gen.coroutine
@@ -95,7 +95,7 @@ class map(DaskStream):
 
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.emit(self.client.submit(self.func, x))
 
 
@@ -107,7 +107,7 @@ class scan(DaskStream):
 
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         if self.state is core.no_default:
             self.state = x
         else:

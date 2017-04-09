@@ -2,6 +2,7 @@ from collections import deque
 from time import time
 
 from tornado import gen
+from tornado.locks import Condition
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.queues import Queue
 
@@ -18,14 +19,15 @@ class Stream(object):
             self.children = [child]
         if kwargs.get('loop'):
             self._loop = kwargs.get('loop')
-        if child:
-            self.child.add_parent(self)
+        for child in self.children:
+            if child:
+                child.add_parent(self)
 
     def add_parent(self, other):
         self.parents.append(other)
 
     def emit(self, x):
-        results = [parent.update(x) for parent in self.parents]
+        results = [parent.update(x, who=self) for parent in self.parents]
         results = [r if type(r) is list else [r] for r in results if r]
         return sum(results, [])
 
@@ -97,7 +99,7 @@ class Sink(Stream):
 
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         result = self.func(x)
         if isinstance(result, gen.Future):
             return result
@@ -111,7 +113,7 @@ class map(Stream):
 
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.emit(self.func(x))
 
 
@@ -121,7 +123,7 @@ class filter(Stream):
 
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         if self.predicate(x):
             return self.emit(x)
         else:
@@ -134,7 +136,7 @@ class scan(Stream):
         self.state = start
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         if self.state is no_default:
             self.state = x
         else:
@@ -148,7 +150,7 @@ class partition(Stream):
         self.buffer = []
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             result, self.buffer = self.buffer, []
@@ -163,7 +165,7 @@ class sliding_window(Stream):
         self.buffer = deque(maxlen=n)
         Stream.__init__(self, child)
 
-    def update(self, x):
+    def update(self, x, who=None):
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             return self.emit(tuple(self.buffer))
@@ -181,7 +183,7 @@ class timed_window(Stream):
 
         self.loop.add_callback(self.cb)
 
-    def update(self, x):
+    def update(self, x, who=None):
         self.buffer.append(x)
         return self.last
 
@@ -213,7 +215,7 @@ class delay(Stream):
             if duration > 0:
                 yield gen.sleep(duration)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.queue.put(x)
 
 
@@ -225,7 +227,7 @@ class rate_limit(Stream):
         Stream.__init__(self, child)
 
     @gen.coroutine
-    def update(self, x):
+    def update(self, x, who=None):
         now = time()
         duration = self.interval - (time() - self.last)
         self.last = now
@@ -243,7 +245,7 @@ class buffer(Stream):
 
         self.loop.add_callback(self.cb)
 
-    def update(self, x):
+    def update(self, x, who=None):
         return self.queue.put(x)
 
     @gen.coroutine
@@ -251,3 +253,21 @@ class buffer(Stream):
         while True:
             x = yield self.queue.get()
             yield self.emit(x)
+
+
+class zip(Stream):
+    def __init__(self, *children, maxsize=10):
+        self.maxsize = maxsize
+        self.buffers = [deque() for _ in children]
+        self.condition = Condition()
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        L = self.buffers[self.children.index(who)]
+        L.append(x)
+        if len(L) == 1 and all(self.buffers):
+            tup = tuple(buf.popleft() for buf in self.buffers)
+            self.condition.notify_all()
+            return self.emit(tup)
+        elif len(L) > self.maxsize:
+            return self.condition.wait()
