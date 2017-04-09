@@ -271,3 +271,18 @@ class zip(Stream):
             return self.emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
+
+
+class combine_latest(Stream):
+    def __init__(self, *children):
+        self.last = [None for _ in children]
+        self.missing = set(children)
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        if self.missing and who in self.missing:
+            self.missing.remove(who)
+
+        self.last[self.children.index(who)] = x
+        if not self.missing:
+            self.emit(tuple(self.last))

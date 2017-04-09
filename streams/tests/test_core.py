@@ -222,6 +222,22 @@ def test_zip():
     assert L == [(1, 'a'), (2, 'b')]
 
 
+def test_combine_latest():
+    a = Stream()
+    b = Stream()
+    c = s.combine_latest(a, b)
+
+    L = c.sink_to_list()
+
+    a.emit(1)
+    a.emit(2)
+    b.emit('a')
+    a.emit(3)
+    b.emit('b')
+
+    assert L == [(2, 'a'), (3, 'a'), (3, 'b')]
+
+
 @gen_test()
 def test_zip_timeout():
     a = Stream()
