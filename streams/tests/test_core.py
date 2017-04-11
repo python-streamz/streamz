@@ -268,3 +268,14 @@ def test_frequencies():
     source.emit('a')
 
     assert L[-1] == {'a': 2, 'b': 1}
+
+
+def test_concat():
+    source = Stream()
+    L = source.concat().sink_to_list()
+
+    source.emit([1, 2, 3])
+    source.emit([4, 5])
+    source.emit([6, 7, 8])
+
+    assert L == [1, 2, 3, 4, 5, 6, 7, 8]

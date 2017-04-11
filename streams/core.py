@@ -81,6 +81,9 @@ class Stream(object):
     def rate_limit(self, interval):
         return rate_limit(interval, self)
 
+    def concat(self):
+        return concat(self)
+
     def to_dask(self):
         from .dask import DaskStream
         return DaskStream(self)
@@ -293,3 +296,15 @@ class combine_latest(Stream):
         self.last[self.children.index(who)] = x
         if not self.missing:
             self.emit(tuple(self.last))
+
+
+class concat(Stream):
+    def update(self, x, who=None):
+        L = []
+        for item in x:
+            y = self.emit(item)
+            if isinstance(y, list):
+                L.extend(y)
+            else:
+                L.append(y)
+        return L
