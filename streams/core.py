@@ -1,6 +1,7 @@
 from collections import deque
 from time import time
 
+import toolz
 from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop, PeriodicCallback
@@ -91,6 +92,12 @@ class Stream(object):
         L = []
         Sink(L.append, self)
         return L
+
+    def frequencies(self):
+        def update_frequencies(last, x):
+            return toolz.assoc(last, x, last.get(x, 0) + 1)
+
+        return self.scan(update_frequencies, start={})
 
 
 class Sink(Stream):

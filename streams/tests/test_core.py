@@ -257,3 +257,14 @@ def test_zip_timeout():
     yield future
 
     assert L == [(1, 'a')]
+
+
+def test_frequencies():
+    source = Stream()
+    L = source.frequencies().sink_to_list()
+
+    source.emit('a')
+    source.emit('b')
+    source.emit('a')
+
+    assert L[-1] == {'a': 2, 'b': 1}
