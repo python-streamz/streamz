@@ -29,9 +29,14 @@ class Stream(object):
         self.parents.append(other)
 
     def emit(self, x):
-        results = [parent.update(x, who=self) for parent in self.parents]
-        results = [r if type(r) is list else [r] for r in results if r]
-        return sum(results, [])
+        result = []
+        for parent in self.parents:
+            r = parent.update(x, who=self)
+            if type(r) is list:
+                result.extend(r)
+            else:
+                result.append(r)
+        return result
 
     @property
     def child(self):
@@ -121,7 +126,7 @@ class Sink(Stream):
 
     def update(self, x, who=None):
         result = self.func(x)
-        if isinstance(result, gen.Future):
+        if type(result) is gen.Future:
             return result
         else:
             return []
@@ -313,7 +318,7 @@ class concat(Stream):
         L = []
         for item in x:
             y = self.emit(item)
-            if isinstance(y, list):
+            if type(y) is list:
                 L.extend(y)
             else:
                 L.append(y)
