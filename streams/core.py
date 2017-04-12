@@ -242,19 +242,18 @@ class delay(Stream):
 class rate_limit(Stream):
     def __init__(self, interval, child):
         self.interval = interval
-        self.last = 0
+        self.next = 0
 
         Stream.__init__(self, child)
 
     @gen.coroutine
     def update(self, x, who=None):
         now = time()
-        duration = self.interval - (time() - self.last)
-        self.last = now
-        if duration > 0:
-            yield gen.sleep(duration)
-        results = yield self.emit(x)
-        raise gen.Return(results)
+        old_next = self.next
+        self.next = max(now, self.next) + self.interval
+        if now < old_next:
+            yield gen.sleep(old_next - now)
+        yield self.emit(x)
 
 
 class buffer(Stream):

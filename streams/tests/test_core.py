@@ -172,7 +172,7 @@ def test_rate_limit():
     for i in range(5):
         yield source.emit(i)
     stop = time()
-    assert stop - start > 0.1
+    assert stop - start > 0.2
     assert len(L) == 5
 
 
