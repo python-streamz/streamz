@@ -69,6 +69,35 @@ This means that if the sinks can't keep up then the sources will stop pushing
 data into the system.  This is useful to control buildup.
 
 
+Recursion and Feedback
+----------------------
+
+By connecting sources to sinks you can create feedback loops.  Here is a tiny
+web crawler:
+
+```python
+source = Stream()
+pages = source.unique()
+content = (pages.map(requests.get)
+                .map(lambda x: x.content))
+links = (content.map(get_list_of_links)
+                .concat())
+links.sink(source.emit)
+
+pages.sink(print)
+
+>>> source.emit('http://github.com')
+http://github.com
+http://github.com/features
+http://github.com/business
+http://github.com/explore
+http://github.com/pricing
+...
+```
+
+This was not an intentional feature of the system.  It just fell out from the
+design.
+
 Dask
 ----
 
@@ -77,7 +106,12 @@ Tornado event loop.  Alternatively this library plays well with Dask.  You can
 scatter data to the cluster, map and scan things up there, gather back, etc..
 
 ```python
-source.to_dask().scatter().map(func).scan(func).gather().sink(...)
+source.to_dask()
+      .scatter()
+      .map(func)   # Runs on a cluster
+      .scan(func)  # Runs on a cluster
+      .gather()
+      .sink(...)
 ```
 
 Less Trivial Example
