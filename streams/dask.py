@@ -8,8 +8,8 @@ from .core import Stream
 
 
 class DaskStream(Stream):
-    def map(self, func):
-        return map(func, self)
+    def map(self, func, **kwargs):
+        return map(func, self, **kwargs)
 
     def scan(self, func, start=core.no_default):
         return scan(func, self, start=start)
@@ -92,14 +92,15 @@ class gather(Stream):
 
 
 class map(DaskStream):
-    def __init__(self, func, child, client=None):
+    def __init__(self, func, child, client=None, **kwargs):
         self.client = client or default_client()
         self.func = func
+        self.kwargs = kwargs
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        return self.emit(self.client.submit(self.func, x))
+        return self.emit(self.client.submit(self.func, x, **self.kwargs))
 
 
 class scan(DaskStream):

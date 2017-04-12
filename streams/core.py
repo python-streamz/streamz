@@ -55,8 +55,8 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
-    def map(self, func):
-        return map(func, self)
+    def map(self, func, **kwargs):
+        return map(func, self, **kwargs)
 
     def filter(self, predicate):
         return filter(predicate, self)
@@ -128,13 +128,14 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child):
+    def __init__(self, func, child, **kwargs):
         self.func = func
+        self.kwargs = kwargs
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        return self.emit(self.func(x))
+        return self.emit(self.func(x, **self.kwargs))
 
 
 class filter(Stream):

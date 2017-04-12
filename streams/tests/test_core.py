@@ -42,6 +42,18 @@ def test_filter():
     assert L == [0, 2, 4, 6, 8]
 
 
+def test_map():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    L = source.map(add, y=10).sink_to_list()
+
+    source.emit(1)
+
+    assert L[0] == 11
+
+
 def test_remove():
     source = Stream()
     L = source.remove(lambda x: x % 2 == 0).sink_to_list()
