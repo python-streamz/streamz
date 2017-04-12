@@ -279,3 +279,38 @@ def test_concat():
     source.emit([6, 7, 8])
 
     assert L == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_unique():
+    source = Stream()
+    L = source.unique().sink_to_list()
+
+    source.emit(1)
+    source.emit(2)
+    source.emit(1)
+
+    assert L == [1, 2]
+
+
+@pytest.mark.xfail(reason="not yet implemented")
+def test_unique_history():
+    source = Stream()
+    L = source.unique(history=2).sink_to_list()
+
+    source.emit(1)
+    source.emit(2)
+    source.emit(1)
+    source.emit(2)
+    source.emit(1)
+    source.emit(2)
+
+    assert L == [1, 2]
+
+    source.emit(3)
+    source.emit(2)
+
+    assert L == [1, 2, 3]
+
+    source.emit(1)
+
+    assert L == [1, 2, 3, 1]
