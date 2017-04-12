@@ -8,6 +8,17 @@ from .core import Stream
 
 
 class DaskStream(Stream):
+    """ A Stream of Dask futures
+
+    This follows a subset of the Stream API but operates on a cluster
+
+    Examples
+    --------
+    >>> from dask.distributed import Client
+    >>> client = Client()
+    >>> source = Stream()
+    >>> s = source.to_dask().map(func).gather()
+    """
     def map(self, func, **kwargs):
         """ Apply a function on every element of the stream with Dask
 

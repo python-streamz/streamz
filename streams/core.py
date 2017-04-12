@@ -13,6 +13,37 @@ no_default = '--no-default--'
 
 
 class Stream(object):
+    """ A Stream is an infinite sequence of data
+
+    Streams subscribe to each other passing and transforming data between them.
+    A Stream object listens for updates from upstream, reacts to these updates,
+    and then emits more data to flow downstream to all Stream objects that
+    subscribe to it.  Downstream Stream objects may connect at any point of a
+    Stream graph to get a full view of the data coming off of that point to do
+    with as they will.
+
+    Examples
+    --------
+    >>> def inc(x):
+    ...     return x + 1
+
+    >>> source = Stream()  # Create a stream object
+    >>> s = source.map(inc).map(str)  # Subscribe to make new streams
+    >>> s.sink(print)  # take an action whenever an element reaches the end
+
+    >>> L = list()
+    >>> s.sink(L.append)  # or take multiple actions (streams can branch)
+
+    >>> for i in range(5):
+    ...     source.emit(i)  # push data in at the source
+    '1'
+    '2'
+    '3'
+    '4'
+    '5'
+    >>> L  # and the actions happen at the sinks
+    ['1', '2', '3', '4', '5']
+    """
     def __init__(self, child=None, children=None, **kwargs):
         self.parents = []
         if children is not None:
@@ -23,12 +54,14 @@ class Stream(object):
             self._loop = kwargs.get('loop')
         for child in self.children:
             if child:
-                child.add_parent(self)
-
-    def add_parent(self, other):
-        self.parents.append(other)
+                cihld.parents.append(self)
 
     def emit(self, x):
+        """ Push data into the stream at this point
+
+        This is typically done only at source Streams but can theortically be
+        done at any point
+        """
         result = []
         for parent in self.parents:
             r = parent.update(x, who=self)
@@ -260,6 +293,7 @@ class Stream(object):
         return L
 
     def frequencies(self):
+        """ Count occurrences of elements """
         def update_frequencies(last, x):
             return toolz.assoc(last, x, last.get(x, 0) + 1)
 
