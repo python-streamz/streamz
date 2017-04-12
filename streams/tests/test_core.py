@@ -314,10 +314,10 @@ def test_unique():
     assert L == [1, 2]
 
 
-@pytest.mark.xfail(reason="not yet implemented")
 def test_unique_history():
     source = Stream()
-    L = source.unique(history=2).sink_to_list()
+    s = source.unique(history=2)
+    L = s.sink_to_list()
 
     source.emit(1)
     source.emit(2)

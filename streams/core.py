@@ -89,7 +89,7 @@ class Stream(object):
         return concat(self)
 
     def unique(self, history=None):
-        return unique(self, history=None)
+        return unique(self, history=history)
 
     def zip(self, other):
         return zip(self, other)
@@ -322,12 +322,14 @@ class concat(Stream):
 
 class unique(Stream):
     def __init__(self, child, history=None):
-        self.history = history
-        self.seen = set()
+        self.seen = dict()
+        if history:
+            from zict import LRU
+            self.seen = LRU(history, self.seen)
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
         if x not in self.seen:
-            self.seen.add(x)
+            self.seen[x] = 1
             return self.emit(x)
