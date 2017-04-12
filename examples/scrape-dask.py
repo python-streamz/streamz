@@ -5,15 +5,12 @@ import sys
 
 from BeautifulSoup import BeautifulSoup  # Python 2 only, sorry.
 from dask.distributed import Client
-from nltk.corpus import stopwords
 import requests
 from streams import Stream
 import toolz
 import urlparse
 
 client = Client(processes=False)
-
-stopwords = set(stopwords.words('english'))
 
 def links_of_page((content, page)):
     uri = urlparse.urlparse(page)
@@ -48,6 +45,9 @@ links = (content.zip(pages)
 links.sink(source.emit)
 
 """
+from nltk.corpus import stopwords
+stopwords = set(stopwords.words('english'))
+
 word_counts = (content.map(str.split)
                       .gather().concat()
                       .filter(str.isalpha)

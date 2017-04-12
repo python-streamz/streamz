@@ -5,15 +5,12 @@ import sys
 
 from BeautifulSoup import BeautifulSoup  # Python 2 only, sorry.
 
-from nltk.corpus import stopwords
 import requests
 from streams import Stream
 import toolz
 import urlparse
 
 
-
-stopwords = set(stopwords.words('english'))
 
 def links_of_page((content, page)):
     uri = urlparse.urlparse(page)
@@ -48,6 +45,9 @@ links = (content.zip(pages)
 links.sink(source.emit)
 
 """
+from nltk.corpus import stopwords
+stopwords = set(stopwords.words('english'))
+
 word_counts = (content.map(str.split)
                       .concat()
                       .filter(str.isalpha)
