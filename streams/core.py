@@ -61,6 +61,9 @@ class Stream(object):
     def filter(self, predicate):
         return filter(predicate, self)
 
+    def remove(self, predicate):
+        return filter(lambda x: not predicate(x), self)
+
     def scan(self, func, start=no_default):
         return scan(func, self, start=start)
 

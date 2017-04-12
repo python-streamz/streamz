@@ -42,6 +42,16 @@ def test_filter():
     assert L == [0, 2, 4, 6, 8]
 
 
+def test_remove():
+    source = Stream()
+    L = source.remove(lambda x: x % 2 == 0).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [1, 3, 5, 7, 9]
+
+
 def test_partition():
     source = Stream()
     L = source.partition(2).sink_to_list()
