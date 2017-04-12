@@ -23,6 +23,9 @@ class DaskStream(Stream):
     def update(self, x, who=None):
         return self.emit(x)
 
+    def zip(self, other):
+        return zip(self, other)
+
 
 class scatter(DaskStream):
     def __init__(self, child, limit=10, client=None):
@@ -113,3 +116,6 @@ class scan(DaskStream):
         else:
             self.state = self.client.submit(self.func, self.state, x)
             return self.emit(self.state)
+
+class zip(core.zip, DaskStream):
+    pass

@@ -66,3 +66,19 @@ def test_scan(c, s, a, b):
 
     results = yield c._gather(L)
     assert results == [0, 1, 3]
+
+
+@gen_cluster(client=True)
+def test_zip_method(c, s, a, b):
+    source = Stream()
+    L = source.to_dask().map(inc).zip(source).sink_to_list()
+
+    source.emit(1)
+    source.emit(2)
+
+    assert len(L) == 2
+    assert L[0][1] == 1
+    assert L[1][1] == 2
+    x = yield L[0][0]._result()
+    y = yield L[1][0]._result()
+    assert (x, y) == (2, 3)

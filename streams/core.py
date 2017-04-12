@@ -84,6 +84,9 @@ class Stream(object):
     def concat(self):
         return concat(self)
 
+    def zip(self, other):
+        return zip(self, other)
+
     def to_dask(self):
         from .dask import DaskStream
         return DaskStream(self)
@@ -266,8 +269,8 @@ class buffer(Stream):
 
 
 class zip(Stream):
-    def __init__(self, *children, maxsize=10):
-        self.maxsize = maxsize
+    def __init__(self, *children, **kwargs):
+        self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]
         self.condition = Condition()
         Stream.__init__(self, children=children)
