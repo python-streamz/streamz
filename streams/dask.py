@@ -9,15 +9,32 @@ from .core import Stream
 
 class DaskStream(Stream):
     def map(self, func, **kwargs):
+        """ Apply a function on every element of the stream with Dask
+
+        This uses ``Client.submit`` to call a function on the element
+        asynchronously on a Dask cluster.  It returns a stream of futures.
+        """
         return map(func, self, **kwargs)
 
     def scan(self, func, start=core.no_default):
+        """ Accumulate results with previous state
+
+        This uses ``Client.submit`` to call the function using a Dask client.
+        It returns a stream of futures.
+        """
         return scan(func, self, start=start)
 
+    accumulate = scan
+
     def scatter(self, limit=10, client=None):
+        """ Scatter data out to a cluster
+
+        This returns a stream of futures
+        """
         return scatter(self, limit=limit, client=client)
 
     def gather(self, limit=10, client=None):
+        """ Gather a stream of futures back to a stream of local results """
         return gather(self, limit=limit, client=client)
 
     def update(self, x, who=None):

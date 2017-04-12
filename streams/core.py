@@ -61,52 +61,200 @@ class Stream(object):
         return self._loop
 
     def map(self, func, **kwargs):
+        """ Apply a function to every element in the stream """
         return map(func, self, **kwargs)
 
     def filter(self, predicate):
+        """ Only pass through elements that satisfy the predicate """
         return filter(predicate, self)
 
     def remove(self, predicate):
+        """ Only pass through elements for which the predicate returns False """
         return filter(lambda x: not predicate(x), self)
 
-    def scan(self, func, start=no_default):
+    def accumulate(self, func, start=no_default):
+        """ Accumulate results with previous state
+
+        This preforms running or cumulative reductions, applying the function
+        to the previous total and the new element.  The function should take
+        two arguments, the previous accumulated state and the next element and
+        it should return a new accumulated state.
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.accumulate(lambda acc, x: acc + x).sink(print)
+        ...
+        >>> for i in range(5):
+        ...     source.emit(i)
+        1
+        3
+        6
+        10
+        15
+        """
         return scan(func, self, start=start)
 
-    def buffer(self, n, loop=None):
-        return buffer(n, self, loop=loop)
+    scan = accumulate
 
     def partition(self, n):
+        """ Partition stream into tuples of equal size
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.partition(3).sink(print)
+        >>> for i in range(10):
+        ...     source.emit(i)
+        (0, 1, 2)
+        (3, 4, 5)
+        (6, 7, 8)
+        """
         return partition(n, self)
 
     def sliding_window(self, n):
+        """ Produce overlapping tuples of size n
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.sliding_window(3).sink(print)
+        >>> for i in range(8):
+        ...     source.emit(i)
+        (0, 1, 2)
+        (1, 2, 3)
+        (2, 3, 4)
+        (3, 4, 5)
+        (4, 5, 6)
+        (5, 6, 7)
+        """
         return sliding_window(n, self)
 
+    def rate_limit(self, interval):
+        """ Limit the flow of data
+
+        This stops two elements of streaming through in an interval shorter
+        than the provided value.
+
+        Parameters
+        ----------
+        interval: float
+            Time in seconds
+        """
+        return rate_limit(interval, self)
+
+    def buffer(self, n, loop=None):
+        """ Allow results to pile up at this point in the stream
+
+        This allows results to buffer in place at various points in the stream.
+        This can help to smooth flow through the system when backpressure is
+        applied.
+        """
+        return buffer(n, self, loop=loop)
+
     def timed_window(self, interval, loop=None):
+        """ Emit a tuple of collected results every interval
+
+        Every ``interval`` seconds this emits a tuple of all of the results
+        seen so far.  This can help to batch data coming off of a high-volume
+        stream.
+        """
         return timed_window(interval, self, loop=loop)
 
     def delay(self, interval, loop=None):
+        """ Add a time delay to results """
         return delay(interval, self, loop=None)
 
-    def rate_limit(self, interval):
-        return rate_limit(interval, self)
-
     def concat(self):
+        """ Flatten streams of lists or iterables into a stream of elements
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.concat().sink(print)
+        >>> for x in [[1, 2, 3], [4, 5], [6, 7, 7]]:
+        ...     source.emit(x)
+        1
+        2
+        3
+        4
+        5
+        6
+        7
+        """
         return concat(self)
 
+    flatten = concat
+
     def unique(self, history=None):
+        """ Avoid sending through repeated elements
+
+        This deduplicates a stream so that only new elements pass through.
+        You can control how much of a history is stored with the ``history=``
+        parameter.  For example setting ``history=1`` avoids sending through
+        elements when one is repeated right after the other.
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.unique(history=1).sink(print)
+        >>> for x in [1, 1, 2, 2, 2, 1, 3]:
+        ...     source.emit(x)
+        1
+        2
+        1
+        3
+        """
         return unique(self, history=history)
 
     def zip(self, other):
+        """ Combine two streams together into a stream of tuples """
         return zip(self, other)
 
     def to_dask(self):
+        """ Convert to a Dask Stream
+
+        Operations like map and accumulate/scan on this stream will result in
+        Future objects running on a cluster.  You should have already started a
+        Dask Client running
+        """
         from .dask import DaskStream
         return DaskStream(self)
 
     def sink(self, func):
+        """ Apply a function on every element
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> L = list()
+        >>> source.sink(L.append)
+        >>> source.sink(print)
+        >>> source.sink(print)
+        >>> source.emit(123)
+        123
+        123
+        >>> L
+        [123]
+
+        See Also
+        --------
+        Stream.sink_to_list
+        """
         return Sink(func, self)
 
     def sink_to_list(self):
+        """ Append all elements of a stream to a list as they come in
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> L = source.map(lambda x: 10 * x).sink_to_list()
+        >>> for i in range(5):
+        ...     source.emit(i)
+        >>> L
+        [0, 10, 20, 30, 40]
+        """
         L = []
         Sink(L.append, self)
         return L
