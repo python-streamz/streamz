@@ -54,7 +54,7 @@ class Stream(object):
             self._loop = kwargs.get('loop')
         for child in self.children:
             if child:
-                cihld.parents.append(self)
+                child.parents.append(self)
 
     def emit(self, x):
         """ Push data into the stream at this point
@@ -334,8 +334,6 @@ class filter(Stream):
     def update(self, x, who=None):
         if self.predicate(x):
             return self.emit(x)
-        else:
-            return []
 
 
 class scan(Stream):
