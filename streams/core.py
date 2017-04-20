@@ -61,6 +61,8 @@ class Stream(object):
         for child in self.children:
             if child:
                 child.parents.append(self)
+                # takes the wrapper from latest child, all children must have
+                # same wrapper
                 if child._wrapper is not None:
                     self._wrapper = child._wrapper
 
@@ -333,7 +335,7 @@ class map(Stream):
         if self._wrapper is None:
             self.func = func
         else:
-            self.func = func
+            self.func = self._wrapper("map")(func)
         self.kwargs = kwargs
 
         Stream.__init__(self, child)
