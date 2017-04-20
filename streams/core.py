@@ -8,6 +8,8 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.queues import Queue
 
+# decorator to normalize inputs/outputs
+from .StreamDoc import parse_streamdoc
 
 no_default = '--no-default--'
 
@@ -21,6 +23,10 @@ class Stream(object):
     subscribe to it.  Downstream Stream objects may connect at any point of a
     Stream graph to get a full view of the data coming off of that point to do
     with as they will.
+
+    wrapper : Streams can also have wrapper methods. These are treated
+    as decorators which intercept the inputs and outputs. See StreamDoc
+    for an example wrapper.
 
     Examples
     --------
@@ -52,14 +58,19 @@ class Stream(object):
             self.children = [child]
         if kwargs.get('loop'):
             self._loop = kwargs.get('loop')
+        if kwargs.get('wrapper'):
+            self._wrapper = kwargs.get('wrapper')
+
         for child in self.children:
             if child:
                 child.parents.append(self)
+                if child._wrapper is not None:
+                    self._wrapper = child._wrapper
 
     def emit(self, x):
         """ Push data into the stream at this point
 
-        This is typically done only at source Streams but can theortically be
+        This is typically done only at source Streams but can theoretically be
         done at any point
         """
         result = []
@@ -102,7 +113,8 @@ class Stream(object):
         return filter(predicate, self)
 
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False """
+        """ Only pass through elements for which the predicate returns False
+        """
         return filter(lambda x: not predicate(x), self)
 
     def accumulate(self, func, start=no_default):
@@ -302,7 +314,11 @@ class Stream(object):
 
 class Sink(Stream):
     def __init__(self, func, child):
-        self.func = func
+        self._wrapper = child._wrapper
+        if self._wrapper is None:
+            self.func = func
+        else:
+            self.func = self._wrapper("sink")(func)
 
         Stream.__init__(self, child)
 
@@ -316,7 +332,11 @@ class Sink(Stream):
 
 class map(Stream):
     def __init__(self, func, child, **kwargs):
-        self.func = func
+        self._wrapper = child._wrapper
+        if self._wrapper is None:
+            self.func = func
+        else:
+            self.func = parse_streamdoc("map")(func)
         self.kwargs = kwargs
 
         Stream.__init__(self, child)
@@ -338,9 +358,12 @@ class filter(Stream):
 
 class scan(Stream):
     def __init__(self, func, child, start=no_default):
-        self.func = func
         self.state = start
         Stream.__init__(self, child)
+        if self._wrapper is not None:
+            self.func = self._wrapper("scan")(func)
+        else:
+            self.func = func
 
     def update(self, x, who=None):
         if self.state is no_default:
