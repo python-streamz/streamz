@@ -57,6 +57,8 @@ class Stream(object):
             self._loop = kwargs.get('loop')
         if kwargs.get('wrapper'):
             self._wrapper = kwargs.get('wrapper')
+        else:
+            self._wrapper = None
 
         for child in self.children:
             if child:
