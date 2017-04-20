@@ -5,8 +5,6 @@
 '''
 from functools import wraps
 
-_MAX_STR_LEN = 72  # Maximum length for string representations of objects
-
 
 class StreamDoc(dict):
     def __init__(self, streamdoc=None, args=(), kwargs={}, attributes={}):
