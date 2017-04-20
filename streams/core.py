@@ -8,9 +8,6 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.queues import Queue
 
-# decorator to normalize inputs/outputs
-from .StreamDoc import parse_streamdoc
-
 no_default = '--no-default--'
 
 
@@ -336,7 +333,7 @@ class map(Stream):
         if self._wrapper is None:
             self.func = func
         else:
-            self.func = parse_streamdoc("map")(func)
+            self.func = func
         self.kwargs = kwargs
 
         Stream.__init__(self, child)
