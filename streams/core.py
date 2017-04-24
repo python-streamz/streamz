@@ -55,10 +55,7 @@ class Stream(object):
             self.children = [child]
         if kwargs.get('loop'):
             self._loop = kwargs.get('loop')
-        if kwargs.get('wrapper'):
-            self._wrapper = kwargs.get('wrapper')
-        else:
-            self._wrapper = None
+        self._wrapper = kwargs.get('wrapper', None)
 
         for child in self.children:
             if child:
@@ -108,6 +105,13 @@ class Stream(object):
     def map(self, func, **kwargs):
         """ Apply a function to every element in the stream """
         return map(func, self, **kwargs)
+
+    def apply(self, func, *args, **kwargs):
+        """ Apply a function to every element in the stream on the header level.
+            Note : The header/data separation is define by the function wrapper.
+            If no wrapper is set, this is equivalent to map.
+        """
+        return apply(func, self, *args, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -344,6 +348,19 @@ class map(Stream):
 
     def update(self, x, who=None):
         return self.emit(self.func(x, **self.kwargs))
+
+class apply(Stream):
+    def __init__(self, func, child, *args, **kwargs):
+        ''' Like map but the wrapper is not applied.'''
+        self._wrapper = child._wrapper
+        self.func = func
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, child)
+
+    def update(self, x, who=None):
+        return self.emit(self.func(x, *self.args, **self.kwargs))
 
 
 class filter(Stream):

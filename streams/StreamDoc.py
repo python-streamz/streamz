@@ -5,6 +5,9 @@
 '''
 from functools import wraps
 
+def select(sdoc, mapping):
+    ''' select outputs from a stream document.'''
+    return sdoc.select(mapping)
 
 class StreamDoc(dict):
     def __init__(self, streamdoc=None, args=(), kwargs={}, attributes={}):
@@ -135,13 +138,12 @@ class StreamDoc(dict):
         totargs = dict(args=newargs, kwargs=newkwargs)
 
         for mapelem in mapping:
-            # duck-type to figure out if mapelem is a str key or int index
             if isinstance(mapelem, str):
                 mapelem = mapelem, mapelem
             elif isinstance(mapelem, int):
                 mapelem = mapelem, None
 
-            # only for strings
+            # length 1 for strings, repeat, for int give None
             if len(mapelem) == 1 and isinstance(mapelem[0], str):
                 mapelem = mapelem[0], mapelem[0]
             elif len(mapelem) == 1 and isinstance(mapelem[0], int):
