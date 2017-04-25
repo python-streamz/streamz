@@ -180,6 +180,21 @@ class Stream(object):
         """
         return sliding_window(n, self)
 
+
+    def multiplex(self, nelems):
+        ''' Multiplex stream into a series of nelems streams.
+
+            Assumes that the emitted value of parent is a tuple
+                of at least length nelems.
+        '''
+        def get_elem(args, elem=None):
+            if elem is None:
+                raise ValueError("Must supply an elem number")
+            return args[elem]
+
+        return [self.map(get_elem, elem=i) for i in range(nelems)]
+
+
     def rate_limit(self, interval):
         """ Limit the flow of data
 
@@ -257,9 +272,9 @@ class Stream(object):
         """
         return unique(self, history=history)
 
-    def zip(self, other):
-        """ Combine two streams together into a stream of tuples """
-        return zip(self, other)
+    def zip(self, *other):
+        """ Combine additional streams together into a stream of tuples """
+        return zip(self, *other)
 
     def to_dask(self):
         """ Convert to a Dask Stream
