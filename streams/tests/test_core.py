@@ -242,6 +242,17 @@ def test_zip():
     b.emit('b')
 
     assert L == [(1, 'a'), (2, 'b')]
+    d = Stream()
+    # test zip from the object itself
+    # zip 3 streams together
+    e = a.zip(b, d)
+    L2 = e.sink_to_list()
+
+    a.emit(1)
+    b.emit(2)
+    d.emit(3)
+    print(L2)
+    assert L2 == [(1, 2, 3)]
 
 
 def test_combine_latest():
