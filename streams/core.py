@@ -102,7 +102,8 @@ class Stream(object):
         return filter(predicate, self)
 
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False """
+        """ Only pass through elements for which the predicate returns False
+        """
         return filter(lambda x: not predicate(x), self)
 
     def accumulate(self, func, start=no_default):
@@ -240,9 +241,9 @@ class Stream(object):
         """
         return unique(self, history=history)
 
-    def zip(self, other):
+    def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
-        return zip(self, other)
+        return zip(self, *other)
 
     def to_dask(self):
         """ Convert to a Dask Stream
