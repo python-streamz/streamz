@@ -251,7 +251,6 @@ def test_zip():
     a.emit(1)
     b.emit(2)
     d.emit(3)
-    print(L2)
     assert L2 == [(1, 2, 3)]
 
 
