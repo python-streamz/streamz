@@ -106,6 +106,13 @@ class Stream(object):
         """ Apply a function to every element in the stream """
         return map(func, self, **kwargs)
 
+    # TODO : Make Stream inherit all this
+    def select(self, elems, **kwargs):
+        """ Access the select attribute of the stream."""
+        def select(obj, elems):
+            return obj.select(elems, **kwargs)
+        return apply(select, self, elems, **kwargs)
+
     def apply(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream on the header level.
             Note : The header/data separation is define by the function wrapper.
@@ -275,6 +282,11 @@ class Stream(object):
     def zip(self, *other):
         """ Combine additional streams together into a stream of tuples """
         return zip(self, *other)
+
+    def merge(self, *other):
+        """ Merge streams togehter. This assumes streams are represented by
+        dicts."""
+        return merge(self, *other)
 
     def to_dask(self):
         """ Convert to a Dask Stream
@@ -514,6 +526,41 @@ class buffer(Stream):
         while True:
             x = yield self.queue.get()
             yield self.emit(x)
+
+class merge(Stream):
+    ''' This assumes that each stream is some kind of dictionary.
+        Apply a rightermost update rule.
+
+        This is same idea as zip except that rather than using tuples, we use
+        dicts (and so hence there can be collisions in this case).
+    '''
+    def __init__(self, *children, **kwargs):
+        self.maxsize = kwargs.pop('maxsize', 10)
+        self.buffers = [deque() for _ in children]
+        self.condition = Condition()
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        L = self.buffers[self.children.index(who)]
+        L.append(x)
+        if len(L) == 1 and all(self.buffers):
+            #print("merging")
+            # in case of delayed instance, this is necessary
+            res = self.buffers[0].popleft()
+            for buf in self.buffers[1:]:
+                # this is meant to allow data that has a "merge" feature
+                # TODO : to be improved (removed??)
+                buftmp = buf.popleft()
+                if hasattr(res, 'merge'):
+                    #print("found merge attribute")
+                    res = res.merge(buftmp)
+                else:
+                    #print("did not find merge attribute")
+                    res.update(buftmp)
+            self.condition.notify_all()
+            return self.emit(res)
+        elif len(L) > self.maxsize:
+            return self.condition.wait()
 
 
 class zip(Stream):

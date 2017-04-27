@@ -336,3 +336,16 @@ def test_unique_history():
     source.emit(1)
 
     assert L == [1, 2, 3, 1]
+
+def test_merge():
+    source = Stream()
+    def foo(a):
+        return a
+    # any operation
+    s1 = source.map(foo)
+    s2 = source.map(foo)
+    s3 = s1.merge(s2)
+    s3.map(print)
+
+    s1.emit(dict(a=2))
+    s2.emit(dict(b=7))

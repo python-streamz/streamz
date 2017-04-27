@@ -5,10 +5,6 @@
 '''
 from functools import wraps
 
-def select(sdoc, mapping):
-    ''' select outputs from a stream document.'''
-    return sdoc.select(mapping)
-
 class StreamDoc(dict):
     def __init__(self, streamdoc=None, args=(), kwargs={}, attributes={}):
         ''' A generalized document meant to be parsed by Streams.
@@ -21,6 +17,7 @@ class StreamDoc(dict):
                 statistics : some statistics of the stream that generated this
                     It can be anything, like run_start, run_stop etc
         '''
+        super(StreamDoc, self).__init__(self)
         # TODO : make attributes a separate class with its own get/set and
         # parsing
         # TODO : make option whether not attributes should be inherited?
@@ -106,6 +103,15 @@ class StreamDoc(dict):
 
         return res
 
+    def merge(self, newstreamdoc):
+        ''' Merge another streamdoc into this one.
+            The new streamdoc's attributes/args/kwargs will override this one.
+        '''
+        streamdoc = StreamDoc(self)
+        streamdoc.add(args=newstreamdoc['args'], kwargs=newstreamdoc['kwargs'],
+                      attributes=newstreamdoc['attributes'])
+        return streamdoc
+
     # TODO : allow partial remapping both for args and kwargs
     def select(self, mapping):
         ''' remap args and kwargs
@@ -130,6 +136,7 @@ class StreamDoc(dict):
             These *must* be tuples, and the list a list kwarg elems must be
                 strs and arg elems must be ints to accomplish this instead
         '''
+        #print("IN STREAMDOC -> SELECT")
         if not isinstance(mapping, list):
             mapping = [mapping]
         streamdoc = StreamDoc(self)
