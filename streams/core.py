@@ -69,7 +69,7 @@ class Stream(object):
                 result.extend(r)
             else:
                 result.append(r)
-        return result
+        return [r for r in result if r is not None]
 
     @property
     def child(self):
