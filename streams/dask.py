@@ -1,3 +1,4 @@
+from dask.delayed import Delayed
 from distributed.client import default_client
 from tornado.locks import Condition
 from tornado.queues import Queue
@@ -26,6 +27,15 @@ class DaskStream(Stream):
         asynchronously on a Dask cluster.  It returns a stream of futures.
         """
         return map(func, self, **kwargs)
+
+    def compute(self, func, **kwargs):
+        """ Computes a dask delayed on every element of the stream
+
+        This uses ``Client.compute`` to trigger execution of a delayed function
+        on the element asynchronously on a Dask cluster.
+        It returns a stream of futures.
+        """
+        return compute(func, self, **kwargs)
 
     def scan(self, func, start=core.no_default):
         """ Accumulate results with previous state
@@ -56,6 +66,7 @@ class DaskStream(Stream):
 
 
 class scatter(DaskStream):
+
     def __init__(self, child, limit=10, client=None):
         self.client = client or default_client()
         self.queue = Queue(maxsize=limit)
@@ -88,6 +99,7 @@ class scatter(DaskStream):
 
 
 class gather(Stream):
+
     def __init__(self, child, limit=10, client=None):
         self.client = client or default_client()
         self.queue = Queue(maxsize=limit)
@@ -120,6 +132,7 @@ class gather(Stream):
 
 
 class map(DaskStream):
+
     def __init__(self, func, child, client=None, **kwargs):
         self.client = client or default_client()
         self.func = func
@@ -131,7 +144,21 @@ class map(DaskStream):
         return self.emit(self.client.submit(self.func, x, **self.kwargs))
 
 
+class compute(DaskStream):
+
+    def __init__(self, func, child, client=None, **kwargs):
+        self.client = client or default_client()
+        self.func = func
+        self.kwargs = kwargs
+
+        Stream.__init__(self, child)
+
+    def update(self, x, who=None):
+        self.emit(self.client.compute(self.func(x), **self.kwargs))
+
+
 class scan(DaskStream):
+
     def __init__(self, func, child, start=core.no_default, client=None):
         self.client = client or default_client()
         self.func = func
@@ -145,6 +172,7 @@ class scan(DaskStream):
         else:
             self.state = self.client.submit(self.func, self.state, x)
             return self.emit(self.state)
+
 
 class zip(core.zip, DaskStream):
     pass

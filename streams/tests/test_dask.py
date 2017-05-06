@@ -3,6 +3,7 @@ from time import time
 
 import pytest
 
+from dask import delayed
 from distributed.client import Future
 from distributed.utils_test import inc, double, gen_test, gen_cluster
 from distributed.utils import tmpfile
@@ -51,6 +52,33 @@ def test_map(c, s, a, b):
 
     results = yield c._gather(L)
     assert results == [1, 2, 3]
+
+
+@gen_cluster(client=True)
+def test_compute(c, s, a, b):
+    source = Stream()
+
+    @delayed
+    def inc1(x):
+        """Immediate delayed function"""
+        return inc(x)
+
+    def inc2(x):
+        """Function that just returns a delayed"""
+        return delayed(inc)(x)
+
+    L1 = source.to_dask().compute(inc1).sink_to_list()
+    L2 = source.to_dask().compute(inc2).sink_to_list()
+
+    for i in range(3):
+        source.emit(i)
+
+    for L in [L1, L2]:
+        assert len(L) == 3
+        assert all(isinstance(x, Future) for x in L)
+
+        results = yield c._gather(L)
+        assert results == [1, 2, 3]
 
 
 @gen_cluster(client=True)
