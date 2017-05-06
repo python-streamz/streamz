@@ -8,7 +8,6 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop, PeriodicCallback
 from tornado.queues import Queue
 
-
 no_default = '--no-default--'
 
 
@@ -21,6 +20,10 @@ class Stream(object):
     subscribe to it.  Downstream Stream objects may connect at any point of a
     Stream graph to get a full view of the data coming off of that point to do
     with as they will.
+
+    wrapper : Streams can also have wrapper methods. These are treated
+    as decorators which intercept the inputs and outputs. See StreamDoc
+    for an example wrapper.
 
     Examples
     --------
@@ -52,14 +55,20 @@ class Stream(object):
             self.children = [child]
         if kwargs.get('loop'):
             self._loop = kwargs.get('loop')
+        self._wrapper = kwargs.get('wrapper', None)
+
         for child in self.children:
             if child:
                 child.parents.append(self)
+                # takes the wrapper from latest child, all children must have
+                # same wrapper
+                if child._wrapper is not None:
+                    self._wrapper = child._wrapper
 
     def emit(self, x):
         """ Push data into the stream at this point
 
-        This is typically done only at source Streams but can theortically be
+        This is typically done only at source Streams but can theoretically be
         done at any point
         """
         result = []
@@ -96,6 +105,13 @@ class Stream(object):
     def map(self, func, **kwargs):
         """ Apply a function to every element in the stream """
         return map(func, self, **kwargs)
+
+    def apply(self, func, *args, **kwargs):
+        """ Apply a function to every element in the stream on the header level.
+            Note : The header/data separation is define by the function wrapper.
+            If no wrapper is set, this is equivalent to map.
+        """
+        return apply(func, self, *args, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -303,7 +319,11 @@ class Stream(object):
 
 class Sink(Stream):
     def __init__(self, func, child):
-        self.func = func
+        self._wrapper = child._wrapper
+        if self._wrapper is None:
+            self.func = func
+        else:
+            self.func = self._wrapper("sink")(func)
 
         Stream.__init__(self, child)
 
@@ -317,13 +337,30 @@ class Sink(Stream):
 
 class map(Stream):
     def __init__(self, func, child, **kwargs):
-        self.func = func
+        self._wrapper = child._wrapper
+        if self._wrapper is None:
+            self.func = func
+        else:
+            self.func = self._wrapper("map")(func)
         self.kwargs = kwargs
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
         return self.emit(self.func(x, **self.kwargs))
+
+class apply(Stream):
+    def __init__(self, func, child, *args, **kwargs):
+        ''' Like map but the wrapper is not applied.'''
+        self._wrapper = child._wrapper
+        self.func = func
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, child)
+
+    def update(self, x, who=None):
+        return self.emit(self.func(x, *self.args, **self.kwargs))
 
 
 class filter(Stream):
@@ -339,9 +376,12 @@ class filter(Stream):
 
 class scan(Stream):
     def __init__(self, func, child, start=no_default):
-        self.func = func
         self.state = start
         Stream.__init__(self, child)
+        if self._wrapper is not None:
+            self.func = self._wrapper("scan")(func)
+        else:
+            self.func = func
 
     def update(self, x, who=None):
         if self.state is no_default:
