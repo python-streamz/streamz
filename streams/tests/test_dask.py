@@ -17,8 +17,8 @@ from ..sources import *
 @gen_cluster(client=True)
 def test_scatter_gather(c, s, a, b):
     source = Stream()
-    a = source.to_dask().scatter()
-    b = a.gather()
+    a = ds.scatter(source)
+    b = ds.gather(a)
     L1 = a.sink_to_list()
     L2 = b.sink_to_list()
     L3 = b.map(inc).sink_to_list()
@@ -41,10 +41,11 @@ def test_scatter_gather(c, s, a, b):
 @gen_cluster(client=True)
 def test_map(c, s, a, b):
     source = Stream()
-    L = source.to_dask().map(inc).sink_to_list()
+    L = source.map(inc).sink_to_list()
 
-    for i in range(3):
-        source.emit(i)
+    futures = yield c._scatter(list(range(3)))
+    for f in futures:
+        source.emit(f)
 
     assert len(L) == 3
     assert all(isinstance(x, Future) for x in L)
@@ -56,29 +57,14 @@ def test_map(c, s, a, b):
 @gen_cluster(client=True)
 def test_scan(c, s, a, b):
     source = Stream()
-    L = source.to_dask().scan(add, start=0).sink_to_list()
+    L = source.scan(add, start=0).sink_to_list()
 
-    for i in range(3):
-        source.emit(i)
+    futures = yield c._scatter(list(range(3)))
+    for f in futures:
+        source.emit(f)
 
     assert len(L) == 3
     assert all(isinstance(x, Future) for x in L)
 
     results = yield c._gather(L)
     assert results == [0, 1, 3]
-
-
-@gen_cluster(client=True)
-def test_zip_method(c, s, a, b):
-    source = Stream()
-    L = source.to_dask().map(inc).zip(source).sink_to_list()
-
-    source.emit(1)
-    source.emit(2)
-
-    assert len(L) == 2
-    assert L[0][1] == 1
-    assert L[1][1] == 2
-    x = yield L[0][0]._result()
-    y = yield L[1][0]._result()
-    assert (x, y) == (2, 3)
