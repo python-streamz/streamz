@@ -377,3 +377,27 @@ def test_union():
     assert L == [1, 2, 3]
     c.emit(4)
     assert L == [1, 2, 3, 4]
+
+
+def test_collect():
+    source1 = Stream()
+    source2 = Stream()
+    collector = source1.collect()
+    L = collector.sink_to_list()
+    source2.sink(collector.flush)
+
+    source1.emit(1)
+    source1.emit(2)
+    assert L == []
+
+    source2.emit('anything')  # flushes collector
+    assert L == [(1, 2)]
+
+    source2.emit('anything')
+    assert L == [(1, 2), ()]
+
+    source1.emit(3)
+    assert L == [(1, 2), ()]
+
+    source2.emit('anything')
+    assert L == [(1, 2), (), (3,)]

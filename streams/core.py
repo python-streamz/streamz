@@ -266,6 +266,25 @@ class Stream(object):
         """
         return unique(self, history=history, key=key)
 
+    def collect(self, cache=None):
+        """
+        Hold elements in a cache and emit them as a collection when flushed.
+
+        Examples
+        --------
+        >>> source1 = Stream()
+        >>> source2 = Stream()
+        >>> collector = collect(source1)
+        >>> collector.sink(print)
+        >>> source2.sink(collector.flush)
+        >>> source1.emit(1)
+        >>> source1.emit(2)
+        >>> source2.emit('anything')  # flushes collector
+        ...
+        [1, 2]
+        """
+        return collect(self, cache=cache)
+
     def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
@@ -566,3 +585,20 @@ class unique(Stream):
 class union(Stream):
     def update(self, x, who=None):
         return self.emit(x)
+
+
+class collect(Stream):
+    def __init__(self, child, cache=None):
+        if cache is None:
+            cache = deque()
+        self.cache = cache
+
+        Stream.__init__(self, child)
+
+    def update(self, x, who=None):
+        self.cache.append(x)
+
+    def flush(self, _=None):
+        out = tuple(self.cache)
+        self.emit(out)
+        self.cache.clear()
