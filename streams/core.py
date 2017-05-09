@@ -224,6 +224,20 @@ class Stream(object):
 
     flatten = concat
 
+    def union(self, *others):
+        """ Combine multiple streams into one
+
+        Every element from any of the children streams will immediately flow
+        into the output stream.  They will not be combined with elements from
+        other streams.
+
+        See also
+        --------
+        Stream.zip
+        Stream.combine_latest
+        """
+        return union(children=(self,) + others)
+
     def unique(self, history=None, key=identity):
         """ Avoid sending through repeated elements
 
@@ -540,3 +554,8 @@ class unique(Stream):
         if y not in self.seen:
             self.seen[y] = 1
             return self.emit(x)
+
+
+class union(Stream):
+    def update(self, x, who=None):
+        return self.emit(x)

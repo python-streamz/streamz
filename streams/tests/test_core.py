@@ -359,3 +359,20 @@ def test_unique_history():
     source.emit(1)
 
     assert L == [1, 2, 3, 1]
+
+
+def test_union():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+
+    L = a.union(b, c).sink_to_list()
+
+    a.emit(1)
+    assert L == [1]
+    b.emit(2)
+    assert L == [1, 2]
+    a.emit(3)
+    assert L == [1, 2, 3]
+    c.emit(4)
+    assert L == [1, 2, 3, 4]
