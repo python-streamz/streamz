@@ -107,11 +107,26 @@ class Stream(object):
         return map(func, self, **kwargs)
 
     # TODO : Make Stream inherit all this
-    def select(self, elems, **kwargs):
+    def select(self, *elems, **kwargs):
         """ Access the select attribute of the stream."""
-        def select(obj, elems):
-            return obj.select(elems, **kwargs)
-        return apply(select, self, elems, **kwargs)
+        def select(obj, *elems):
+            return obj.select(*elems, **kwargs)
+        return apply(select, self, *elems, **kwargs)
+
+    # TODO : Make Stream inherit all this
+    def get_attributes(self):
+        """ Access the select attribute of the stream."""
+        def get_attributes(obj):
+            return obj.get_attributes()
+
+        return apply(get_attributes, self)
+
+    def add_attributes(self, **attrs):
+        ''' Set the attributes in stream.'''
+        def add_attributes(obj):
+            obj.add(attributes=attrs)
+            return obj
+        return apply(add_attributes, self)
 
     def apply(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream on the header level.
@@ -186,21 +201,6 @@ class Stream(object):
         (5, 6, 7)
         """
         return sliding_window(n, self)
-
-
-    def multiplex(self, nelems):
-        ''' Multiplex stream into a series of nelems streams.
-
-            Assumes that the emitted value of parent is a tuple
-                of at least length nelems.
-        '''
-        def get_elem(args, elem=None):
-            if elem is None:
-                raise ValueError("Must supply an elem number")
-            return args[elem]
-
-        return [self.map(get_elem, elem=i) for i in range(nelems)]
-
 
     def rate_limit(self, interval):
         """ Limit the flow of data
@@ -333,6 +333,22 @@ class Stream(object):
         [0, 10, 20, 30, 40]
         """
         L = []
+        Sink(L.append, self)
+        return L
+
+    def sink_to_deque(self, maxlen=None):
+        """ Append all elements of a stream to a deque as they come in
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> L = source.map(lambda x: 10 * x).sink_to_list()
+        >>> for i in range(5):
+        ...     source.emit(i)
+        >>> L
+        [0, 10, 20, 30, 40]
+        """
+        L = deque(maxlen=maxlen)
         Sink(L.append, self)
         return L
 
@@ -561,6 +577,22 @@ class merge(Stream):
             return self.emit(res)
         elif len(L) > self.maxsize:
             return self.condition.wait()
+
+class split(Stream):
+    def __init__(self, child, splitfunc, n=100, loop=None):
+        self.queue = Queue(maxsize=n)
+        Stream.__init__(self, child, loop=loop)
+
+        self.loop.add_callback(self.cb)
+
+    def update(self, x, who=None):
+        return self.queue.put(x)
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            x = yield self.queue.get()
+            yield self.emit(x)
 
 
 class zip(Stream):
