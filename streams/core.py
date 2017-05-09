@@ -1,11 +1,10 @@
 from collections import deque
-import math
 from time import time
 
 import toolz
 from tornado import gen
 from tornado.locks import Condition
-from tornado.ioloop import IOLoop, PeriodicCallback
+from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 
 
