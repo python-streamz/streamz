@@ -31,6 +31,19 @@ def test_map():
     assert L[0].data == 2
 
 
+def test_map_raw():
+    source = Stream()
+    L = source.map(lambda x: (x, x), raw=True).sink_to_list()
+
+    f = Foo(1)
+    source.emit(f)
+
+    assert isinstance(L[0], tuple)
+    assert len(L[0]) == 2
+    assert L[0][0] is f
+    assert L[0][1] is f
+
+
 def test_scan():
     source = Stream()
     L = source.scan(add).sink_to_list()

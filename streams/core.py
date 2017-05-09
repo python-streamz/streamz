@@ -316,14 +316,15 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, **kwargs):
+    def __init__(self, func, child, raw=False, **kwargs):
         self.func = func
         self.kwargs = kwargs
+        self.raw = raw
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if hasattr(x, '__stream_map__'):
+        if not self.raw and hasattr(x, '__stream_map__'):
             result = x.__stream_map__(self.func, **self.kwargs)
         else:
             result = self.func(x, **self.kwargs)
