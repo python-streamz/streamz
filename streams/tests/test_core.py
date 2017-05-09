@@ -257,7 +257,7 @@ def test_zip():
 def test_combine_latest():
     a = Stream()
     b = Stream()
-    c = s.combine_latest(a, b)
+    c = a.combine_latest(b)
 
     L = c.sink_to_list()
 

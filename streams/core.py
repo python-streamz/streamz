@@ -203,6 +203,14 @@ class Stream(object):
         """ Add a time delay to results """
         return delay(interval, self, loop=None)
 
+    def combine_latest(self, *others):
+        """ Combine multiple streams together to a stream of tuples
+
+        This will emit a new tuple of all of the most recent elements seen from
+        any stream.
+        """
+        return combine_latest(self, *others)
+
     def concat(self):
         """ Flatten streams of lists or iterables into a stream of elements
 
