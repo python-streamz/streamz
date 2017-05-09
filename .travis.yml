@@ -1,0 +1,29 @@
+sudo: False
+
+language: python
+
+matrix:
+  include:
+    - python: 2.7
+    - python: 3.6
+
+install:
+  # Install conda
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update conda
+
+  # Install dependencies
+  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8
+  - source activate test-streams
+
+  - python setup.py install
+
+script:
+  - py.test --doctest-modules streams
+  - flake8 streams
+
+notifications:
+  email: false
