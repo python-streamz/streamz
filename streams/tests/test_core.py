@@ -8,11 +8,12 @@ from distributed.utils_test import inc, double, gen_test
 from distributed.utils import tmpfile
 from tornado import gen
 from tornado.queues import Queue
+from tornado.ioloop import IOLoop
 
 import streams as s
 
-from ..core import *
-from ..sources import *
+from ..core import Stream
+from streams.sources import sink_to_file, Counter
 
 
 def test_basic():
@@ -90,12 +91,12 @@ def test_backpressure():
     q = Queue(maxsize=2)
 
     source = Stream()
-    sink = source.map(inc).scan(add, start=0).sink(q.put)
+    source.map(inc).scan(add, start=0).sink(q.put)
 
     @gen.coroutine
     def read_from_q():
         while True:
-            result = yield q.get()
+            yield q.get()
             yield gen.sleep(0.1)
 
     IOLoop.current().add_callback(read_from_q)
@@ -113,7 +114,7 @@ def test_timed_window():
     source = Stream()
     a = source.timed_window(0.01)
 
-    L = sink_to_list(a)
+    L = a.sink_to_list()
 
     for i in range(10):
         yield source.emit(i)
@@ -134,12 +135,12 @@ def test_timed_window_backpressure():
     q = Queue(maxsize=1)
 
     source = Stream()
-    sink = source.timed_window(0.01).sink(q.put)
+    source.timed_window(0.01).sink(q.put)
 
     @gen.coroutine
     def read_from_q():
         while True:
-            result = yield q.get()
+            yield q.get()
             yield gen.sleep(0.1)
 
     IOLoop.current().add_callback(read_from_q)

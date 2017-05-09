@@ -3,7 +3,6 @@ from tornado.locks import Condition
 from tornado.queues import Queue
 from tornado import gen
 
-from . import core
 from .core import Stream
 
 

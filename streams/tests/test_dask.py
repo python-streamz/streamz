@@ -1,17 +1,10 @@
 from operator import add
-from time import time
-
-import pytest
 
 from distributed.client import Future
-from distributed.utils_test import inc, double, gen_test, gen_cluster
-from distributed.utils import tmpfile
-from tornado import gen
-from tornado.queues import Queue
+from distributed.utils_test import inc, gen_cluster
 
-from ..core import *
+from streams.core import Stream
 import streams.dask as ds
-from ..sources import *
 
 
 @gen_cluster(client=True)
