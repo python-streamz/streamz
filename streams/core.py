@@ -12,6 +12,10 @@ from tornado.queues import Queue
 no_default = '--no-default--'
 
 
+def identity(x):
+    return x
+
+
 class Stream(object):
     """ A Stream is an infinite sequence of data
 
@@ -220,7 +224,7 @@ class Stream(object):
 
     flatten = concat
 
-    def unique(self, history=None):
+    def unique(self, history=None, key=identity):
         """ Avoid sending through repeated elements
 
         This deduplicates a stream so that only new elements pass through.
@@ -239,7 +243,7 @@ class Stream(object):
         1
         3
         """
-        return unique(self, history=history)
+        return unique(self, history=history, key=key)
 
     def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
@@ -522,8 +526,9 @@ class concat(Stream):
 
 
 class unique(Stream):
-    def __init__(self, child, history=None):
+    def __init__(self, child, history=None, key=identity):
         self.seen = dict()
+        self.key = key
         if history:
             from zict import LRU
             self.seen = LRU(history, self.seen)
@@ -531,6 +536,7 @@ class unique(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if x not in self.seen:
-            self.seen[x] = 1
+        y = self.key(x)
+        if y not in self.seen:
+            self.seen[y] = 1
             return self.emit(x)

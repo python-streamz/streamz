@@ -324,6 +324,19 @@ def test_unique():
     assert L == [1, 2]
 
 
+def test_unique_key():
+    source = Stream()
+    L = source.unique(key=lambda x: x % 2, history=1).sink_to_list()
+
+    source.emit(1)
+    source.emit(2)
+    source.emit(4)
+    source.emit(6)
+    source.emit(3)
+
+    assert L == [1, 2, 3]
+
+
 def test_unique_history():
     source = Stream()
     s = source.unique(history=2)
