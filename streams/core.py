@@ -1,4 +1,5 @@
 from collections import deque
+from functools import singledispatch
 from time import time
 
 import toolz
@@ -371,7 +372,7 @@ class map(Stream):
         if not self.raw and hasattr(x, '__stream_map__'):
             result = x.__stream_map__(self.func, **self.kwargs)
         else:
-            result = self.func(x, **self.kwargs)
+            result = stream_map(x, self.func, **self.kwargs)
 
         return self.emit(result)
 
@@ -396,17 +397,13 @@ class scan(Stream):
     def update(self, x, who=None):
         if hasattr(x, '__stream_reduce__'):
             self.state, result = x.__stream_reduce__(self.func, self.state)
-            if result is not no_default:
-                return self.emit(result)
-            else:
-                return []
-
-        if self.state is no_default:
-            self.state = x
         else:
-            result = self.func(self.state, x)
-            self.state = result
-            return self.emit(self.state)
+            self.state, result = stream_accumulate(x, self.func, self.state)
+
+        if result is not no_default:
+            return self.emit(result)
+        else:
+            return []
 
 
 class partition(Stream):
@@ -606,3 +603,17 @@ class collect(Stream):
         out = tuple(self.cache)
         self.emit(out)
         self.cache.clear()
+
+
+@singledispatch
+def stream_map(obj, func, **kwargs):
+    return func(obj, **kwargs)
+
+
+@singledispatch
+def stream_accumulate(obj, func, accumulator):
+    if accumulator is no_default:
+        return obj, no_default
+    else:
+        result = func(accumulator, obj)
+        return result, result

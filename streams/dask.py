@@ -3,23 +3,21 @@ from tornado.locks import Condition
 from tornado.queues import Queue
 from tornado import gen
 
-from .core import Stream, no_default
+from .core import Stream, no_default, stream_map, stream_accumulate
 
 
-def __stream_map__(self, func):
-    return self.client.submit(func, self)
+@stream_map.register(Future)
+def stream_map(future, func, **kwargs):
+    return future.client.submit(func, future, **kwargs)
 
 
-def __stream_reduce__(self, func, accumulator):
+@stream_accumulate.register(Future)
+def stream_accumulate(future, func, accumulator):
     if accumulator is not no_default:
-        result = self.client.submit(func, accumulator, self)
+        result = future.client.submit(func, accumulator, future)
         return result, result
     else:
-        return no_default, self
-
-
-Future.__stream_map__ = __stream_map__
-Future.__stream_reduce__ = __stream_reduce__
+        return no_default, future
 
 
 class scatter(Stream):

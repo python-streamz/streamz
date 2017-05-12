@@ -3,10 +3,13 @@ try:
 except ImportError:
     from toolz import accumulate
 
+import functools
 from .core import no_default
 
 class Batch(tuple):
-    def __stream_map__(self, func):
+    def __stream_map__(self, func, **kwargs):
+        if kwargs:
+            func = functools.partial(func, **kwargs)
         return Batch(map(func, self))
 
     def __stream_reduce__(self, func, accumulator):
