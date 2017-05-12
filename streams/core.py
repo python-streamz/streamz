@@ -394,13 +394,17 @@ class scan(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
+        if hasattr(x, '__stream_reduce__'):
+            self.state, result = x.__stream_reduce__(self.func, self.state)
+            if result is not no_default:
+                return self.emit(result)
+            else:
+                return []
+
         if self.state is no_default:
             self.state = x
         else:
-            if hasattr(x, '__stream_reduce__'):
-                result = x.__stream_reduce__(self.func, self.state)
-            else:
-                result = self.func(self.state, x)
+            result = self.func(self.state, x)
             self.state = result
             return self.emit(self.state)
 

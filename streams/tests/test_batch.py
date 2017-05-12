@@ -1,5 +1,8 @@
-from streams import Stream, Batch
 from operator import add
+
+import toolz
+
+from streams import Stream, Batch
 
 
 def inc(x):
@@ -18,9 +21,12 @@ def test_map():
 
 def test_accumulate():
     source = Stream()
-    L = source.partition(3).map(Batch).accumulate(add).sink_to_list()
+    L1 = source.partition(3).map(Batch).accumulate(add).sink_to_list()
+    L2 = source.accumulate(add).sink_to_list()
 
-    for i in range(10):
+    for i in range(9):
         source.emit(i)
 
-    assert L == [(1, 2), (3, 4, 6), (7, 8, 9)]
+    assert all(isinstance(x, tuple) for x in L1)
+
+    assert list(toolz.concat(L1))== L2

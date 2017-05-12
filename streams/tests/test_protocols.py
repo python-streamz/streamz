@@ -1,6 +1,7 @@
 from operator import add
 
 from streams import Stream
+from streams.core import no_default
 
 
 def inc(x):
@@ -15,7 +16,11 @@ class Foo(object):
         return Foo(func(self.data))
 
     def __stream_reduce__(self, func, accumulator):
-        return Foo(func(accumulator.data, self.data))
+        if accumulator is no_default:
+            return self, no_default
+        else:
+            result = Foo(func(accumulator.data, self.data))
+            return result, result
 
     def __stream_merge__(self, *others):
         return Foo((self.data,) + tuple(o.data for o in others))

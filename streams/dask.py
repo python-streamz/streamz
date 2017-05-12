@@ -3,15 +3,19 @@ from tornado.locks import Condition
 from tornado.queues import Queue
 from tornado import gen
 
-from .core import Stream
+from .core import Stream, no_default
 
 
 def __stream_map__(self, func):
-    return default_client().submit(func, self)
+    return self.client.submit(func, self)
 
 
 def __stream_reduce__(self, func, accumulator):
-    return default_client().submit(func, accumulator, self)
+    if accumulator is not no_default:
+        result = self.client.submit(func, accumulator, self)
+        return result, result
+    else:
+        return no_default, self
 
 
 Future.__stream_map__ = __stream_map__
