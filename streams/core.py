@@ -395,8 +395,8 @@ class scan(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if hasattr(x, '__stream_reduce__'):
-            self.state, result = x.__stream_reduce__(self.func, self.state)
+        if hasattr(x, '__stream_accumulate__'):
+            self.state, result = x.__stream_accumulate__(self.func, self.state)
         else:
             self.state, result = stream_accumulate(x, self.func, self.state)
 

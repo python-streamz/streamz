@@ -12,7 +12,7 @@ class Batch(tuple):
             func = functools.partial(func, **kwargs)
         return Batch(map(func, self))
 
-    def __stream_reduce__(self, func, accumulator):
+    def __stream_accumulate__(self, func, accumulator):
         if accumulator is not no_default:
             seq = accumulate(func, self, accumulator)
         else:

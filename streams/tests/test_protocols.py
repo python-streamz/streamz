@@ -15,7 +15,7 @@ class Foo(object):
     def __stream_map__(self, func):
         return Foo(func(self.data))
 
-    def __stream_reduce__(self, func, accumulator):
+    def __stream_accumulate__(self, func, accumulator):
         if accumulator is no_default:
             return self, no_default
         else:
