@@ -1,5 +1,5 @@
 from collections import deque
-from functools import singledispatch
+from functools import singledispatch, partial
 from time import time
 
 import toolz
@@ -369,12 +369,10 @@ class map(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if not self.raw and hasattr(x, '__stream_map__'):
-            result = x.__stream_map__(self.func, **self.kwargs)
-        else:
-            result = stream_map(x, self.func, **self.kwargs)
+        if self.raw:
+            return self.emit(self.func(x, **self.kwargs))
 
-        return self.emit(result)
+        return self.emit(_stream_map(x, self.func, **self.kwargs))
 
 
 class filter(Stream):
@@ -605,9 +603,24 @@ class collect(Stream):
         self.cache.clear()
 
 
+def _stream_map(obj, func=None, **kwargs):
+    if hasattr(obj, '__stream_map__'):
+        return obj.__stream_map__(partial(_stream_map, func=func), **kwargs)
+    else:
+        sm = stream_map.dispatch(type(obj))
+        if sm is base_stream_map:
+            return func(obj, **kwargs)
+        else:
+            return sm(obj, partial(_stream_map, func=func), **kwargs)
+
+
+
 @singledispatch
 def stream_map(obj, func, **kwargs):
     return func(obj, **kwargs)
+
+
+base_stream_map = stream_map.dispatch(object)
 
 
 @singledispatch
