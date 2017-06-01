@@ -348,11 +348,11 @@ class Stream(StreamBase):
         return self.scan(update_frequencies, start={})
 
 
-class Sink(StreamBase):
+class Sink(Stream):
     def __init__(self, func, child):
         self.func = func
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         result = self.func(x)
@@ -362,13 +362,13 @@ class Sink(StreamBase):
             return []
 
 
-class map(StreamBase):
+class map(Stream):
     def __init__(self, func, child, raw=False, **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.raw = raw
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         if not self.raw and hasattr(x, '__stream_map__'):
@@ -379,22 +379,22 @@ class map(StreamBase):
         return self.emit(result)
 
 
-class filter(StreamBase):
+class filter(Stream):
     def __init__(self, predicate, child):
         self.predicate = predicate
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         if self.predicate(x):
             return self.emit(x)
 
 
-class scan(StreamBase):
+class scan(Stream):
     def __init__(self, func, child, start=no_default):
         self.func = func
         self.state = start
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         if self.state is no_default:
@@ -408,11 +408,11 @@ class scan(StreamBase):
             return self.emit(self.state)
 
 
-class partition(StreamBase):
+class partition(Stream):
     def __init__(self, n, child):
         self.n = n
         self.buffer = []
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -423,11 +423,11 @@ class partition(StreamBase):
             return []
 
 
-class sliding_window(StreamBase):
+class sliding_window(Stream):
     def __init__(self, n, child):
         self.n = n
         self.buffer = deque(maxlen=n)
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -437,13 +437,13 @@ class sliding_window(StreamBase):
             return []
 
 
-class timed_window(StreamBase):
+class timed_window(Stream):
     def __init__(self, interval, child, loop=None):
         self.interval = interval
         self.buffer = []
         self.last = gen.moment
 
-        StreamBase.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop)
 
         self.loop.add_callback(self.cb)
 
@@ -460,12 +460,12 @@ class timed_window(StreamBase):
             yield gen.sleep(self.interval)
 
 
-class delay(StreamBase):
+class delay(Stream):
     def __init__(self, interval, child, loop=None):
         self.interval = interval
         self.queue = Queue()
 
-        StreamBase.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop)
 
         self.loop.add_callback(self.cb)
 
@@ -483,12 +483,12 @@ class delay(StreamBase):
         return self.queue.put(x)
 
 
-class rate_limit(StreamBase):
+class rate_limit(Stream):
     def __init__(self, interval, child):
         self.interval = interval
         self.next = 0
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     @gen.coroutine
     def update(self, x, who=None):
@@ -500,11 +500,11 @@ class rate_limit(StreamBase):
         yield self.emit(x)
 
 
-class buffer(StreamBase):
+class buffer(Stream):
     def __init__(self, n, child, loop=None):
         self.queue = Queue(maxsize=n)
 
-        StreamBase.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop)
 
         self.loop.add_callback(self.cb)
 
@@ -518,12 +518,12 @@ class buffer(StreamBase):
             yield self.emit(x)
 
 
-class zip(StreamBase):
+class zip(Stream):
     def __init__(self, *children, **kwargs):
         self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]
         self.condition = Condition()
-        StreamBase.__init__(self, children=children)
+        Stream.__init__(self, children=children)
 
     def update(self, x, who=None):
         L = self.buffers[self.children.index(who)]
@@ -538,11 +538,11 @@ class zip(StreamBase):
             return self.condition.wait()
 
 
-class combine_latest(StreamBase):
+class combine_latest(Stream):
     def __init__(self, *children):
         self.last = [None for _ in children]
         self.missing = set(children)
-        StreamBase.__init__(self, children=children)
+        Stream.__init__(self, children=children)
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
@@ -556,7 +556,7 @@ class combine_latest(StreamBase):
             return self.emit(tup)
 
 
-class concat(StreamBase):
+class concat(Stream):
     def update(self, x, who=None):
         L = []
         for item in x:
@@ -568,7 +568,7 @@ class concat(StreamBase):
         return L
 
 
-class unique(StreamBase):
+class unique(Stream):
     def __init__(self, child, history=None, key=identity):
         self.seen = dict()
         self.key = key
@@ -576,7 +576,7 @@ class unique(StreamBase):
             from zict import LRU
             self.seen = LRU(history, self.seen)
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         y = self.key(x)
@@ -585,18 +585,18 @@ class unique(StreamBase):
             return self.emit(x)
 
 
-class union(StreamBase):
+class union(Stream):
     def update(self, x, who=None):
         return self.emit(x)
 
 
-class collect(StreamBase):
+class collect(Stream):
     def __init__(self, child, cache=None):
         if cache is None:
             cache = deque()
         self.cache = cache
 
-        StreamBase.__init__(self, child)
+        Stream.__init__(self, child)
 
     def update(self, x, who=None):
         self.cache.append(x)
