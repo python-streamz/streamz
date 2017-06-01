@@ -605,13 +605,13 @@ class collect(Stream):
 
 def _stream_map(obj, func=None, **kwargs):
     if hasattr(obj, '__stream_map__'):
-        return obj.__stream_map__(wraps(func)(partial(_stream_map, func=func), **kwargs))
+        return obj.__stream_map__(wraps(func)(partial(_stream_map, func=func)), **kwargs)
     else:
         sm = stream_map.dispatch(type(obj))
         if sm is base_stream_map:
             return func(obj, **kwargs)
         else:
-            return sm(obj, wraps(func)(partial(_stream_map, func=func), **kwargs))
+            return sm(obj, wraps(func)(partial(_stream_map, func=func)), **kwargs)
 
 
 @singledispatch
