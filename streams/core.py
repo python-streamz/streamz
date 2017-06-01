@@ -15,7 +15,58 @@ def identity(x):
     return x
 
 
-class Stream(object):
+class StreamBase(object):
+    def __init__(self, child=None, children=None, **kwargs):
+        self.parents = []
+        if children is not None:
+            self.children = children
+        else:
+            self.children = [child]
+        if kwargs.get('loop'):
+            self._loop = kwargs.get('loop')
+        for child in self.children:
+            if child:
+                child.parents.append(self)
+
+    def emit(self, x):
+        """ Push data into the stream at this point
+
+        This is typically done only at source Streams but can theortically be
+        done at any point
+        """
+        result = []
+        for parent in self.parents:
+            r = parent.update(x, who=self)
+            if type(r) is list:
+                result.extend(r)
+            else:
+                result.append(r)
+        return [element for element in result if element is not None]
+
+    @property
+    def loop(self):
+        try:
+            return self._loop
+        except AttributeError:
+            pass
+        for child in self.children:
+            if child:
+                loop = self.child.loop
+                if loop:
+                    self._loop = loop
+                    return loop
+        self._loop = IOLoop.current()
+        return self._loop
+
+    @property
+    def child(self):
+        if len(self.children) != 1:
+            raise ValueError("Stream has multiple children")
+        else:
+            return self.children[0]
+
+
+class Stream(StreamBase):
     """ A Stream is an infinite sequence of data
 
     Streams subscribe to each other passing and transforming data between them.
@@ -47,54 +98,6 @@ class Stream(object):
     >>> L  # and the actions happen at the sinks
     ['1', '2', '3', '4', '5']
     """
-    def __init__(self, child=None, children=None, **kwargs):
-        self.parents = []
-        if children is not None:
-            self.children = children
-        else:
-            self.children = [child]
-        if kwargs.get('loop'):
-            self._loop = kwargs.get('loop')
-        for child in self.children:
-            if child:
-                child.parents.append(self)
-
-    def emit(self, x):
-        """ Push data into the stream at this point
-
-        This is typically done only at source Streams but can theortically be
-        done at any point
-        """
-        result = []
-        for parent in self.parents:
-            r = parent.update(x, who=self)
-            if type(r) is list:
-                result.extend(r)
-            else:
-                result.append(r)
-        return [element for element in result if element is not None]
-
-    @property
-    def child(self):
-        if len(self.children) != 1:
-            raise ValueError("Stream has multiple children")
-        else:
-            return self.children[0]
-
-    @property
-    def loop(self):
-        try:
-            return self._loop
-        except AttributeError:
-            pass
-        for child in self.children:
-            if child:
-                loop = self.child.loop
-                if loop:
-                    self._loop = loop
-                    return loop
-        self._loop = IOLoop.current()
-        return self._loop
 
     def map(self, func, **kwargs):
         """ Apply a function to every element in the stream """
