@@ -1,4 +1,5 @@
 from collections import deque
+from functools import singledispatch, partial, wraps
 from time import time
 
 import toolz
@@ -368,12 +369,10 @@ class map(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if not self.raw and hasattr(x, '__stream_map__'):
-            result = x.__stream_map__(self.func, **self.kwargs)
-        else:
-            result = self.func(x, **self.kwargs)
+        if self.raw:
+            return self.emit(self.func(x, **self.kwargs))
 
-        return self.emit(result)
+        return self.emit(_stream_map(x, self.func, **self.kwargs))
 
 
 class filter(Stream):
@@ -394,15 +393,15 @@ class scan(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if self.state is no_default:
-            self.state = x
+        if hasattr(x, '__stream_accumulate__'):
+            self.state, result = x.__stream_accumulate__(self.func, self.state)
         else:
-            if hasattr(x, '__stream_reduce__'):
-                result = x.__stream_reduce__(self.func, self.state)
-            else:
-                result = self.func(self.state, x)
-            self.state = result
-            return self.emit(self.state)
+            self.state, result = stream_accumulate(x, self.func, self.state)
+
+        if result is not no_default:
+            return self.emit(result)
+        else:
+            return []
 
 
 class partition(Stream):
@@ -602,3 +601,31 @@ class collect(Stream):
         out = tuple(self.cache)
         self.emit(out)
         self.cache.clear()
+
+
+def _stream_map(obj, func=None, **kwargs):
+    if hasattr(obj, '__stream_map__'):
+        return obj.__stream_map__(wraps(func)(partial(_stream_map, func=func), **kwargs))
+    else:
+        sm = stream_map.dispatch(type(obj))
+        if sm is base_stream_map:
+            return func(obj, **kwargs)
+        else:
+            return sm(obj, wraps(func)(partial(_stream_map, func=func), **kwargs))
+
+
+@singledispatch
+def stream_map(obj, func, **kwargs):
+    return func(obj, **kwargs)
+
+
+base_stream_map = stream_map.dispatch(object)
+
+
+@singledispatch
+def stream_accumulate(obj, func, accumulator):
+    if accumulator is no_default:
+        return obj, no_default
+    else:
+        result = func(accumulator, obj)
+        return result, result

@@ -2,8 +2,9 @@ from operator import add
 
 from distributed.client import Future
 from distributed.utils_test import inc, gen_cluster
+from tornado import gen
 
-from streams.core import Stream
+from streams import Stream, Batch
 import streams.dask as ds
 
 
@@ -61,3 +62,50 @@ def test_scan(c, s, a, b):
 
     results = yield c._gather(L)
     assert results == [0, 1, 3]
+
+
+@gen_cluster(client=True)
+def test_batches(c, s, a, b):
+    source = Stream()
+    remote_batches = ds.scatter(source.partition(2).map(Batch))
+    local_batches = ds.gather(remote_batches.map(inc))
+    L = local_batches.flatten().sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    while len(L) < 3:
+        yield gen.sleep(0.01)
+
+    yield remote_batches.flush()
+    yield local_batches.flush()
+
+    assert L == list(map(inc, range(10)))
+
+
+@gen_cluster(client=True)
+def test_batch_future(c, s, a, b):
+    source = Stream()
+    L = source.map(inc).sink_to_list()
+    [future] = yield c._scatter([Batch([1, 2, 3])])
+
+    source.emit(future)
+
+    assert isinstance(L[0], Future)
+    result = yield c._gather(L[0])
+    assert result == (2, 3, 4)
+
+
+@gen_cluster(client=True)
+def test_future_batch(c, s, a, b):
+    source = Stream()
+    L = source.map(inc).sink_to_list()
+    futures = yield c._scatter([1, 2, 3])
+    batch = Batch(futures)
+
+    source.emit(batch)
+
+    assert isinstance(L[0], Batch)
+    assert isinstance(L[0][0], Future)
+    result = yield c._gather(list(L[0]))
+    assert result == [2, 3, 4]
