@@ -55,6 +55,20 @@ def test_map():
     assert L[0] == 11
 
 
+def test_starmap():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    source2 = Stream()
+    L = source.zip(source2).starmap(add).sink_to_list()
+
+    source.emit(1)
+    source2.emit(10)
+
+    assert L[0] == 11
+
+
 def test_remove():
     source = Stream()
     L = source.remove(lambda x: x % 2 == 0).sink_to_list()
