@@ -104,6 +104,10 @@ class Stream(object):
         """ Apply a function to every element in the stream """
         return starmap(func, self, **kwargs)
 
+    def dstarmap(self, func, **kwargs):
+        """ Apply a function to every element in the stream """
+        return dstarmap(func, self, **kwargs)
+
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
         return filter(predicate, self)
@@ -621,5 +625,22 @@ class starmap(Stream):
             result = x.__stream_map__(self.func, **self.kwargs)
         else:
             result = self.func(*x, **self.kwargs)
+
+        return self.emit(result)
+
+
+class dstarmap(Stream):
+    def __init__(self, func, child, raw=False, **kwargs):
+        self.func = func
+        self.kwargs = kwargs
+        self.raw = raw
+
+        Stream.__init__(self, child)
+
+    def update(self, x, who=None):
+        if not self.raw and hasattr(x, '__stream_map__'):
+            result = x.__stream_map__(self.func, **self.kwargs)
+        else:
+            result = self.func(**x, **self.kwargs)
 
         return self.emit(result)
