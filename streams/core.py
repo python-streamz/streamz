@@ -532,7 +532,7 @@ class combine_latest(Stream):
                 emit_on = (emit_on, )
             self.emit_on = emit_on
         else:
-            self.emit_on = list(range(len(children)))
+            self.emit_on = children
         Stream.__init__(self, children=children)
 
     def update(self, x, who=None):
