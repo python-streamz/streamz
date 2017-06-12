@@ -291,10 +291,11 @@ def test_combine_latest():
 
     assert L == [(2, 'a'), (3, 'a'), (3, 'b')]
 
+
 def test_combine_latest_emit_on():
     a = Stream()
     b = Stream()
-    c = a.combine_latest(b, emit_on=0)
+    c = a.combine_latest(b, emit_on=a)
 
     L = c.sink_to_list()
 

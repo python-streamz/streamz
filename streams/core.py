@@ -540,7 +540,7 @@ class combine_latest(Stream):
             self.missing.remove(who)
 
         self.last[self.children.index(who)] = x
-        if not self.missing and self.children.index(who) in self.emit_on:
+        if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
             return self.emit(tup)
 
