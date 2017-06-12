@@ -22,7 +22,7 @@ install:
   - python setup.py install
 
 script:
-  - coverage run py.test streams --verbose
+  - coverage run run_tests.py
   - flake8 streams
 
 after_success:
