@@ -404,15 +404,31 @@ def test_collect():
 
 
 def test_subclass():
+    class plusone(Stream):
+        def __init__(self, child, raw=False, **kwargs):
+            # Need to take child or children as kwarg
+            if child is None:
+                raise ValueError("Child cannot be None")
+            self.kwargs = kwargs
+            self.raw = raw
+
+            Stream.__init__(self, child)
+
+        def update(self, x, who=None):
+            # just emit 1
+            result = x + 1
+
+            return self.emit(result)
+
     class newStream(Stream):
-        def newmap(self, func, **kwargs):
-            return self.map(func, **kwargs)
+        def plusone(self, **kwargs):
+            return self.makestream(self, **kwargs, stream_method=plusone)
 
     L = list()
     s = newStream()
-    s2 = s.newmap(lambda x : x + 1)
+    s2 = s.plusone()
     s3 = s2.map(lambda x : x + 1)
-    s4 = s3.newmap(lambda x : x + 1)
+    s4 = s3.plusone()
     s4.map(L.append)
 
     s.emit(1)
@@ -422,14 +438,14 @@ def test_subclass():
 
     # test recursion
     class newStream2(newStream):
-        def newmap2(self, func, **kwargs):
-            return self.map(func, **kwargs)
+        def plusone2(self, **kwargs):
+            return self.makestream(self, **kwargs, stream_method=plusone)
 
     L = list()
     s = newStream2()
     s2 = s.map(lambda x : x + 1)
-    s3 = s2.newmap(lambda x : x + 1)
-    s4 = s3.newmap2(lambda x : x + 1)
+    s3 = s2.plusone()
+    s4 = s3.plusone2()
     s5 = s4.map(lambda x : x + 1)
     s5.map(L.append)
 

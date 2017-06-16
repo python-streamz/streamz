@@ -96,7 +96,7 @@ class StreamBase(object):
         self._loop = IOLoop.current()
         return self._loop
 
-    def _makestream(self, *args, **kwargs):
+    def makestream(self, *args, **kwargs):
         '''
             This is a wrapper to allow the dynamic creation of stream
             subclasses. The point of this is to allow dynamic subclassing.
@@ -127,16 +127,16 @@ class Stream(StreamBase):
         """ Apply a function to every element in the stream
             Should return a class constructor
         """
-        return self._makestream(func, self, stream_method=map, **kwargs)
+        return self.makestream(func, self, stream_method=map, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
-        return self._makestream(predicate, self, stream_method=filter)
+        return self.makestream(predicate, self, stream_method=filter)
 
     def remove(self, predicate):
         """ Only pass through elements for which the predicate returns False
         """
-        return self._makestream(lambda x: not predicate(x), self, stream_method=filter)
+        return self.makestream(lambda x: not predicate(x), self, stream_method=filter)
 
     def accumulate(self, func, start=no_default):
         """ Accumulate results with previous state
@@ -159,7 +159,7 @@ class Stream(StreamBase):
         10
         15
         """
-        return self._makestream(func, self, start=start, stream_method=scan)
+        return self.makestream(func, self, start=start, stream_method=scan)
 
     scan = accumulate
 
@@ -176,7 +176,7 @@ class Stream(StreamBase):
         (3, 4, 5)
         (6, 7, 8)
         """
-        return self._makestream(n, self, stream_method=partition)
+        return self.makestream(n, self, stream_method=partition)
 
     def sliding_window(self, n):
         """ Produce overlapping tuples of size n
@@ -194,7 +194,7 @@ class Stream(StreamBase):
         (4, 5, 6)
         (5, 6, 7)
         """
-        return self._makestream(n, self, stream_method=sliding_window)
+        return self.makestream(n, self, stream_method=sliding_window)
 
     def rate_limit(self, interval):
         """ Limit the flow of data
@@ -207,7 +207,7 @@ class Stream(StreamBase):
         interval: float
             Time in seconds
         """
-        return self._makestream(interval, self, stream_method=rate_limit)
+        return self.makestream(interval, self, stream_method=rate_limit)
 
     def buffer(self, n, loop=None):
         """ Allow results to pile up at this point in the stream
@@ -216,7 +216,7 @@ class Stream(StreamBase):
         This can help to smooth flow through the system when backpressure is
         applied.
         """
-        return self._makestream(n, self, loop=loop, stream_method=buffer)
+        return self.makestream(n, self, loop=loop, stream_method=buffer)
 
     def timed_window(self, interval, loop=None):
         """ Emit a tuple of collected results every interval
@@ -225,7 +225,7 @@ class Stream(StreamBase):
         seen so far.  This can help to batch data coming off of a high-volume
         stream.
         """
-        return self._makestream(interval, self, loop=loop, stream_method=timed_window)
+        return self.makestream(interval, self, loop=loop, stream_method=timed_window)
 
     def delay(self, interval, loop=None):
         """ Add a time delay to results """
@@ -237,7 +237,7 @@ class Stream(StreamBase):
         This will emit a new tuple of all of the most recent elements seen from
         any stream.
         """
-        return self._makestream(self, *others, stream_method=combine_latest)
+        return self.makestream(self, *others, stream_method=combine_latest)
 
     def concat(self):
         """ Flatten streams of lists or iterables into a stream of elements
@@ -256,7 +256,7 @@ class Stream(StreamBase):
         6
         7
         """
-        return self._makestream(self, stream_method=concat)
+        return self.makestream(self, stream_method=concat)
 
     flatten = concat
 
@@ -272,7 +272,7 @@ class Stream(StreamBase):
         Stream.zip
         Stream.combine_latest
         """
-        return self._makestream(children=(self,) + others, stream_method=union)
+        return self.makestream(children=(self,) + others, stream_method=union)
 
     def unique(self, history=None, key=identity):
         """ Avoid sending through repeated elements
@@ -293,7 +293,7 @@ class Stream(StreamBase):
         1
         3
         """
-        return self._makestream(self, history=history, key=key, stream_method=unique)
+        return self.makestream(self, history=history, key=key, stream_method=unique)
 
     def collect(self, cache=None):
         """
@@ -312,11 +312,11 @@ class Stream(StreamBase):
         ...
         [1, 2]
         """
-        return self._makestream(self, cache=cache, stream_method=collect)
+        return self.makestream(self, cache=cache, stream_method=collect)
 
     def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
-        return self._makestream(self, *other, stream_method=zip)
+        return self.makestream(self, *other, stream_method=zip)
 
     def to_dask(self):
         """ Convert to a Dask Stream
@@ -326,7 +326,7 @@ class Stream(StreamBase):
         Dask Client running
         """
         from .dask import DaskStream
-        return self._makestream(self, stream_method=DaskStream)
+        return self.makestream(self, stream_method=DaskStream)
 
     def sink(self, func):
         """ Apply a function on every element
@@ -348,7 +348,7 @@ class Stream(StreamBase):
         --------
         Stream.sink_to_list
         """
-        return self._makestream(func, self, stream_method=Sink)
+        return self.makestream(func, self, stream_method=Sink)
 
     def sink_to_list(self):
         """ Append all elements of a stream to a list as they come in
@@ -363,7 +363,7 @@ class Stream(StreamBase):
         [0, 10, 20, 30, 40]
         """
         L = []
-        self._makestream(L.append, self, stream_method=Sink)
+        self.makestream(L.append, self, stream_method=Sink)
         return L
 
     def frequencies(self):
