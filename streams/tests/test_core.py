@@ -401,3 +401,55 @@ def test_collect():
 
     source2.emit('anything')
     assert L == [(1, 2), (), (3,)]
+
+
+def test_subclass():
+    class plusone(Stream):
+        def __init__(self, child, raw=False, **kwargs):
+            # Need to take child or children as kwarg
+            if child is None:
+                raise ValueError("Child cannot be None")
+            self.kwargs = kwargs
+            self.raw = raw
+
+            Stream.__init__(self, child)
+
+        def update(self, x, who=None):
+            # just emit 1
+            result = x + 1
+
+            return self.emit(result)
+
+    class newStream(Stream):
+        def plusone(self, **kwargs):
+            return self.makestream(self, **kwargs, stream_method=plusone)
+
+    L = list()
+    s = newStream()
+    s2 = s.plusone()
+    s3 = s2.map(lambda x : x + 1)
+    s4 = s3.plusone()
+    s4.map(L.append)
+
+    s.emit(1)
+    s.emit(1)
+    print(L)
+    assert (L == [4,4])
+
+    # test recursion
+    class newStream2(newStream):
+        def plusone2(self, **kwargs):
+            return self.makestream(self, **kwargs, stream_method=plusone)
+
+    L = list()
+    s = newStream2()
+    s2 = s.map(lambda x : x + 1)
+    s3 = s2.plusone()
+    s4 = s3.plusone2()
+    s5 = s4.map(lambda x : x + 1)
+    s5.map(L.append)
+
+    s.emit(1)
+    s.emit(1)
+    print(L)
+    assert (L == [5,5])
