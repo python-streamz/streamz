@@ -401,3 +401,39 @@ def test_collect():
 
     source2.emit('anything')
     assert L == [(1, 2), (), (3,)]
+
+
+def test_subclass():
+    class newStream(Stream):
+        def newmap(self, func, **kwargs):
+            return self.map(func, **kwargs)
+
+    L = list()
+    s = newStream()
+    s2 = s.newmap(lambda x : x + 1)
+    s3 = s2.map(lambda x : x + 1)
+    s4 = s3.newmap(lambda x : x + 1)
+    s4.map(L.append)
+
+    s.emit(1)
+    s.emit(1)
+    print(L)
+    assert (L == [4,4])
+
+    # test recursion
+    class newStream2(newStream):
+        def newmap2(self, func, **kwargs):
+            return self.map(func, **kwargs)
+
+    L = list()
+    s = newStream2()
+    s2 = s.map(lambda x : x + 1)
+    s3 = s2.newmap(lambda x : x + 1)
+    s4 = s3.newmap2(lambda x : x + 1)
+    s5 = s4.map(lambda x : x + 1)
+    s5.map(L.append)
+
+    s.emit(1)
+    s.emit(1)
+    print(L)
+    assert (L == [5,5])

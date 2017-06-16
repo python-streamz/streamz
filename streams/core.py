@@ -15,7 +15,7 @@ def identity(x):
     return x
 
 
-class Stream(object):
+class StreamBase(object):
     """ A Stream is an infinite sequence of data
 
     Streams subscribe to each other passing and transforming data between them.
@@ -96,9 +96,26 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
+
+class Stream(StreamBase):
     def map(self, func, **kwargs):
-        """ Apply a function to every element in the stream """
-        return map(func, self, **kwargs)
+        """ Apply a function to every element in the stream
+            Should return a class constructor
+        """
+        name = "map"
+        # this always strips off the top class
+        bases = self.__class__.__mro__
+        # differentiate a mapped class from base through def of update function
+        if hasattr(self, "update"):
+            bases = bases[1:]
+        # needs to be tuple for type
+        bases = tuple(bases)
+        # get the map class methods
+        dct = map.__dict__.copy()
+        # dynamically create new class
+        newcls = type(name, bases, dct)
+
+        return newcls(func, self, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -360,7 +377,10 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, raw=False, **kwargs):
+    def __init__(self, func, child=None, raw=False, **kwargs):
+        # Need to take child or children as kwarg
+        if child is None:
+            raise ValueError("Child cannot be None")
         self.func = func
         self.kwargs = kwargs
         self.raw = raw
