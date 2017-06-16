@@ -103,7 +103,7 @@ class StreamBase(object):
         '''
         stream_method = kwargs.pop('stream_method', None)
         if stream_method is None:
-            raise ValueError("Stream Method does not exist")
+            raise ValueError("Need to specify stream_method kwarg")
 
         name = stream_method.__name__
 
