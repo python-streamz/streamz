@@ -128,7 +128,6 @@ class Stream(object):
         3
         6
         10
-        15
         """
         return scan(func, self, start=start, returns_state=returns_state)
 
