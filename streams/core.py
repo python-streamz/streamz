@@ -109,7 +109,7 @@ class Stream(object):
         """
         return filter(lambda x: not predicate(x), self)
 
-    def accumulate(self, func, start=no_default):
+    def accumulate(self, func, start=no_default, returns_state=False):
         """ Accumulate results with previous state
 
         This preforms running or cumulative reductions, applying the function
@@ -130,7 +130,7 @@ class Stream(object):
         10
         15
         """
-        return scan(func, self, start=start)
+        return scan(func, self, start=start, returns_state=returns_state)
 
     scan = accumulate
 
@@ -375,9 +375,10 @@ class filter(Stream):
 
 
 class scan(Stream):
-    def __init__(self, func, child, start=no_default):
+    def __init__(self, func, child, start=no_default, returns_state=False):
         self.func = func
         self.state = start
+        self.returns_state = returns_state
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
@@ -385,8 +386,12 @@ class scan(Stream):
             self.state = x
         else:
             result = self.func(self.state, x)
-            self.state = result
-            return self.emit(self.state)
+            if self.returns_state:
+                state, result = result
+            else:
+                state = result
+            self.state = state
+            return self.emit(result)
 
 
 class partition(Stream):
