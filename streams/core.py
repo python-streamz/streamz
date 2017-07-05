@@ -368,10 +368,7 @@ class map(Stream):
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if not self.raw and hasattr(x, '__stream_map__'):
-            result = x.__stream_map__(self.func, **self.kwargs)
-        else:
-            result = self.func(x, **self.kwargs)
+        result = self.func(x, **self.kwargs)
 
         return self.emit(result)
 
@@ -397,10 +394,7 @@ class scan(Stream):
         if self.state is no_default:
             self.state = x
         else:
-            if hasattr(x, '__stream_reduce__'):
-                result = x.__stream_reduce__(self.func, self.state)
-            else:
-                result = self.func(self.state, x)
+            result = self.func(self.state, x)
             self.state = result
             return self.emit(self.state)
 
@@ -528,8 +522,6 @@ class zip(Stream):
         if len(L) == 1 and all(self.buffers):
             tup = tuple(buf.popleft() for buf in self.buffers)
             self.condition.notify_all()
-            if tup and hasattr(tup[0], '__stream_merge__'):
-                tup = tup[0].__stream_merge__(*tup[1:])
             return self.emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
@@ -548,8 +540,6 @@ class combine_latest(Stream):
         self.last[self.children.index(who)] = x
         if not self.missing:
             tup = tuple(self.last)
-            if tup and hasattr(tup[0], '__stream_merge__'):
-                tup = tup[0].__stream_merge__(*tup[1:])
             return self.emit(tup)
 
 
