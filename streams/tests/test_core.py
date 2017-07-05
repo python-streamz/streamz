@@ -1,4 +1,5 @@
 from datetime import timedelta
+import operator
 from operator import add
 from time import time
 
@@ -65,6 +66,13 @@ def test_map():
     source.emit(1)
 
     assert L[0] == 11
+
+
+def test_map_args():
+    source = Stream()
+    L = source.map(operator.add, 10).sink_to_list()
+    source.emit(1)
+    assert L == [11]
 
 
 def test_remove():

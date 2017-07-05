@@ -96,9 +96,9 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
-    def map(self, func, **kwargs):
+    def map(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream """
-        return map(func, self, **kwargs)
+        return map(func, self, args=args, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -350,15 +350,16 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, raw=False, **kwargs):
+    def __init__(self, func, child, raw=False, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.raw = raw
+        self.args = args
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        result = self.func(x, **self.kwargs)
+        result = self.func(x, *self.args, **self.kwargs)
 
         return self.emit(result)
 
