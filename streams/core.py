@@ -289,16 +289,6 @@ class Stream(object):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
 
-    def to_dask(self):
-        """ Convert to a Dask Stream
-
-        Operations like map and accumulate/scan on this stream will result in
-        Future objects running on a cluster.  You should have already started a
-        Dask Client running
-        """
-        from .dask import DaskStream
-        return DaskStream(self)
-
     def sink(self, func):
         """ Apply a function on every element
 
