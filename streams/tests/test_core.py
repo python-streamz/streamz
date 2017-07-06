@@ -35,6 +35,7 @@ def test_basic():
 
 def test_scan():
     source = Stream()
+
     def f(acc, i):
         acc = acc + i
         return acc, acc
