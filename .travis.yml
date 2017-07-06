@@ -16,7 +16,7 @@ install:
   - conda update conda
 
   # Install dependencies
-  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 distributed
+  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 zict
   - source activate test-streams
 
   - python setup.py install

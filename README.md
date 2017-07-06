@@ -98,22 +98,6 @@ http://github.com/pricing
 This was not an intentional feature of the system.  It just fell out from the
 design.
 
-Dask
-----
-
-Everything above runs with normal Python in the main thread or optionally in a
-Tornado event loop.  Alternatively this library plays well with Dask.  You can
-scatter data to the cluster, map and scan things up there, gather back, etc..
-
-```python
-source.to_dask()
-      .scatter()
-      .map(func)   # Runs on a cluster
-      .scan(func)  # Runs on a cluster
-      .gather()
-      .sink(...)
-```
-
 Less Trivial Example
 --------------------
 
@@ -124,11 +108,9 @@ output = open('out')
 s = source.map(json.loads)        # Parse lines of JSON data
           .timed_window(0.050)    # Collect data into into 50ms batches
           .filter(len)            # Remove any batches that didn't have data
-          .to_dask().scatter()    # Send to cluster
           .map(pd.DataFrame)      # Convert to pandas dataframes on the cluster
           .map(pd.DataFrame.sum)  # Sum rows of each batch on the custer
           .scan(add)              # Maintain running sum of all data on the cluster
-          .gather()               # Collect results back to local machine
           .map(str)               # Convert to string
           .sink(output.write)     # Write to file
 
@@ -160,13 +142,3 @@ grow if use cases arrive.  Here are some obvious things that are missing:
     through operations like map
 4.  Multi-stream operations like zip and joins
 5.  More APIs for common endpoints like Kafka
-
-
-Some things I like
-------------------
-
-1.  It's small
-2.  It scales down and is very lightweight.  Common operations can be used
-    without concurrency, without event loops, without Dask.  Nothing but pure
-    Python.
-3.  I think that it can probably combine well with Dask to do very large things

@@ -7,8 +7,3 @@ A minimal streaming system.
 
 .. autoclass:: Stream
    :members:
-
-.. currentmodule:: streams.dask
-
-.. autoclass:: DaskStream
-   :members:

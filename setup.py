@@ -11,7 +11,7 @@ setup(name='streams',
       maintainer='Matthew Rocklin',
       maintainer_email='mrocklin@gmail.com',
       license='BSD',
-      keywords='streams,dask',
+      keywords='streams',
       packages=['streams'],
       long_description=(open('README.rst').read() if exists('README.rst')
                         else ''),
