@@ -4,8 +4,6 @@ from time import time
 
 import pytest
 
-from distributed.utils_test import inc, double, gen_test
-from distributed.utils import tmpfile
 from tornado import gen
 from tornado.queues import Queue
 from tornado.ioloop import IOLoop
@@ -14,6 +12,7 @@ import streams as s
 
 from ..core import Stream
 from streams.sources import sink_to_file, Counter
+from streams.utils_test import inc, double, gen_test, tmpfile
 
 
 def test_basic():
