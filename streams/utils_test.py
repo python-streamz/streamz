@@ -1,9 +1,11 @@
 from contextlib import contextmanager
 import os
+import shutil
 import tempfile
 
 from tornado import gen
 from tornado.ioloop import IOLoop
+
 
 @contextmanager
 def tmpfile(extension=''):
@@ -63,4 +65,3 @@ def gen_test(timeout=10):
                     loop.stop()
         return test_func
     return _
-
