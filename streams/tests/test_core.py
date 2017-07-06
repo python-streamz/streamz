@@ -1,4 +1,5 @@
 from datetime import timedelta
+import operator
 from operator import add
 from time import time
 
@@ -32,6 +33,20 @@ def test_basic():
     assert Lb == [0, 2, 4, 6]
 
 
+def test_scan():
+    source = Stream()
+
+    def f(acc, i):
+        acc = acc + i
+        return acc, acc
+
+    L = source.scan(f, returns_state=True).sink_to_list()
+    for i in range(3):
+        source.emit(i)
+
+    assert L == [1, 3]
+
+
 def test_filter():
     source = Stream()
     L = source.filter(lambda x: x % 2 == 0).sink_to_list()
@@ -52,6 +67,13 @@ def test_map():
     source.emit(1)
 
     assert L[0] == 11
+
+
+def test_map_args():
+    source = Stream()
+    L = source.map(operator.add, 10).sink_to_list()
+    source.emit(1)
+    assert L == [11]
 
 
 def test_remove():

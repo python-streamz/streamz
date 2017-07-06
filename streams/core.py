@@ -96,9 +96,9 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
-    def map(self, func, **kwargs):
+    def map(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream """
-        return map(func, self, **kwargs)
+        return map(func, self, args=args, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -109,7 +109,7 @@ class Stream(object):
         """
         return filter(lambda x: not predicate(x), self)
 
-    def accumulate(self, func, start=no_default):
+    def accumulate(self, func, start=no_default, returns_state=False):
         """ Accumulate results with previous state
 
         This preforms running or cumulative reductions, applying the function
@@ -130,7 +130,7 @@ class Stream(object):
         10
         15
         """
-        return scan(func, self, start=start)
+        return scan(func, self, start=start, returns_state=returns_state)
 
     scan = accumulate
 
@@ -350,15 +350,16 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, raw=False, **kwargs):
+    def __init__(self, func, child, raw=False, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.raw = raw
+        self.args = args
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        result = self.func(x, **self.kwargs)
+        result = self.func(x, *self.args, **self.kwargs)
 
         return self.emit(result)
 
@@ -375,9 +376,10 @@ class filter(Stream):
 
 
 class scan(Stream):
-    def __init__(self, func, child, start=no_default):
+    def __init__(self, func, child, start=no_default, returns_state=False):
         self.func = func
         self.state = start
+        self.returns_state = returns_state
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
@@ -385,8 +387,12 @@ class scan(Stream):
             self.state = x
         else:
             result = self.func(self.state, x)
-            self.state = result
-            return self.emit(self.state)
+            if self.returns_state:
+                state, result = result
+            else:
+                state = result
+            self.state = state
+            return self.emit(result)
 
 
 class partition(Stream):
