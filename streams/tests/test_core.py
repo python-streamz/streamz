@@ -1,11 +1,10 @@
 from datetime import timedelta
+import operator
 from operator import add
 from time import time
 
 import pytest
 
-from distributed.utils_test import inc, double, gen_test
-from distributed.utils import tmpfile
 from tornado import gen
 from tornado.queues import Queue
 from tornado.ioloop import IOLoop
@@ -14,6 +13,7 @@ import streams as s
 
 from ..core import Stream
 from streams.sources import sink_to_file, Counter
+from streams.utils_test import inc, double, gen_test, tmpfile
 
 
 def test_basic():
@@ -31,6 +31,20 @@ def test_basic():
 
     assert Lc == [3, 6, 10]
     assert Lb == [0, 2, 4, 6]
+
+
+def test_scan():
+    source = Stream()
+
+    def f(acc, i):
+        acc = acc + i
+        return acc, acc
+
+    L = source.scan(f, returns_state=True).sink_to_list()
+    for i in range(3):
+        source.emit(i)
+
+    assert L == [1, 3]
 
 
 def test_filter():
@@ -53,6 +67,13 @@ def test_map():
     source.emit(1)
 
     assert L[0] == 11
+
+
+def test_map_args():
+    source = Stream()
+    L = source.map(operator.add, 10).sink_to_list()
+    source.emit(1)
+    assert L == [11]
 
 
 def test_remove():

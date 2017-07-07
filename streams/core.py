@@ -96,9 +96,9 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
-    def map(self, func, **kwargs):
+    def map(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream """
-        return map(func, self, **kwargs)
+        return map(func, self, args=args, **kwargs)
 
     def filter(self, predicate):
         """ Only pass through elements that satisfy the predicate """
@@ -109,7 +109,7 @@ class Stream(object):
         """
         return filter(lambda x: not predicate(x), self)
 
-    def accumulate(self, func, start=no_default):
+    def accumulate(self, func, start=no_default, returns_state=False):
         """ Accumulate results with previous state
 
         This preforms running or cumulative reductions, applying the function
@@ -130,7 +130,7 @@ class Stream(object):
         10
         15
         """
-        return scan(func, self, start=start)
+        return scan(func, self, start=start, returns_state=returns_state)
 
     scan = accumulate
 
@@ -289,16 +289,6 @@ class Stream(object):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
 
-    def to_dask(self):
-        """ Convert to a Dask Stream
-
-        Operations like map and accumulate/scan on this stream will result in
-        Future objects running on a cluster.  You should have already started a
-        Dask Client running
-        """
-        from .dask import DaskStream
-        return DaskStream(self)
-
     def sink(self, func):
         """ Apply a function on every element
 
@@ -360,18 +350,16 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, raw=False, **kwargs):
+    def __init__(self, func, child, raw=False, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.raw = raw
+        self.args = args
 
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
-        if not self.raw and hasattr(x, '__stream_map__'):
-            result = x.__stream_map__(self.func, **self.kwargs)
-        else:
-            result = self.func(x, **self.kwargs)
+        result = self.func(x, *self.args, **self.kwargs)
 
         return self.emit(result)
 
@@ -388,21 +376,23 @@ class filter(Stream):
 
 
 class scan(Stream):
-    def __init__(self, func, child, start=no_default):
+    def __init__(self, func, child, start=no_default, returns_state=False):
         self.func = func
         self.state = start
+        self.returns_state = returns_state
         Stream.__init__(self, child)
 
     def update(self, x, who=None):
         if self.state is no_default:
             self.state = x
         else:
-            if hasattr(x, '__stream_reduce__'):
-                result = x.__stream_reduce__(self.func, self.state)
+            result = self.func(self.state, x)
+            if self.returns_state:
+                state, result = result
             else:
-                result = self.func(self.state, x)
-            self.state = result
-            return self.emit(self.state)
+                state = result
+            self.state = state
+            return self.emit(result)
 
 
 class partition(Stream):
@@ -528,8 +518,6 @@ class zip(Stream):
         if len(L) == 1 and all(self.buffers):
             tup = tuple(buf.popleft() for buf in self.buffers)
             self.condition.notify_all()
-            if tup and hasattr(tup[0], '__stream_merge__'):
-                tup = tup[0].__stream_merge__(*tup[1:])
             return self.emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
@@ -548,8 +536,6 @@ class combine_latest(Stream):
         self.last[self.children.index(who)] = x
         if not self.missing:
             tup = tuple(self.last)
-            if tup and hasattr(tup[0], '__stream_merge__'):
-                tup = tup[0].__stream_merge__(*tup[1:])
             return self.emit(tup)
 
 

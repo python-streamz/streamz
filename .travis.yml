@@ -16,7 +16,7 @@ install:
   - conda update conda
 
   # Install dependencies
-  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 distributed coverage codecov -c conda-forge
+  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov -c conda-forge
   - source activate test-streams
 
   - python setup.py install
