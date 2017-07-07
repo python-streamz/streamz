@@ -108,9 +108,9 @@ output = open('out')
 s = source.map(json.loads)        # Parse lines of JSON data
           .timed_window(0.050)    # Collect data into into 50ms batches
           .filter(len)            # Remove any batches that didn't have data
-          .map(pd.DataFrame)      # Convert to pandas dataframes on the cluster
-          .map(pd.DataFrame.sum)  # Sum rows of each batch on the custer
-          .scan(add)              # Maintain running sum of all data on the cluster
+          .map(pd.DataFrame)      # Convert to pandas dataframes
+          .map(pd.DataFrame.sum)  # Sum rows of each batch
+          .scan(add)              # Maintain running sum of all data
           .map(str)               # Convert to string
           .sink(output.write)     # Write to file
 
