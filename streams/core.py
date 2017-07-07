@@ -6,7 +6,7 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
-
+from collections import Iterable
 
 no_default = '--no-default--'
 
@@ -534,8 +534,10 @@ class combine_latest(Stream):
         self.last = [None for _ in children]
         self.missing = set(children)
         if emit_on is not None:
-            if not hasattr(emit_on, '__iter__'):
+            if not isinstance(emit_on, Iterable):
                 emit_on = (emit_on, )
+            emit_on = tuple(
+                children[x] if isinstance(x, int) else x for x in emit_on)
             self.emit_on = emit_on
         else:
             self.emit_on = children
