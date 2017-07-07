@@ -201,7 +201,7 @@ class Stream(object):
         """ Add a time delay to results """
         return delay(interval, self, loop=None)
 
-    def combine_latest(self, *others, emit_on=None):
+    def combine_latest(self, *others, **kwargs):
         """ Combine multiple streams together to a stream of tuples
 
         This will emit a new tuple of all of the most recent elements seen from
@@ -214,6 +214,7 @@ class Stream(object):
             If None, emit on update from any stream
 
         """
+        emit_on = kwargs.pop('emit_on', None)
         return combine_latest(self, *others, emit_on=emit_on)
 
     def concat(self):
