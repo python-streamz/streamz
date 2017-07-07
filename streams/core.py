@@ -214,8 +214,7 @@ class Stream(object):
             If None, emit on update from any stream
 
         """
-        emit_on = kwargs.pop('emit_on', None)
-        return combine_latest(self, *others, emit_on=emit_on)
+        return combine_latest(self, *others, **kwargs)
 
     def concat(self):
         """ Flatten streams of lists or iterables into a stream of elements
@@ -531,7 +530,8 @@ class zip(Stream):
 
 
 class combine_latest(Stream):
-    def __init__(self, *children, emit_on=None):
+    def __init__(self, *children, **kwargs):
+        emit_on = kwargs.pop('emit_on', None)
         self.last = [None for _ in children]
         self.missing = set(children)
         if emit_on is not None:

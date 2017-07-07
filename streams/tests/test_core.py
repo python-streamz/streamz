@@ -328,6 +328,7 @@ def test_combine_latest_emit_on_stream():
 
     assert L == [(2, 'a'), (3, 'a'), (4, 'b')]
 
+
 @gen_test()
 def test_zip_timeout():
     a = Stream()
