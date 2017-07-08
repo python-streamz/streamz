@@ -6,7 +6,7 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
-
+from collections import Iterable
 
 no_default = '--no-default--'
 
@@ -128,7 +128,6 @@ class Stream(object):
         3
         6
         10
-        15
         """
         return scan(func, self, start=start, returns_state=returns_state)
 
@@ -202,13 +201,20 @@ class Stream(object):
         """ Add a time delay to results """
         return delay(interval, self, loop=None)
 
-    def combine_latest(self, *others):
+    def combine_latest(self, *others, **kwargs):
         """ Combine multiple streams together to a stream of tuples
 
         This will emit a new tuple of all of the most recent elements seen from
         any stream.
+
+        Parameters
+        ---------------
+        emit_on : stream or list of streams or None
+            only emit upon update of the streams listed.
+            If None, emit on update from any stream
+
         """
-        return combine_latest(self, *others)
+        return combine_latest(self, *others, **kwargs)
 
     def concat(self):
         """ Flatten streams of lists or iterables into a stream of elements
@@ -524,9 +530,18 @@ class zip(Stream):
 
 
 class combine_latest(Stream):
-    def __init__(self, *children):
+    def __init__(self, *children, **kwargs):
+        emit_on = kwargs.pop('emit_on', None)
         self.last = [None for _ in children]
         self.missing = set(children)
+        if emit_on is not None:
+            if not isinstance(emit_on, Iterable):
+                emit_on = (emit_on, )
+            emit_on = tuple(
+                children[x] if isinstance(x, int) else x for x in emit_on)
+            self.emit_on = emit_on
+        else:
+            self.emit_on = children
         Stream.__init__(self, children=children)
 
     def update(self, x, who=None):
@@ -534,7 +549,7 @@ class combine_latest(Stream):
             self.missing.remove(who)
 
         self.last[self.children.index(who)] = x
-        if not self.missing:
+        if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
             return self.emit(tup)
 

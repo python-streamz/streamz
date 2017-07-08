@@ -280,8 +280,10 @@ def test_combine_latest():
     a = Stream()
     b = Stream()
     c = a.combine_latest(b)
+    d = a.combine_latest(b, emit_on=[a, b])
 
     L = c.sink_to_list()
+    L2 = d.sink_to_list()
 
     a.emit(1)
     a.emit(2)
@@ -290,6 +292,41 @@ def test_combine_latest():
     b.emit('b')
 
     assert L == [(2, 'a'), (3, 'a'), (3, 'b')]
+    assert L2 == [(2, 'a'), (3, 'a'), (3, 'b')]
+
+
+def test_combine_latest_emit_on():
+    a = Stream()
+    b = Stream()
+    c = a.combine_latest(b, emit_on=a)
+
+    L = c.sink_to_list()
+
+    a.emit(1)
+    b.emit('a')
+    a.emit(2)
+    a.emit(3)
+    b.emit('b')
+    a.emit(4)
+
+    assert L == [(2, 'a'), (3, 'a'), (4, 'b')]
+
+
+def test_combine_latest_emit_on_stream():
+    a = Stream()
+    b = Stream()
+    c = a.combine_latest(b, emit_on=0)
+
+    L = c.sink_to_list()
+
+    a.emit(1)
+    b.emit('a')
+    a.emit(2)
+    a.emit(3)
+    b.emit('b')
+    a.emit(4)
+
+    assert L == [(2, 'a'), (3, 'a'), (4, 'b')]
 
 
 @gen_test()
