@@ -356,10 +356,9 @@ class Sink(Stream):
 
 
 class map(Stream):
-    def __init__(self, func, child, raw=False, args=(), **kwargs):
+    def __init__(self, func, child, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
-        self.raw = raw
         self.args = args
 
         Stream.__init__(self, child)
