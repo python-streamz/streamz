@@ -459,3 +459,12 @@ def test_collect():
 
     source2.emit('anything')
     assert L == [(1, 2), (), (3,)]
+
+
+def test_map_str():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    s = source.map(add, y=10)
+    assert str(s) == 'map, add'

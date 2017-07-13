@@ -59,6 +59,13 @@ class Stream(object):
             if child:
                 child.parents.append(self)
 
+    def __str__(self):
+        s = self.__class__.__name__
+        for m in ['func', 'predicate']:
+            if hasattr(self, m):
+                s += ', {}'.format(getattr(self, m).__name__)
+        return s
+
     def emit(self, x):
         """ Push data into the stream at this point
 
