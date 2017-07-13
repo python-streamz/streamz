@@ -422,7 +422,7 @@ def test_subclass():
 
     class newStream(Stream):
         def plusone(self, **kwargs):
-            return self.makestream(self, **kwargs, stream_method=plusone)
+            return self.makestream(self, stream_method=plusone, **kwargs)
 
     L = list()
     s = newStream()
