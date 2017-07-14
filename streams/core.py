@@ -92,7 +92,10 @@ class Stream(object):
         s = self.__class__.__name__
         for m in ['func', 'predicate']:
             if hasattr(self, m):
-                s += ', {}'.format(getattr(self, m).__name__)
+                if hasattr(getattr(self, m), '__name__'):
+                    s += ', {}'.format(getattr(self, m).__name__)
+                elif hasattr(getattr(self, m).__class__, '__name__'):
+                    s += ', {}'.format(getattr(self, m).__class__.__name__)
         return s
 
     def emit(self, x):
