@@ -88,16 +88,6 @@ class Stream(object):
         s = "<" + s + ">"
         return s
 
-    def __str__(self):
-        s = self.__class__.__name__
-        for m in ['func', 'predicate']:
-            if hasattr(self, m):
-                if hasattr(getattr(self, m), '__name__'):
-                    s += ', {}'.format(getattr(self, m).__name__)
-                elif hasattr(getattr(self, m).__class__, '__name__'):
-                    s += ', {}'.format(getattr(self, m).__class__.__name__)
-        return s
-
     def emit(self, x):
         """ Push data into the stream at this point
 
