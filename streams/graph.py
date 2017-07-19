@@ -4,20 +4,6 @@ import matplotlib.pyplot as plt
 from networkx.drawing.nx_agraph import graphviz_layout
 
 
-def get_all_nodes(node, l):
-    if node is None:
-        return
-    t = hash(node)
-    if t in l:
-        return
-    l.append(t)
-    nodes = list(node.parents) + list(node.children)
-    for node2 in nodes:
-        tt = hash(node2)
-        if tt not in l:
-            get_all_nodes(node2, l)
-
-
 def create_graph(node, graph, prior_node=None, pc=None):
     """Create graph from a single node, searching up and down the chain
 
