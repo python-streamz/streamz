@@ -1,7 +1,13 @@
+from __future__ import absolute_import, division, print_function
+
+from operator import getitem
 
 from tornado import gen
+
 from distributed.client import default_client
+
 from . import core
+
 
 class DaskStream(core.Stream):
     def map(self, func, *args, **kwargs):
