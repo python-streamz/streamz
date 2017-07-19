@@ -56,7 +56,7 @@ def plot_graph(node, layout=graphviz_layout, file=None):
     for k, v in mapping.items():
         if v in idx_mapping.keys():
             idx_mapping[v] += 1
-            mapping[k] += ' {}'.format(idx_mapping[v])
+            mapping[k] += '-{}'.format(idx_mapping[v])
         else:
             idx_mapping[v] = 0
 
