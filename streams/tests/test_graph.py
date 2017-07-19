@@ -1,22 +1,9 @@
-from datetime import timedelta
-import operator
 from operator import add
-from time import time
 
-import pytest
-
-from tornado import gen
-from tornado.queues import Queue
-from tornado.ioloop import IOLoop
-
-import streams as s
+import networkx as nx
 
 from ..core import Stream
 from ..graph import create_graph
-from streams.sources import sink_to_file, Counter
-from streams.utils_test import inc, double, gen_test, tmpfile
-
-import networkx as nx
 
 
 def test_create_graph():
