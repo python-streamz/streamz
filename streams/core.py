@@ -62,7 +62,6 @@ class Stream(object):
             if child:
                 child.parents.append(self)
         self.name = name
-        self.name = name
 
     def __str__(self):
         s_list = []
