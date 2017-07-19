@@ -62,6 +62,7 @@ class Stream(object):
             if child:
                 child.parents.append(self)
         self.name = name
+        self.name = name
 
     def __str__(self):
         s_list = []
@@ -86,13 +87,6 @@ class Stream(object):
                 s_list.append('{}={}'.format(m, s))
         s = ": ".join(s_list)
         s = "<" + s + ">"
-        return s
-
-    def __str__(self):
-        s = self.__class__.__name__
-        for m in ['func', 'predicate']:
-            if hasattr(self, m):
-                s += ', {}'.format(getattr(self, m).__name__)
         return s
 
     def emit(self, x):
