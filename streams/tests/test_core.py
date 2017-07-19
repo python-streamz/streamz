@@ -467,4 +467,30 @@ def test_map_str():
 
     source = Stream()
     s = source.map(add, y=10)
-    assert str(s) == 'map, add'
+    assert str(s) == '<map: func=add>'
+
+
+def test_filter_str():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    s = source.filter(add)
+    assert str(s) == '<filter: predicate=add>'
+
+
+def test_timed_window_str():
+    source = Stream()
+    s = source.timed_window(.05)
+    assert str(s) == '<timed_window: interval=0.05>'
+
+
+def test_partition_str():
+    source = Stream()
+    s = source.partition(2)
+    assert str(s) == '<partition: n=2>'
+
+
+def test_stream_name_str():
+    source = Stream(name='this is not a stream')
+    assert str(source) == '<this is not a stream>'
