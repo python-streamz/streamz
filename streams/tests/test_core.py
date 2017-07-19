@@ -29,7 +29,7 @@ def test_basic():
     for i in range(4):
         source.emit(i)
 
-    assert Lc == [3, 6, 10]
+    assert Lc == [1, 3, 6, 10]
     assert Lb == [0, 2, 4, 6]
 
 
@@ -44,7 +44,7 @@ def test_scan():
     for i in range(3):
         source.emit(i)
 
-    assert L == [1, 3]
+    assert L == [0, 1, 3]
 
 
 def test_filter():
