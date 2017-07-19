@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import sys
 import pytest
-import os
 
 if __name__ == '__main__':
     # show output results from every test function
