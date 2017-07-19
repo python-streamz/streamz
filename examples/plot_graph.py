@@ -2,7 +2,9 @@ from streams import Stream
 from operator import add
 
 import networkx as nx
+import matplotlib.pyplot as plt
 from streams.graph import plot_graph
+
 source1 = Stream(name='source1')
 source2 = Stream(name='source2')
 source3 = Stream(name='awsome source')
@@ -14,3 +16,4 @@ L = n3.sink_to_list()
 
 plot_graph(n2, file='example_graph.png')
 plot_graph(n2, nx.spring_layout)
+plt.show()

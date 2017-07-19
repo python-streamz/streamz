@@ -1,6 +1,5 @@
 """Graphing utilities for EventStreams"""
 import networkx as nx
-import matplotlib.pyplot as plt
 from networkx.drawing.nx_agraph import graphviz_layout
 
 
@@ -56,5 +55,4 @@ def plot_graph(node, layout=graphviz_layout, file=None):
         nx.draw_networkx_labels(g, p, labels={k: g.node[k]['str'] for k in g})
         nx.draw_networkx_nodes(g, p, alpha=.3)
         nx.draw_networkx_edges(g, p)
-        plt.show()
     return g, gg
