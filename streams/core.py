@@ -7,6 +7,7 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
+from streams.graph import visualize
 
 no_default = '--no-default--'
 
@@ -369,6 +370,21 @@ class Stream(object):
 
         return self.scan(update_frequencies, start={})
 
+    def visualize(self, filename='mystream', format='png'):
+        """Render the computation of this object's task graph using graphviz.
+
+        Requires ``graphviz`` to be installed.
+
+        Parameters
+        ----------
+        node: Stream instance
+            A node in the task graph
+        filename : str, optional
+            The name (without an extension) of the file to write to disk.
+        format : {'png', 'pdf', 'dot', 'svg', 'jpeg', 'jpg'}, optional
+            Format in which to write output file.  Default is 'png'.
+        """
+        visualize(self, filename, format)
 
 class Sink(Stream):
     def __init__(self, func, child):

@@ -31,11 +31,24 @@ def create_graph(node, graph, prior_node=None, pc=None):
                 create_graph(node2, graph, node, pc=pc)
 
 
-def plot_graph(node, layout=graphviz_layout, file=None):
+def visualize(node, filename='mystream', format='png'):
+    """Render the computation of this object's task graph using graphviz.
+
+    Requires ``graphviz`` to be installed.
+
+    Parameters
+    ----------
+    node: Stream instance
+        A node in the task graph
+    filename : str, optional
+        The name (without an extension) of the file to write to disk.
+    format : {'png', 'pdf', 'dot', 'svg', 'jpeg', 'jpg'}, optional
+        Format in which to write output file.  Default is 'png'.
+    """
+
     g = nx.DiGraph()
     create_graph(node, g)
     create_graph(node, g)
-    p = layout(g)
     mapping = {k: '{}'.format(g.node[k]['str']) for k in g}
     idx_mapping = {}
     for k, v in mapping.items():
@@ -47,12 +60,6 @@ def plot_graph(node, layout=graphviz_layout, file=None):
 
     gg = {k: v for k, v in mapping.items()}
     rg = nx.relabel_nodes(g, gg, copy=True)
-    if file:
-        a = nx.nx_agraph.to_agraph(rg)
-        a.layout('dot')
-        a.draw(file)
-    else:
-        nx.draw_networkx_labels(g, p, labels={k: g.node[k]['str'] for k in g})
-        nx.draw_networkx_nodes(g, p, alpha=.3)
-        nx.draw_networkx_edges(g, p)
-    return g, gg
+    a = nx.nx_agraph.to_agraph(rg)
+    a.layout('dot')
+    a.draw(filename, format=format)
