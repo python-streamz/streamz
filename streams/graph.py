@@ -1,6 +1,5 @@
 """Graphing utilities for EventStreams"""
 import networkx as nx
-from networkx.drawing.nx_agraph import graphviz_layout
 
 
 def create_graph(node, graph, prior_node=None, pc=None):

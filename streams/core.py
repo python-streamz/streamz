@@ -386,6 +386,7 @@ class Stream(object):
         """
         visualize(self, filename, format)
 
+
 class Sink(Stream):
     def __init__(self, func, child):
         self.func = func
