@@ -10,7 +10,7 @@ source3 = Stream(name='awsome source')
 n1 = source1.zip(source2)
 n2 = n1.map(add)
 n3 = n2.zip(source3)
-n3.sink(source1.emit)
+L = n3.sink_to_list()
 
 plot_graph(n2, file='example_graph.png')
 plot_graph(n2, nx.spring_layout)
