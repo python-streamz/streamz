@@ -67,7 +67,7 @@ def to_graphviz(graph):
     return gvz
 
 
-def visualize(node, filename='mystream', format=None):
+def visualize(node, filename='mystream.png'):
     """
     Render a task graph using dot.
 
@@ -109,11 +109,11 @@ def visualize(node, filename='mystream', format=None):
     if filename is None:
         format = 'png'
 
-    if format is None and any(filename.lower().endswith(fmt) for fmt in fmts):
+    elif any(filename.lower().endswith(fmt) for fmt in fmts):
         filename, format = os.path.splitext(filename)
         format = format[1:].lower()
 
-    if format is None:
+    else:
         format = 'png'
 
     data = g.pipe(format=format)
