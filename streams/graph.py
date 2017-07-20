@@ -1,5 +1,9 @@
 """Graphing utilities for EventStreams"""
 import networkx as nx
+import graphviz
+import os
+
+from dask.dot import _get_display_cls
 
 
 def create_graph(node, graph, prior_node=None, pc=None):
@@ -30,17 +34,13 @@ def create_graph(node, graph, prior_node=None, pc=None):
                 create_graph(node2, graph, node, pc=pc)
 
 
-def visualize(node, filename='mystream.png'):
-    """Render the computation of this object's task graph using graphviz.
-
-    Requires ``graphviz`` to be installed.
+def readable_graph(node):
+    """Create human readable version of this object's task graph.
 
     Parameters
     ----------
     node: Stream instance
         A node in the task graph
-    filename : str, optional
-        The name of the file to write to disk.
     """
 
     g = nx.DiGraph()
@@ -56,7 +56,81 @@ def visualize(node, filename='mystream.png'):
 
     gg = {k: v for k, v in mapping.items()}
     rg = nx.relabel_nodes(g, gg, copy=True)
-    a = nx.nx_agraph.to_agraph(rg)
-    a.layout('dot')
-    extension = os.path.splitext(filename)[1]
-    a.draw(filename, format=extension)
+    return rg
+
+
+def to_graphviz(graph):
+    gvz = graphviz.Digraph()
+    for node in graph.nodes():
+        gvz.node(node)
+    gvz.edges(graph.edges())
+    return gvz
+
+
+def visualize(node, filename='mystream', format=None):
+    """
+    Render a task graph using dot.
+
+    If `filename` is not None, write a file to disk with that name in the
+    format specified by `format`.  `filename` should not include an extension.
+
+    Parameters
+    ----------
+    dsk : dict
+        The graph to display.
+    filename : str or None, optional
+        The name (without an extension) of the file to write to disk.  If
+        `filename` is None, no file will be written, and we communicate with
+        dot using only pipes.  Default is 'mydask'.
+    format : {'png', 'pdf', 'dot', 'svg', 'jpeg', 'jpg'}, optional
+        Format in which to write output file.  Default is 'png'.
+
+    Returns
+    -------
+    result : None or IPython.display.Image or IPython.display.SVG  (See below.)
+
+    Notes
+    -----
+    If IPython is installed, we return an IPython.display object in the
+    requested format.  If IPython is not installed, we just return None.
+
+    We always return None if format is 'pdf' or 'dot', because IPython can't
+    display these formats natively. Passing these formats with filename=None
+    will not produce any useful output.
+
+    See Also
+    --------
+    streams.graph.readable_graph
+    """
+    rg = readable_graph(node)
+    g = to_graphviz(rg)
+
+    fmts = ['.png', '.pdf', '.dot', '.svg', '.jpeg', '.jpg']
+    if filename is None:
+        format = 'png'
+
+    if format is None and any(filename.lower().endswith(fmt) for fmt in fmts):
+        filename, format = os.path.splitext(filename)
+        format = format[1:].lower()
+
+    if format is None:
+        format = 'png'
+
+    data = g.pipe(format=format)
+    if not data:
+        raise RuntimeError("Graphviz failed to properly produce an image. "
+                           "This probably means your installation of graphviz "
+                           "is missing png support. See: "
+                           "https://github.com/ContinuumIO/anaconda-issues/"
+                           "issues/485 for more information.")
+
+    display_cls = _get_display_cls(format)
+
+    if not filename:
+        return display_cls(data=data)
+
+    full_filename = '.'.join([filename, format])
+    with open(full_filename, 'wb') as f:
+        f.write(data)
+
+    return display_cls(filename=full_filename)

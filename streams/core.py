@@ -67,7 +67,7 @@ class Stream(object):
     def __str__(self):
         s_list = []
         if self.name:
-            s_list.append('{}: {}'.format(self.name, self.__class__.__name__))
+            s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
         else:
             s_list.append(self.__class__.__name__)
 
@@ -85,7 +85,7 @@ class Stream(object):
                     s = None
             if s:
                 s_list.append('{}={}'.format(m, s))
-        s = ": ".join(s_list)
+        s = "; ".join(s_list)
         s = "<" + s + ">"
         return s
 
