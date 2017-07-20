@@ -47,7 +47,6 @@ def visualize(node, filename='mystream', format='png'):
 
     g = nx.DiGraph()
     create_graph(node, g)
-    create_graph(node, g)
     mapping = {k: '{}'.format(g.node[k]['str']) for k in g}
     idx_mapping = {}
     for k, v in mapping.items():
