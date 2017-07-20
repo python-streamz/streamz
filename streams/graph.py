@@ -30,7 +30,7 @@ def create_graph(node, graph, prior_node=None, pc=None):
                 create_graph(node2, graph, node, pc=pc)
 
 
-def visualize(node, filename='mystream', format='png'):
+def visualize(node, filename='mystream.png'):
     """Render the computation of this object's task graph using graphviz.
 
     Requires ``graphviz`` to be installed.
@@ -40,9 +40,7 @@ def visualize(node, filename='mystream', format='png'):
     node: Stream instance
         A node in the task graph
     filename : str, optional
-        The name (without an extension) of the file to write to disk.
-    format : {'png', 'pdf', 'dot', 'svg', 'jpeg', 'jpg'}, optional
-        Format in which to write output file.  Default is 'png'.
+        The name of the file to write to disk.
     """
 
     g = nx.DiGraph()
@@ -60,4 +58,5 @@ def visualize(node, filename='mystream', format='png'):
     rg = nx.relabel_nodes(g, gg, copy=True)
     a = nx.nx_agraph.to_agraph(rg)
     a.layout('dot')
-    a.draw(filename + '.{}'.format(format), format=format)
+    extension = os.path.splitext(filename)[1]
+    a.draw(filename, format=extension)
