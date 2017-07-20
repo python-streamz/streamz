@@ -370,7 +370,7 @@ class Stream(object):
 
         return self.scan(update_frequencies, start={})
 
-    def visualize(self, filename='mystream.png'):
+    def visualize(self, filename='mystream.png', **kwargs):
         """Render the computation of this object's task graph using graphviz.
 
         Requires ``graphviz`` to be installed.
@@ -381,8 +381,10 @@ class Stream(object):
             A node in the task graph
         filename : str, optional
             The name of the file to write to disk.
+        kwargs:
+            Graph attributes to pass to graphviz like ``rankdir="LR"``
         """
-        return visualize(self, filename)
+        return visualize(self, filename, **kwargs)
 
 
 class Sink(Stream):

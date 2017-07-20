@@ -59,15 +59,15 @@ def readable_graph(node):
     return rg
 
 
-def to_graphviz(graph):
-    gvz = graphviz.Digraph()
+def to_graphviz(graph, **graph_attr):
+    gvz = graphviz.Digraph(graph_attr=graph_attr)
     for node in graph.nodes():
         gvz.node(node)
     gvz.edges(graph.edges())
     return gvz
 
 
-def visualize(node, filename='mystream.png'):
+def visualize(node, filename='mystream.png', **kwargs):
     """
     Render a task graph using dot.
 
@@ -103,7 +103,7 @@ def visualize(node, filename='mystream.png'):
     streams.graph.readable_graph
     """
     rg = readable_graph(node)
-    g = to_graphviz(rg)
+    g = to_graphviz(rg, **kwargs)
 
     fmts = ['.png', '.pdf', '.dot', '.svg', '.jpeg', '.jpg']
     if filename is None:

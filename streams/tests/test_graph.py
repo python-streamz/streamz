@@ -34,5 +34,13 @@ def test_create_file():
         assert os.path.exists(fn)
 
     with tmpfile(extension='svg') as fn:
-        n1.visualize(filename=fn)
+        n1.visualize(filename=fn, rankdir="LR")
         assert os.path.exists(fn)
+
+    with tmpfile(extension='dot') as fn:
+        n1.visualize(filename=fn, rankdir="LR")
+        with open(fn) as f:
+            text = f.read()
+
+        for word in ['rankdir', 'source1', 'source2', 'zip', 'map', 'add']:
+            assert word in text
