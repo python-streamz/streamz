@@ -60,4 +60,4 @@ def visualize(node, filename='mystream', format='png'):
     rg = nx.relabel_nodes(g, gg, copy=True)
     a = nx.nx_agraph.to_agraph(rg)
     a.layout('dot')
-    a.draw(filename, format=format)
+    a.draw(filename + '.{}'.format(format), format=format)
