@@ -18,6 +18,7 @@ install:
   # Install dependencies
   - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov dask distributed -c conda-forge
   - source activate test-streams
+  - pip install git+https://github.com/dask/distributed.git --upgrade --no-deps
 
   - python setup.py install
 

@@ -98,6 +98,10 @@ class Stream(object):
         self._loop = IOLoop.current()
         return self._loop
 
+    def scatter(self):
+        from .dask import scatter
+        return scatter(self)
+
     def map(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream """
         return map(func, self, args=args, **kwargs)

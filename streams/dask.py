@@ -52,6 +52,7 @@ class scan(DaskStream):
     def update(self, x, who=None):
         if self.state is core.no_default:
             self.state = x
+            return self.emit(self.state)
         else:
             client = default_client()
             result = client.submit(self.func, self.state, x)
@@ -72,7 +73,7 @@ class scatter(DaskStream):
     @gen.coroutine
     def update(self, x, who=None):
         client = default_client()
-        future = yield client.scatter(x)
+        future = yield client.scatter(x, asynchronous=True)
         yield self.emit(future)
 
 
@@ -81,7 +82,7 @@ class gather(core.Stream):
     @gen.coroutine
     def update(self, x, who=None):
         client = default_client()
-        result = yield client.gather(x)
+        result = yield client.gather(x, asynchronous=True)
         yield self.emit(result)
 
 

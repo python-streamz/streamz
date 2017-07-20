@@ -1,10 +1,13 @@
 from operator import add
 
+from tornado import gen
+
 from streams.dask import scatter
 from streams import Stream
 
-from distributed import Future
-from distributed.utils_test import gen_cluster, inc
+from distributed import Future, Client
+from distributed.utils import sync
+from distributed.utils_test import gen_cluster, inc, cluster, loop  # flake8: noqa
 
 
 @gen_cluster(client=True)
@@ -31,7 +34,7 @@ def test_scan(c, s, a, b):
     for i in range(5):
         yield source.emit(i)
 
-    assert L == [3, 6, 10, 15]
+    assert L == [1, 3, 6, 10, 15]
     assert all(isinstance(f, Future) for f in futures_L)
 
 
@@ -47,7 +50,7 @@ def test_scan_state(c, s, a, b):
     for i in range(3):
         yield source.emit(i)
 
-    assert L == [1, 3]
+    assert L == [0, 1, 3]
 
 
 @gen_cluster(client=True)
@@ -64,3 +67,19 @@ def test_zip(c, s, a, b):
     yield b.emit('b')
 
     assert L == [(1, 'a'), (2, 'b')]
+
+
+def test_sync(loop):
+    with cluster() as (s, [a, b]):
+        with Client(s['address'], loop=loop):  # flake8: noqa
+            source = Stream()
+            L = source.scatter().map(inc).gather().sink_to_list()
+
+            @gen.coroutine
+            def f():
+                for i in range(10):
+                    yield source.emit(i)
+
+            sync(loop, f)
+
+            assert L == list(map(inc, range(10)))
