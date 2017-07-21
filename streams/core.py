@@ -7,6 +7,7 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
+from streams.graph import visualize
 
 no_default = '--no-default--'
 
@@ -66,7 +67,7 @@ class Stream(object):
     def __str__(self):
         s_list = []
         if self.name:
-            s_list.append('{}: {}'.format(self.name, self.__class__.__name__))
+            s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
         else:
             s_list.append(self.__class__.__name__)
 
@@ -84,7 +85,7 @@ class Stream(object):
                     s = None
             if s:
                 s_list.append('{}={}'.format(m, s))
-        s = ": ".join(s_list)
+        s = "; ".join(s_list)
         s = "<" + s + ">"
         return s
 
@@ -368,6 +369,22 @@ class Stream(object):
             return toolz.assoc(last, x, last.get(x, 0) + 1)
 
         return self.scan(update_frequencies, start={})
+
+    def visualize(self, filename='mystream.png', **kwargs):
+        """Render the computation of this object's task graph using graphviz.
+
+        Requires ``graphviz`` to be installed.
+
+        Parameters
+        ----------
+        node: Stream instance
+            A node in the task graph
+        filename : str, optional
+            The name of the file to write to disk.
+        kwargs:
+            Graph attributes to pass to graphviz like ``rankdir="LR"``
+        """
+        return visualize(self, filename, **kwargs)
 
 
 class Sink(Stream):
