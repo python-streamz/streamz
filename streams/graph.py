@@ -1,6 +1,6 @@
 """Graphing utilities for EventStreams"""
-import networkx as nx
-import graphviz
+from __future__ import absolute_import, division, print_function
+
 import os
 
 from dask.dot import _get_display_cls
@@ -42,7 +42,7 @@ def readable_graph(node):
     node: Stream instance
         A node in the task graph
     """
-
+    import networkx as nx
     g = nx.DiGraph()
     create_graph(node, g)
     mapping = {k: '{}'.format(g.node[k]['str']) for k in g}
@@ -60,6 +60,7 @@ def readable_graph(node):
 
 
 def to_graphviz(graph, **graph_attr):
+    import graphviz
     gvz = graphviz.Digraph(graph_attr=graph_attr)
     for node in graph.nodes():
         gvz.node(node)
