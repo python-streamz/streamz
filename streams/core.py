@@ -9,6 +9,7 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
+from streams.graph import visualize
 
 no_default = '--no-default--'
 
@@ -49,7 +50,10 @@ class Stream(object):
     >>> L  # and the actions happen at the sinks
     ['1', '2', '3', '4', '5']
     """
-    def __init__(self, child=None, children=None, **kwargs):
+
+    str_list = ['func', 'predicate', 'n', 'interval']
+
+    def __init__(self, child=None, children=None, name=None, **kwargs):
         self.parents = []
         if children is not None:
             self.children = children
@@ -60,6 +64,32 @@ class Stream(object):
         for child in self.children:
             if child:
                 child.parents.append(self)
+        self.name = name
+
+    def __str__(self):
+        s_list = []
+        if self.name:
+            s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
+        else:
+            s_list.append(self.__class__.__name__)
+
+        for m in self.str_list:
+            s = ''
+            at = getattr(self, m, None)
+            if at:
+                if not callable(at):
+                    s = str(at)
+                elif hasattr(at, '__name__'):
+                    s = getattr(self, m).__name__
+                elif hasattr(at.__class__, '__name__'):
+                    s = getattr(self, m).__class__.__name__
+                else:
+                    s = None
+            if s:
+                s_list.append('{}={}'.format(m, s))
+        s = "; ".join(s_list)
+        s = "<" + s + ">"
+        return s
 
     def emit(self, x):
         """ Push data into the stream at this point
@@ -346,6 +376,22 @@ class Stream(object):
 
         return self.scan(update_frequencies, start={})
 
+    def visualize(self, filename='mystream.png', **kwargs):
+        """Render the computation of this object's task graph using graphviz.
+
+        Requires ``graphviz`` to be installed.
+
+        Parameters
+        ----------
+        node: Stream instance
+            A node in the task graph
+        filename : str, optional
+            The name of the file to write to disk.
+        kwargs:
+            Graph attributes to pass to graphviz like ``rankdir="LR"``
+        """
+        return visualize(self, filename, **kwargs)
+
 
 class Sink(Stream):
     def __init__(self, func, child):
@@ -396,6 +442,7 @@ class scan(Stream):
     def update(self, x, who=None):
         if self.state is no_default:
             self.state = x
+            return self.emit(x)
         else:
             result = self.func(self.state, x)
             if self.returns_state:

@@ -29,7 +29,7 @@ def test_basic():
     for i in range(4):
         source.emit(i)
 
-    assert Lc == [3, 6, 10]
+    assert Lc == [1, 3, 6, 10]
     assert Lb == [0, 2, 4, 6]
 
 
@@ -44,7 +44,7 @@ def test_scan():
     for i in range(3):
         source.emit(i)
 
-    assert L == [1, 3]
+    assert L == [0, 1, 3]
 
 
 def test_filter():
@@ -459,3 +459,38 @@ def test_collect():
 
     source2.emit('anything')
     assert L == [(1, 2), (), (3,)]
+
+
+def test_map_str():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    s = source.map(add, y=10)
+    assert str(s) == '<map; func=add>'
+
+
+def test_filter_str():
+    def add(x=0, y=0):
+        return x + y
+
+    source = Stream()
+    s = source.filter(add)
+    assert str(s) == '<filter; predicate=add>'
+
+
+def test_timed_window_str():
+    source = Stream()
+    s = source.timed_window(.05)
+    assert str(s) == '<timed_window; interval=0.05>'
+
+
+def test_partition_str():
+    source = Stream()
+    s = source.partition(2)
+    assert str(s) == '<partition; n=2>'
+
+
+def test_stream_name_str():
+    source = Stream(name='this is not a stream')
+    assert str(source) == '<this is not a stream; Stream>'
