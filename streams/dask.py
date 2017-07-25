@@ -3,7 +3,10 @@ from __future__ import absolute_import, division, print_function
 from operator import getitem
 
 from tornado import gen
+import threading
 
+import dask.distributed
+from distributed.utils import set_thread_state
 from distributed.client import default_client
 
 from . import core
@@ -26,6 +29,15 @@ class DaskStream(core.Stream):
     def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
+
+    def buffer(self, n, loop=None):
+        """ Allow results to pile up at this point in the stream
+
+        This allows results to buffer in place at various points in the stream.
+        This can help to smooth flow through the system when backpressure is
+        applied.
+        """
+        return buffer(n, self, loop=loop)
 
 
 class map(DaskStream):
@@ -71,20 +83,56 @@ class scatter(DaskStream):
     All elements flowing through the input will be scattered out to the cluster
     """
     @gen.coroutine
-    def update(self, x, who=None):
+    def _update(self, x, who=None):
         client = default_client()
         future = yield client.scatter(x, asynchronous=True)
         yield self.emit(future)
+
+    def update(self, x, who=None):
+        client = default_client()
+        return client.sync(self._update, x, who)
 
 
 class gather(core.Stream):
     """ Convert Dask stream to local Stream """
     @gen.coroutine
-    def update(self, x, who=None):
+    def _update(self, x, who=None):
         client = default_client()
         result = yield client.gather(x, asynchronous=True)
-        yield self.emit(result)
+        with set_thread_state(asynchronous=True):
+            result = self.emit(result)
+        yield result
+
+    def update(self, x, who=None):
+        client = default_client()
+        return client.sync(self._update, x, who)
 
 
 class zip(DaskStream, core.zip):
     pass
+
+
+class buffer(DaskStream):
+    def __init__(self, n, child, loop=None):
+        client = default_client()
+        self.queue = dask.distributed.Queue(maxsize=n, client=client)
+
+        core.Stream.__init__(self, child, loop=loop or client.loop)
+
+        self.loop.add_callback(self.cb)
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            x = yield self.queue.get(asynchronous=True)
+            with set_thread_state(asynchronous=True):
+                result = self.emit(x)
+            yield result
+
+    @gen.coroutine
+    def _update(self, x, who=None):
+        result = yield self.queue.put(x, asynchronous=True)
+        return result
+
+    def update(self, x, who=None):
+        return self.queue.put(x)

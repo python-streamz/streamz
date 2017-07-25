@@ -546,8 +546,9 @@ class rate_limit(Stream):
 
 
 class buffer(Stream):
+    Queue = Queue
     def __init__(self, n, child, loop=None):
-        self.queue = Queue(maxsize=n)
+        self.queue = self.Queue(maxsize=n)
 
         Stream.__init__(self, child, loop=loop)
 

@@ -1,4 +1,5 @@
 from operator import add
+import time
 
 from tornado import gen
 
@@ -7,7 +8,7 @@ from streams import Stream
 
 from distributed import Future, Client
 from distributed.utils import sync
-from distributed.utils_test import gen_cluster, inc, cluster, loop  # flake8: noqa
+from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # flake8: noqa
 
 
 @gen_cluster(client=True)
@@ -81,5 +82,64 @@ def test_sync(loop):
                     yield source.emit(i)
 
             sync(loop, f)
+
+            assert L == list(map(inc, range(10)))
+
+
+def test_sync_2(loop):
+    with cluster() as (s, [a, b]):
+        with Client(s['address'], loop=loop):  # flake8: noqa
+            source = Stream()
+            L = source.scatter().map(inc).gather().sink_to_list()
+
+            for i in range(10):
+                source.emit(i)
+
+            assert L == list(map(inc, range(10)))
+
+
+@gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
+def test_buffer(c, s, a, b):
+    source = Stream()
+    L = source.scatter().map(slowinc, delay=0.1).buffer(5).gather().sink_to_list()
+
+    start = time.time()
+    for i in range(5):
+        yield source.emit(i)
+    end = time.time()
+    assert end - start < 0.1
+    for i in range(5, 10):
+        yield source.emit(i)
+
+    end2 = time.time()
+    assert end2 - start > (0.5 / 3)
+
+    while len(L) < 10:
+        yield gen.sleep(0.01)
+        assert time.time() - start < 5
+
+    assert L == list(map(inc, range(10)))
+
+
+def test_buffer_sync(loop):
+    with cluster() as (s, [a, b]):
+        with Client(s['address'], loop=loop) as c:  # flake8: noqa
+            source = Stream()
+            buff = source.scatter().map(slowinc, delay=0.1).buffer(5)
+            L = buff.gather().sink_to_list()
+
+            start = time.time()
+            for i in range(5):
+                source.emit(i)
+                print(i)
+            end = time.time()
+            assert end - start < 0.1
+            for i in range(5, 10):
+                source.emit(i)
+            end2 = time.time()
+
+            while len(L) < 10:
+                time.sleep(0.01)
+                assert time.time() - start < 5
 
             assert L == list(map(inc, range(10)))
