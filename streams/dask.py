@@ -132,7 +132,7 @@ class buffer(DaskStream):
     @gen.coroutine
     def _update(self, x, who=None):
         result = yield self.queue.put(x, asynchronous=True)
-        return result
+        raise gen.Return(result)
 
     def update(self, x, who=None):
         return self.queue.put(x)
