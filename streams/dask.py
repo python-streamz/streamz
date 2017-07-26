@@ -3,7 +3,6 @@ from __future__ import absolute_import, division, print_function
 from operator import getitem
 
 from tornado import gen
-import threading
 
 import dask.distributed
 from distributed.utils import set_thread_state

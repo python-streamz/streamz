@@ -50,7 +50,6 @@ class Stream(object):
     >>> L  # and the actions happen at the sinks
     ['1', '2', '3', '4', '5']
     """
-
     str_list = ['func', 'predicate', 'n', 'interval']
 
     def __init__(self, child=None, children=None, name=None, **kwargs):
@@ -546,9 +545,8 @@ class rate_limit(Stream):
 
 
 class buffer(Stream):
-    Queue = Queue
     def __init__(self, n, child, loop=None):
-        self.queue = self.Queue(maxsize=n)
+        self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, child, loop=loop)
 
