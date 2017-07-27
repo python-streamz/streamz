@@ -104,6 +104,9 @@ class Stream(object):
                 result.append(r)
         return [element for element in result if element is not None]
 
+    def update(self, x, who=None):
+        self.emit(x)
+
     @property
     def child(self):
         if len(self.children) != 1:

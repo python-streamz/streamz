@@ -549,3 +549,19 @@ def test_triple_zip_latest():
     s3.emit('b')
     s1.emit(3)
     assert L_simple == [(1, 'III', 'a'), (2, 'III', 'a'), (3, 'III', 'b')]
+
+
+def test_piping():
+    source = Stream()
+    source2 = Stream()
+    # put source2 upstream of source
+    #source.children = [source2]
+    source2.parents = [source]
+
+    L = list()
+    source.map(L.append)
+
+    source2.emit(1)
+    source2.emit(3)
+
+    assert L == [1,3]
