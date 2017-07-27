@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function
+
 from collections import deque
 from time import time
 
@@ -48,7 +50,6 @@ class Stream(object):
     >>> L  # and the actions happen at the sinks
     ['1', '2', '3', '4', '5']
     """
-
     str_list = ['func', 'predicate', 'n', 'interval']
 
     def __init__(self, child=None, children=None, name=None, **kwargs):
@@ -125,6 +126,10 @@ class Stream(object):
                     return loop
         self._loop = IOLoop.current()
         return self._loop
+
+    def scatter(self):
+        from .dask import scatter
+        return scatter(self)
 
     def map(self, func, *args, **kwargs):
         """ Apply a function to every element in the stream """
