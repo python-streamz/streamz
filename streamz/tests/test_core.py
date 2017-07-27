@@ -565,3 +565,18 @@ def test_piping():
     source2.emit(3)
 
     assert L == [1,3]
+
+
+def test_connect():
+    source = Stream()
+    source2 = Stream()
+
+    sout = source.map(lambda x : x + 1)
+    L = list()
+    sout = sout.map(L.append)
+    source2.connect(source)
+
+    source2.emit(2)
+    source2.emit(4)
+
+    assert L == [3, 5]

@@ -107,6 +107,20 @@ class Stream(object):
     def update(self, x, who=None):
         self.emit(x)
 
+    def connect(self, parent):
+        ''' Connect another child to stream.
+            Note that parents go downstream and children go upstream.
+        '''
+        if self.parents == [None]:
+            self.parents = [parent]
+        else:
+            self.parents.append(parent)
+
+        if parent.children == [None]:
+            parent.children = [self]
+        else:
+            parent.children.append(self)
+
     @property
     def child(self):
         if len(self.children) != 1:
