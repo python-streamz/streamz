@@ -178,8 +178,6 @@ def test_obj(c, s, a, b):
                 a, b = args[0], args[1]
                 self.a = a
                 self.b = b
-            else:
-                raise ValueError("Num args must be 1 or 2")
 
     @normalize_token.register(myObj)
     def tokenize_myObj(obj):
