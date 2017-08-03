@@ -17,7 +17,7 @@ def create_graph(node, graph, prior_node=None, pc=None):
     if node is None:
         return
     t = hash(node)
-    graph.add_node(t, str=str(node))
+    graph.add_node(t, str=str(node), stream_node=node)
     if prior_node:
         tt = hash(prior_node)
         if graph.has_edge(t, tt):
