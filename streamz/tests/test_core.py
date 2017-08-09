@@ -555,7 +555,6 @@ def test_piping():
     source = Stream()
     source2 = Stream()
     # put source2 upstream of source
-    #source.children = [source2]
     source2.parents = [source]
 
     L = list()
