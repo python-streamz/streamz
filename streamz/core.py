@@ -330,6 +330,14 @@ class Stream(object):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
 
+    def zip_product(self, *others):
+        """Combine multiple streams together to a stream of tuples
+
+        This will emit a new tuple of the elements from the lossless stream paired
+        with the latest elements from the other streams.
+        """
+        return zip_product(self, *others)
+
     def sink(self, func):
         """ Apply a function on every element
 
@@ -657,22 +665,7 @@ class collect(Stream):
 
 
 class zip_product(Stream):
-    """Combine multiple streams together to a stream of tuples
-
-    This will emit a new tuple of the elements from the lossless stream paired
-    with the latest elements from the other streams.
-    """
-
     def __init__(self, lossless, *children):
-        """Initialize the node
-
-        Parameters
-        ----------
-        lossless : Stream instance
-            The stream who's documents will always be emitted
-        children: Stream instance
-            The streams to combine
-        """
         children = (lossless,) + children
         self.last = [None for _ in children]
         self.missing = set(children)
