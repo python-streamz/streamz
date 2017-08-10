@@ -654,3 +654,44 @@ class collect(Stream):
         out = tuple(self.cache)
         self.emit(out)
         self.cache.clear()
+
+
+class zip_product(Stream):
+    """Combine multiple streams together to a stream of tuples
+
+    This will emit a new tuple of the elements from the lossless stream paired
+    with the latest elements from the other streams.
+    """
+
+    def __init__(self, lossless, *children):
+        """Initialize the node
+
+        Parameters
+        ----------
+        lossless : Stream instance
+            The stream who's documents will always be emitted
+        children: Stream instance
+            The streams to combine
+        """
+        children = (lossless,) + children
+        self.last = [None for _ in children]
+        self.missing = set(children)
+        self.lossless = lossless
+        self.lossless_buffer = deque()
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        idx = self.children.index(who)
+        if who is self.lossless:
+            self.lossless_buffer.append(x)
+
+        self.last[idx] = x
+        if self.missing and who in self.missing:
+            self.missing.remove(who)
+
+        if not self.missing:
+            L = []
+            while self.lossless_buffer:
+                self.last[0] = self.lossless_buffer.popleft()
+                L.append(self.emit(tuple(self.last)))
+            return L
