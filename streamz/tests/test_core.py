@@ -254,7 +254,7 @@ def test_buffer():
 def test_zip():
     a = Stream()
     b = Stream()
-    c = s.zip(a, b)
+    c = sz.zip(a, b)
 
     L = c.sink_to_list()
 
@@ -333,7 +333,7 @@ def test_combine_latest_emit_on_stream():
 def test_zip_timeout():
     a = Stream()
     b = Stream()
-    c = s.zip(a, b, maxsize=2)
+    c = sz.zip(a, b, maxsize=2)
 
     L = c.sink_to_list()
 
