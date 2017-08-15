@@ -108,13 +108,15 @@ class Stream(object):
         self.emit(x)
 
     def connect(self, parent):
-        ''' Connect another child to stream.
-            Note that parents go downstream and children go upstream.
+        ''' Connect this stream to a downstream element.
+
+            Parameters
+            ----------
+            parent: Stream
+                the parent stream (downstream element) to connect to
         '''
-        if self.parents == [None]:
-            self.parents = [parent]
-        else:
-            self.parents.append(parent)
+        # Note : parents go downstream and children go upstream.
+        self.parents.append(parent)
 
         if parent.children == [None]:
             parent.children = [self]

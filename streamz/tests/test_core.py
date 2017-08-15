@@ -567,15 +567,21 @@ def test_piping():
 
 
 def test_connect():
-    source = Stream()
-    source2 = Stream()
+    source_downstream = Stream()
+    # connect assumes this default behaviour
+    # of stream initialization
+    assert source_downstream.parents == []
+    assert source_downstream.children == [None]
 
-    sout = source.map(lambda x : x + 1)
+    # initialize the second stream to connect to
+    source_upstream = Stream()
+
+    sout = source_downstream.map(lambda x : x + 1)
     L = list()
     sout = sout.map(L.append)
-    source2.connect(source)
+    source_upstream.connect(source_downstream)
 
-    source2.emit(2)
-    source2.emit(4)
+    source_upstream.emit(2)
+    source_upstream.emit(4)
 
     assert L == [3, 5]
