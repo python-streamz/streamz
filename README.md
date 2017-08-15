@@ -1,4 +1,4 @@
-Streams
+Streamz
 =======
 
 Do not use.  This is an exploratory project to learn more about what it takes

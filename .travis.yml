@@ -16,15 +16,15 @@ install:
   - conda update conda
 
   # Install dependencies
-  - conda create -n test-streams python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov networkx graphviz python-graphviz dask distributed -c conda-forge
-  - source activate test-streams
+  - conda create -n test-streamz python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov networkx graphviz python-graphviz dask distributed -c conda-forge
+  - source activate test-streamz
   - pip install git+https://github.com/dask/distributed.git --upgrade --no-deps
 
   - python setup.py install
 
 script:
   - coverage run run_tests.py
-  - flake8 streams
+  - flake8 streamz
 
 after_success:
   - codecov
