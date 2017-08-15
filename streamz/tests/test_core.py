@@ -9,7 +9,7 @@ from tornado import gen
 from tornado.queues import Queue
 from tornado.ioloop import IOLoop
 
-import streamz as s
+import streamz as sz
 
 from ..core import Stream
 from streamz.sources import sink_to_file, Counter
