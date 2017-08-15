@@ -1,9 +1,9 @@
-Streams
+Streamz
 =======
 
 A minimal streaming system.
 
-.. currentmodule:: streams
+.. currentmodule:: streamz
 
 .. autoclass:: Stream
    :members:

@@ -4,7 +4,7 @@ import os
 from dask.utils import tmpfile
 import networkx as nx
 
-from streams import Stream, create_graph, visualize
+from streamz import Stream, create_graph, visualize
 
 
 def test_create_graph():

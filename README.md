@@ -1,4 +1,4 @@
-Streams
+Streamz
 =======
 
 Do not use.  This is an exploratory project to learn more about what it takes
@@ -20,7 +20,7 @@ stream using common modifiers like map, filter, scan, etc..  Eventually you
 create a sink that consumes results.
 
 ```python
-from streams import Stream
+from streamz import Stream
 
 source = Stream()
 

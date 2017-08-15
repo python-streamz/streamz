@@ -9,11 +9,11 @@ from tornado import gen
 from tornado.queues import Queue
 from tornado.ioloop import IOLoop
 
-import streams as s
+import streamz as sz
 
 from ..core import Stream
-from streams.sources import sink_to_file, Counter
-from streams.utils_test import inc, double, gen_test, tmpfile
+from streamz.sources import sink_to_file, Counter
+from streamz.utils_test import inc, double, gen_test, tmpfile
 
 
 def test_basic():
@@ -254,7 +254,7 @@ def test_buffer():
 def test_zip():
     a = Stream()
     b = Stream()
-    c = s.zip(a, b)
+    c = sz.zip(a, b)
 
     L = c.sink_to_list()
 
@@ -333,7 +333,7 @@ def test_combine_latest_emit_on_stream():
 def test_zip_timeout():
     a = Stream()
     b = Stream()
-    c = s.zip(a, b, maxsize=2)
+    c = sz.zip(a, b, maxsize=2)
 
     L = c.sink_to_list()
 
