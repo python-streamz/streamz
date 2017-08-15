@@ -512,7 +512,7 @@ def test_zip_product():
     a.emit(3)
 
     assert L == [(1, 'a'), (2, 'a'), (3, 'b')]
-    assert L2 != L
+    assert L2 == [(3, 'b')]
 
 
 def test_zip_product_reverse():
