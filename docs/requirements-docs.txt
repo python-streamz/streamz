@@ -1,0 +1,6 @@
+numpydoc==0.6
+sphinx
+sphinx_rtd_theme
+tornado
+toolz
+zict
