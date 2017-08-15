@@ -3,8 +3,8 @@ import time
 
 from tornado import gen
 
-from dask_streams.dask import scatter
-from dask_streams import Stream
+from streamz.dask import scatter
+from streamz import Stream
 
 from distributed import Future, Client
 from distributed.utils import sync

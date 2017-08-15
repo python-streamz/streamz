@@ -20,7 +20,7 @@ stream using common modifiers like map, filter, scan, etc..  Eventually you
 create a sink that consumes results.
 
 ```python
-from dask_streams import Stream
+from streamz import Stream
 
 source = Stream()
 

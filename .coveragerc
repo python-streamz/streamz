@@ -1,6 +1,6 @@
 [run]
 source = 
-    dask_streams
+    streamz
 [report]
 omit =
     */python?.?/*

@@ -1,4 +1,4 @@
-from dask_streams import Stream
+from streamz import Stream
 from operator import add
 
 source1 = Stream(name='source1')
