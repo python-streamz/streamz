@@ -4,7 +4,7 @@ from os.path import exists
 from setuptools import setup
 
 
-setup(name='streams',
+setup(name='dask-streams',
       version='0.0.1',
       description='Streams',
       url='http://github.com/mrocklin/streams/',

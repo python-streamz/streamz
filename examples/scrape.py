@@ -6,7 +6,7 @@ import sys
 from BeautifulSoup import BeautifulSoup  # Python 2 only, sorry.
 
 import requests
-from streams import Stream
+from dask_streams import Stream
 import toolz
 import urlparse
 

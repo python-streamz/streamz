@@ -9,7 +9,7 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
-from streams.graph import visualize
+from dask_streams.graph import visualize
 
 no_default = '--no-default--'
 
