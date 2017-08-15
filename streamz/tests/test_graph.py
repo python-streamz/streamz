@@ -1,6 +1,9 @@
 from operator import add
 import os
 
+import pytest
+pytest.importorskip('streamz.graph')
+
 from dask.utils import tmpfile
 import networkx as nx
 

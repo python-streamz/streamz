@@ -1,6 +1,9 @@
 from operator import add
 import time
 
+import pytest
+pytest.importorskip('dask.distributed')
+
 from tornado import gen
 
 from streamz.dask import scatter
