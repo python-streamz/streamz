@@ -9,7 +9,6 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
-from .graph import visualize
 
 no_default = '--no-default--'
 
@@ -389,6 +388,7 @@ class Stream(object):
         kwargs:
             Graph attributes to pass to graphviz like ``rankdir="LR"``
         """
+        from .graph import visualize
         return visualize(self, filename, **kwargs)
 
 

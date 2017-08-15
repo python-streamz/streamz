@@ -1,10 +1,11 @@
 from operator import add
 import os
 
-from dask.utils import tmpfile
-import networkx as nx
+import pytest
+nx = pytest.importorskip('networkx')
 
 from streamz import Stream, create_graph, visualize
+from streamz.utils_test import tmpfile
 
 
 def test_create_graph():
