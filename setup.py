@@ -5,7 +5,7 @@ from setuptools import setup
 
 
 setup(name='streamz',
-      version='0.0.1',
+      version='0.1.0',
       description='Streams',
       url='http://github.com/mrocklin/streamz/',
       maintainer='Matthew Rocklin',
