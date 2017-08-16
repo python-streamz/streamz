@@ -496,10 +496,10 @@ def test_stream_name_str():
     assert str(source) == '<this is not a stream; Stream>'
 
 
-def test_zip_product():
+def test_zip_latest():
     a = Stream()
     b = Stream()
-    c = a.zip_product(b)
+    c = a.zip_latest(b)
     d = a.combine_latest(b, emit_on=a)
 
     L = c.sink_to_list()
@@ -515,10 +515,10 @@ def test_zip_product():
     assert L2 == [(3, 'b')]
 
 
-def test_zip_product_reverse():
+def test_zip_latest_reverse():
     a = Stream()
     b = Stream()
-    c = a.zip_product(b)
+    c = a.zip_latest(b)
 
     L = c.sink_to_list()
 
