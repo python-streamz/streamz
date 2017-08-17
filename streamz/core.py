@@ -51,7 +51,7 @@ class Stream(object):
     """
     str_list = ['func', 'predicate', 'n', 'interval']
 
-    def __init__(self, child=None, children=None, name=None, **kwargs):
+    def __init__(self, child=None, children=None, stream_name=None, **kwargs):
         self.parents = []
         if children is not None:
             self.children = children
@@ -62,12 +62,13 @@ class Stream(object):
         for child in self.children:
             if child:
                 child.parents.append(self)
-        self.name = name
+        self.stream_name = stream_name
 
     def __str__(self):
         s_list = []
-        if self.name:
-            s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
+        if self.stream_name:
+            s_list.append('{}; {}'.format(self.stream_name,
+                                          self.__class__.__name__))
         else:
             s_list.append(self.__class__.__name__)
 
