@@ -329,6 +329,23 @@ class Stream(object):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
 
+    def zip_latest(self, *others):
+        """Combine multiple streams together to a stream of tuples
+
+        The stream which this is called from is lossless. All elements from
+        the lossless stream are emitted reguardless of when they came in.
+        This will emit a new tuple consisting of an element from the lossless
+        stream paired with the latest elements from the other streams.
+        Elements are only emitted when an element on the lossless stream are
+        received, similar to ``combine_latest`` with the ``emit_on`` flag.
+
+        See Also
+        --------
+        Stream.combine_latest
+        Stream.zip
+        """
+        return zip_latest(self, *others)
+
     def sink(self, func):
         """ Apply a function on every element
 
@@ -654,3 +671,29 @@ class collect(Stream):
         out = tuple(self.cache)
         self.emit(out)
         self.cache.clear()
+
+
+class zip_latest(Stream):
+    def __init__(self, lossless, *children):
+        children = (lossless,) + children
+        self.last = [None for _ in children]
+        self.missing = set(children)
+        self.lossless = lossless
+        self.lossless_buffer = deque()
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        idx = self.children.index(who)
+        if who is self.lossless:
+            self.lossless_buffer.append(x)
+
+        self.last[idx] = x
+        if self.missing and who in self.missing:
+            self.missing.remove(who)
+
+        if not self.missing:
+            L = []
+            while self.lossless_buffer:
+                self.last[0] = self.lossless_buffer.popleft()
+                L.append(self.emit(tuple(self.last)))
+            return L
