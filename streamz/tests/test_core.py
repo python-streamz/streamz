@@ -530,3 +530,22 @@ def test_zip_latest_reverse():
     a.emit(4)
 
     assert L == [(1, 'a'), (2, 'a'), (3, 'a'), (4, 'b')]
+
+
+def test_triple_zip_latest():
+    from streamz.core import Stream
+    s1 = Stream()
+    s2 = Stream()
+    s3 = Stream()
+    s_simple = s1.zip_latest(s2, s3)
+    L_simple = s_simple.sink_to_list()
+
+    s1.emit(1)
+    s2.emit('I')
+    s2.emit("II")
+    s1.emit(2)
+    s2.emit("III")
+    s3.emit('a')
+    s3.emit('b')
+    s1.emit(3)
+    assert L_simple == [(1, 'III', 'a'), (2, 'III', 'a'), (3, 'III', 'b')]
