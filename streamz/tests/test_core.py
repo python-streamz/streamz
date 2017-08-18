@@ -549,3 +549,24 @@ def test_triple_zip_latest():
     s3.emit('b')
     s1.emit(3)
     assert L_simple == [(1, 'III', 'a'), (2, 'III', 'a'), (3, 'III', 'b')]
+
+
+def test_connect():
+    source_downstream = Stream()
+    # connect assumes this default behaviour
+    # of stream initialization
+    assert source_downstream.parents == []
+    assert source_downstream.children == [None]
+
+    # initialize the second stream to connect to
+    source_upstream = Stream()
+
+    sout = source_downstream.map(lambda x : x + 1)
+    L = list()
+    sout = sout.map(L.append)
+    source_upstream.connect(source_downstream)
+
+    source_upstream.emit(2)
+    source_upstream.emit(4)
+
+    assert L == [3, 5]

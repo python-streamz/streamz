@@ -104,6 +104,25 @@ class Stream(object):
                 result.append(r)
         return [element for element in result if element is not None]
 
+    def update(self, x, who=None):
+        self.emit(x)
+
+    def connect(self, parent):
+        ''' Connect this stream to a downstream element.
+
+            Parameters
+            ----------
+            parent: Stream
+                the parent stream (downstream element) to connect to
+        '''
+        # Note : parents go downstream and children go upstream.
+        self.parents.append(parent)
+
+        if parent.children == [None]:
+            parent.children = [self]
+        else:
+            parent.children.append(self)
+
     @property
     def child(self):
         if len(self.children) != 1:
