@@ -9,8 +9,8 @@ from streamz.utils_test import tmpfile
 
 
 def test_create_graph():
-    source1 = Stream(name='source1')
-    source2 = Stream(name='source2')
+    source1 = Stream(stream_name='source1')
+    source2 = Stream(stream_name='source2')
 
     n1 = source1.zip(source2)
     n2 = n1.map(add)
@@ -23,8 +23,8 @@ def test_create_graph():
 
 
 def test_create_file():
-    source1 = Stream(name='source1')
-    source2 = Stream(name='source2')
+    source1 = Stream(stream_name='source1')
+    source2 = Stream(stream_name='source2')
 
     n1 = source1.zip(source2)
     n2 = n1.map(add)

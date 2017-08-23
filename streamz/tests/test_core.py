@@ -492,7 +492,7 @@ def test_partition_str():
 
 
 def test_stream_name_str():
-    source = Stream(name='this is not a stream')
+    source = Stream(stream_name='this is not a stream')
     assert str(source) == '<this is not a stream; Stream>'
 
 
