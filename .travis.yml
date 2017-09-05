@@ -23,7 +23,7 @@ install:
   - python setup.py install
 
 script:
-  - coverage run run_tests.py
+  - coverage run run_tests.py --runslow
   - flake8 streamz
 
 after_success:

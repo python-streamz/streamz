@@ -73,6 +73,7 @@ def test_zip(c, s, a, b):
     assert L == [(1, 'a'), (2, 'b')]
 
 
+@pytest.mark.slow
 def test_sync(loop):
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # flake8: noqa
@@ -89,6 +90,7 @@ def test_sync(loop):
             assert L == list(map(inc, range(10)))
 
 
+@pytest.mark.slow
 def test_sync_2(loop):
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # flake8: noqa
@@ -101,16 +103,18 @@ def test_sync_2(loop):
             assert L == list(map(inc, range(10)))
 
 
+@pytest.mark.slow
 @gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
 def test_buffer(c, s, a, b):
     source = Stream()
-    L = source.scatter().map(slowinc, delay=0.1).buffer(5).gather().sink_to_list()
+    L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()
 
     start = time.time()
     for i in range(5):
         yield source.emit(i)
     end = time.time()
-    assert end - start < 0.1
+    assert end - start < 0.5
+
     for i in range(5, 10):
         yield source.emit(i)
 
@@ -124,11 +128,12 @@ def test_buffer(c, s, a, b):
     assert L == list(map(inc, range(10)))
 
 
+@pytest.mark.slow
 def test_buffer_sync(loop):
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # flake8: noqa
             source = Stream()
-            buff = source.scatter().map(slowinc, delay=0.1).buffer(5)
+            buff = source.scatter().map(slowinc, delay=0.5).buffer(5)
             L = buff.gather().sink_to_list()
 
             start = time.time()
@@ -136,7 +141,8 @@ def test_buffer_sync(loop):
                 source.emit(i)
                 print(i)
             end = time.time()
-            assert end - start < 0.1
+            assert end - start < 0.5
+
             for i in range(5, 10):
                 source.emit(i)
             end2 = time.time()
