@@ -492,5 +492,81 @@ def test_partition_str():
 
 
 def test_stream_name_str():
-    source = Stream(name='this is not a stream')
+    source = Stream(stream_name='this is not a stream')
     assert str(source) == '<this is not a stream; Stream>'
+
+
+def test_zip_latest():
+    a = Stream()
+    b = Stream()
+    c = a.zip_latest(b)
+    d = a.combine_latest(b, emit_on=a)
+
+    L = c.sink_to_list()
+    L2 = d.sink_to_list()
+
+    a.emit(1)
+    a.emit(2)
+    b.emit('a')
+    b.emit('b')
+    a.emit(3)
+
+    assert L == [(1, 'a'), (2, 'a'), (3, 'b')]
+    assert L2 == [(3, 'b')]
+
+
+def test_zip_latest_reverse():
+    a = Stream()
+    b = Stream()
+    c = a.zip_latest(b)
+
+    L = c.sink_to_list()
+
+    b.emit('a')
+    a.emit(1)
+    a.emit(2)
+    a.emit(3)
+    b.emit('b')
+    a.emit(4)
+
+    assert L == [(1, 'a'), (2, 'a'), (3, 'a'), (4, 'b')]
+
+
+def test_triple_zip_latest():
+    from streamz.core import Stream
+    s1 = Stream()
+    s2 = Stream()
+    s3 = Stream()
+    s_simple = s1.zip_latest(s2, s3)
+    L_simple = s_simple.sink_to_list()
+
+    s1.emit(1)
+    s2.emit('I')
+    s2.emit("II")
+    s1.emit(2)
+    s2.emit("III")
+    s3.emit('a')
+    s3.emit('b')
+    s1.emit(3)
+    assert L_simple == [(1, 'III', 'a'), (2, 'III', 'a'), (3, 'III', 'b')]
+
+
+def test_connect():
+    source_downstream = Stream()
+    # connect assumes this default behaviour
+    # of stream initialization
+    assert source_downstream.parents == []
+    assert source_downstream.children == [None]
+
+    # initialize the second stream to connect to
+    source_upstream = Stream()
+
+    sout = source_downstream.map(lambda x : x + 1)
+    L = list()
+    sout = sout.map(L.append)
+    source_upstream.connect(source_downstream)
+
+    source_upstream.emit(2)
+    source_upstream.emit(4)
+
+    assert L == [3, 5]

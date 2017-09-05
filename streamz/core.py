@@ -51,7 +51,7 @@ class Stream(object):
     """
     str_list = ['func', 'predicate', 'n', 'interval']
 
-    def __init__(self, child=None, children=None, name=None, **kwargs):
+    def __init__(self, child=None, children=None, stream_name=None, **kwargs):
         self.parents = []
         if children is not None:
             self.children = children
@@ -62,7 +62,7 @@ class Stream(object):
         for child in self.children:
             if child:
                 child.parents.append(self)
-        self.name = name
+        self.name = stream_name
 
     def __str__(self):
         s_list = []
@@ -103,6 +103,25 @@ class Stream(object):
             else:
                 result.append(r)
         return [element for element in result if element is not None]
+
+    def update(self, x, who=None):
+        self.emit(x)
+
+    def connect(self, parent):
+        ''' Connect this stream to a downstream element.
+
+            Parameters
+            ----------
+            parent: Stream
+                the parent stream (downstream element) to connect to
+        '''
+        # Note : parents go downstream and children go upstream.
+        self.parents.append(parent)
+
+        if parent.children == [None]:
+            parent.children = [self]
+        else:
+            parent.children.append(self)
 
     @property
     def child(self):
@@ -328,6 +347,23 @@ class Stream(object):
     def zip(self, *other):
         """ Combine two streams together into a stream of tuples """
         return zip(self, *other)
+
+    def zip_latest(self, *others):
+        """Combine multiple streams together to a stream of tuples
+
+        The stream which this is called from is lossless. All elements from
+        the lossless stream are emitted reguardless of when they came in.
+        This will emit a new tuple consisting of an element from the lossless
+        stream paired with the latest elements from the other streams.
+        Elements are only emitted when an element on the lossless stream are
+        received, similar to ``combine_latest`` with the ``emit_on`` flag.
+
+        See Also
+        --------
+        Stream.combine_latest
+        Stream.zip
+        """
+        return zip_latest(self, *others)
 
     def sink(self, func):
         """ Apply a function on every element
@@ -654,3 +690,29 @@ class collect(Stream):
         out = tuple(self.cache)
         self.emit(out)
         self.cache.clear()
+
+
+class zip_latest(Stream):
+    def __init__(self, lossless, *children):
+        children = (lossless,) + children
+        self.last = [None for _ in children]
+        self.missing = set(children)
+        self.lossless = lossless
+        self.lossless_buffer = deque()
+        Stream.__init__(self, children=children)
+
+    def update(self, x, who=None):
+        idx = self.children.index(who)
+        if who is self.lossless:
+            self.lossless_buffer.append(x)
+
+        self.last[idx] = x
+        if self.missing and who in self.missing:
+            self.missing.remove(who)
+
+        if not self.missing:
+            L = []
+            while self.lossless_buffer:
+                self.last[0] = self.lossless_buffer.popleft()
+                L.append(self.emit(tuple(self.last)))
+            return L

@@ -1,9 +1,9 @@
 from streamz import Stream
 from operator import add
 
-source1 = Stream(name='source1')
-source2 = Stream(name='source2')
-source3 = Stream(name='awesome source')
+source1 = Stream(stream_name='source1')
+source2 = Stream(stream_name='source2')
+source3 = Stream(stream_name='awesome source')
 
 n1 = source1.zip(source2)
 n2 = n1.map(add)
