@@ -38,12 +38,13 @@ bibliography: paper.bib
 
 - This is a small library to manage continuous streams of data, particularly when complex branching and control flow situations arise. 
 - This provides a framework for streaming data analysis in pure python with hooks into the Dask task scheduler for automatic parallelization.
+- Streamz is similar to reactive
+programming systems like [RxPY](https://github.com/ReactiveX/RxPY) or big
+data streaming systems like [Flink](https://flink.apache.org), [Beam](https://beam.apache.org/get-started/quickstart-py) or [Spark Streaming](https://beam.apache.org/get-started/quickstart-py).
 - This software forms the backbone for data processing at the NSLS-II x-ray powder diffraction and complex materials scattering data analysis pipelines.
 
 Citations to entries in paper.bib should be in
 [rMarkdown](http://rmarkdown.rstudio.com/authoring_bibliographies_and_citations.html)
 format.
-
-Figures can be included like this: ![Fidgit deposited in figshare.](figshare_article.png)
 
 # References
