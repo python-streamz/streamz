@@ -17,7 +17,7 @@ authors:
    orcid: ?
    affiliation: 4
  - name: Simon J. L. Billinge
-   orcid: ?
+   orcid: 0000-0002-9734-4998
    affiliation: 2, 3
 affiliations:
  - name: Continuum Analytics
@@ -50,6 +50,5 @@ format.
 # References
 
 # Acknowledgments
-The development of this software in the Billinge group was
-supported by the U.S. National Science Foundation through
+Software and writing contributions from Wright and Billinge were supported by the U.S. National Science Foundation through
 grant DMREF-1534910
