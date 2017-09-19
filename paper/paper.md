@@ -11,7 +11,7 @@ authors:
    orcid: 0000-0003-2522-7028
    affiliation: 2
  - name: Julien Lhermitte
-   orcid: ?
+   orcid: 0000-0003-0660-975X
    affiliation: 5
  - name: Daniel B. Allan
    orcid: ?
