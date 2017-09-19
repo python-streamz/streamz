@@ -48,3 +48,8 @@ Citations to entries in paper.bib should be in
 format.
 
 # References
+
+# Acknowledgments
+The development of this software in the Billinge group was
+supported by the U.S. National Science Foundation through
+grant DMREF-1534910
