@@ -16,6 +16,9 @@ authors:
  - name: Daniel B. Allan
    orcid: ?
    affiliation: 4
+ - name: Kevin G. Yager
+   orcid: 0000-0001-7745-2513
+   affiliation: 5
  - name: Simon J. L. Billinge
    orcid: 0000-0002-9734-4998
    affiliation: 2, 3
@@ -52,3 +55,4 @@ format.
 # Acknowledgments
 Software and writing contributions from Wright and Billinge were supported by the U.S. National Science Foundation through
 grant DMREF-1534910
+This research used resources of the Center for Functional Nanomaterials, which is a U.S. DOE Office of Science Facility, at Brookhaven National Laboratory under Contract No. DE-SC0012704
