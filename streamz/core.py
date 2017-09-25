@@ -86,10 +86,8 @@ class Stream(object):
     def __str__(self):
         s_list = []
         if self.name:
-            #print("Printing name {}".format(self.name))
             s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
         else:
-            #print("Nor pringint name {}".format(self.name))
             s_list.append(self.__class__.__name__)
 
         for m in self.str_list:
