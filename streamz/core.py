@@ -86,8 +86,10 @@ class Stream(object):
     def __str__(self):
         s_list = []
         if self.name:
+            #print("Printing name {}".format(self.name))
             s_list.append('{}; {}'.format(self.name, self.__class__.__name__))
         else:
+            #print("Nor pringint name {}".format(self.name))
             s_list.append(self.__class__.__name__)
 
         for m in self.str_list:
@@ -355,10 +357,12 @@ class map(Stream):
     """ Apply a function to every element in the stream """
     def __init__(self, child, func, *args, **kwargs):
         self.func = func
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
 
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         result = self.func(x, *self.args, **self.kwargs)
@@ -373,12 +377,15 @@ def _truthy(x):
 @Stream.register_api
 class filter(Stream):
     """ Only pass through elements that satisfy the predicate """
-    def __init__(self, child, predicate):
+    def __init__(self, child, predicate, **kwargs):
         if predicate is None:
             predicate = _truthy
         self.predicate = predicate
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
 
         Stream.__init__(self, child)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         if self.predicate(x):
@@ -425,7 +432,9 @@ class accumulate(Stream):
         self.kwargs = kwargs
         self.state = start
         self.returns_state = returns_state
-        Stream.__init__(self, child)
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         if self.state is no_default:
@@ -457,10 +466,12 @@ class partition(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n):
+    def __init__(self, child, n, **kwargs):
         self.n = n
         self.buffer = []
-        Stream.__init__(self, child)
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -490,10 +501,12 @@ class sliding_window(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n):
+    def __init__(self, child, n, **kwargs):
         self.n = n
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
         self.buffer = deque(maxlen=n)
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -513,12 +526,14 @@ class timed_window(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval, loop=None):
+    def __init__(self, child, interval, loop=None, **kwargs):
         self.interval = interval
         self.buffer = []
         self.last = gen.moment
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
 
-        Stream.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop, stream_name=stream_name)
 
         self.loop.add_callback(self.cb)
 
@@ -540,11 +555,13 @@ class delay(Stream):
     """ Add a time delay to results """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval, loop=None):
+    def __init__(self, child, interval, loop=None, **kwargs):
         self.interval = interval
         self.queue = Queue()
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
 
-        Stream.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop, stream_name=stream_name)
 
         self.loop.add_callback(self.cb)
 
@@ -576,11 +593,13 @@ class rate_limit(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval):
+    def __init__(self, child, interval, **kwargs):
         self.interval = interval
         self.next = 0
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
 
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     @gen.coroutine
     def update(self, x, who=None):
@@ -602,10 +621,12 @@ class buffer(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n, loop=None):
+    def __init__(self, child, n, loop=None, **kwargs):
         self.queue = Queue(maxsize=n)
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
 
-        Stream.__init__(self, child, loop=loop)
+        Stream.__init__(self, child, loop=loop, stream_name=stream_name)
 
         self.loop.add_callback(self.cb)
 
@@ -647,7 +668,9 @@ class zip(Stream):
 
         children2 = [child for child in children if isinstance(child, Stream)]
 
-        Stream.__init__(self, children=children2)
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
+        Stream.__init__(self, children=children2, stream_name=stream_name)
 
     def pack_literals(self):
         """ Fill buffers for literals whenver we empty them """
@@ -689,6 +712,8 @@ class combine_latest(Stream):
 
     def __init__(self, *children, **kwargs):
         emit_on = kwargs.pop('emit_on', None)
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
         self.last = [None for _ in children]
         self.missing = set(children)
         if emit_on is not None:
@@ -699,7 +724,7 @@ class combine_latest(Stream):
             self.emit_on = emit_on
         else:
             self.emit_on = children
-        Stream.__init__(self, children=children)
+        Stream.__init__(self, children=children, stream_name=stream_name)
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
@@ -764,14 +789,16 @@ class unique(Stream):
     1
     3
     """
-    def __init__(self, child, history=None, key=identity):
+    def __init__(self, child, history=None, key=identity, **kwargs):
         self.seen = dict()
         self.key = key
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
         if history:
             from zict import LRU
             self.seen = LRU(history, self.seen)
 
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
         y = self.key(x)
@@ -856,12 +883,12 @@ class collect(Stream):
     ...
     [1, 2]
     """
-    def __init__(self, child, cache=None):
+    def __init__(self, child, cache=None, **kwargs):
         if cache is None:
             cache = deque()
         self.cache = cache
 
-        Stream.__init__(self, child)
+        Stream.__init__(self, child, **kwargs)
 
     def update(self, x, who=None):
         self.cache.append(x)
@@ -888,13 +915,14 @@ class zip_latest(Stream):
     Stream.combine_latest
     Stream.zip
     """
-    def __init__(self, lossless, *children):
+    def __init__(self, lossless, *children, **kwargs):
+
         children = (lossless,) + children
         self.last = [None for _ in children]
         self.missing = set(children)
         self.lossless = lossless
         self.lossless_buffer = deque()
-        Stream.__init__(self, children=children)
+        Stream.__init__(self, children=children, **kwargs)
 
     def update(self, x, who=None):
         idx = self.children.index(who)
