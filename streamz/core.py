@@ -382,7 +382,6 @@ class filter(Stream):
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
 
-        Stream.__init__(self, child)
         Stream.__init__(self, child, stream_name=stream_name)
 
     def update(self, x, who=None):
