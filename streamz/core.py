@@ -305,18 +305,17 @@ class Stream(object):
         return union(children=(self,) + others)
 
     def pluck(self, pick):
-        """ Select elements from a tuple in the stream.
+        """ Select elements from elements in the stream.
 
         Parameters
         ----------
-        pluck : list
-            The elements to pick from the incoming element in the stream
-            (note: must be a list)
+        pluck : object, list
+            The element(s) to pick from the incoming element in the stream
 
         Examples
         --------
         >>> source = Stream()
-        >>> source.pluck([0,3]).sink(print)
+        >>> source.pluck([0, 3]).sink(print)
         >>> for x in [[1, 2, 3, 4], [4, 5, 6, 7], [8, 9, 10, 11]]:
         ...     source.emit(x)
         (1,4)
