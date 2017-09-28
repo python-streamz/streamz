@@ -57,6 +57,16 @@ def test_filter():
     assert L == [0, 2, 4, 6, 8]
 
 
+def test_filter_none():
+    source = Stream()
+    L = source.filter(None).sink_to_list()
+
+    for i in range(10):
+        source.emit(i % 3)
+
+    assert L == [1, 2, 1, 2, 1, 2]
+
+
 def test_map():
     def add(x=0, y=0):
         return x + y

@@ -456,8 +456,14 @@ class map(Stream):
         return self.emit(result)
 
 
+def _truthy(x):
+    return not not x
+
+
 class filter(Stream):
     def __init__(self, predicate, child):
+        if predicate is None:
+            predicate = _truthy
         self.predicate = predicate
 
         Stream.__init__(self, child)
