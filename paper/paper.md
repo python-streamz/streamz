@@ -14,7 +14,7 @@ authors:
    orcid: 0000-0003-0660-975X
    affiliation: 5
  - name: Daniel B. Allan
-   orcid: ?
+   orcid: 0000-0002-5947-6017
    affiliation: 4
  - name: Kevin G. Yager
    orcid: 0000-0001-7745-2513
@@ -23,7 +23,7 @@ authors:
    orcid: 0000-0002-9734-4998
    affiliation: 2, 3
 affiliations:
- - name: Continuum Analytics
+ - name: Anaconda Inc.
    index: 1
  - name: Department of Applied Physics and Applied Mathematics, Columbia University
    index: 2
@@ -43,7 +43,7 @@ bibliography: paper.bib
 - This provides a framework for streaming data analysis in pure python with hooks into the Dask task scheduler for automatic parallelization.
 - Streamz is similar to reactive
 programming systems like [RxPY](https://github.com/ReactiveX/RxPY) or big
-data streaming systems like [Flink](https://flink.apache.org), [Beam](https://beam.apache.org/get-started/quickstart-py) or [Spark Streaming](https://beam.apache.org/get-started/quickstart-py).
+data streaming systems like [Apache Flink](https://flink.apache.org), [Apache Beam](https://beam.apache.org/get-started/quickstart-py) or [Apache Spark Streaming](https://spark.apache.org/streaming/).
 - This software forms the backbone for data processing at the NSLS-II x-ray powder diffraction and complex materials scattering data analysis pipelines.
 
 Citations to entries in paper.bib should be in
@@ -55,4 +55,4 @@ format.
 # Acknowledgments
 Software and writing contributions from Wright and Billinge were supported by the U.S. National Science Foundation through
 grant DMREF-1534910
-This research used resources of the Center for Functional Nanomaterials, which is a U.S. DOE Office of Science Facility, at Brookhaven National Laboratory under Contract No. DE-SC0012704
+This research used resources of the Center for Functional Nanomaterials and the NSLS-II, which is a U.S. DOE Office of Science Facility, at Brookhaven National Laboratory under Contract No. DE-SC0012704
