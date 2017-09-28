@@ -162,13 +162,24 @@ class Stream(object):
         """
         return filter(lambda x: not predicate(x), self)
 
-    def accumulate(self, func, start=no_default, returns_state=False):
+    def accumulate(self, func, start=no_default, returns_state=False, **kwargs):
         """ Accumulate results with previous state
 
         This preforms running or cumulative reductions, applying the function
         to the previous total and the new element.  The function should take
         two arguments, the previous accumulated state and the next element and
         it should return a new accumulated state.
+
+        Parameters
+        ----------
+        func: callable
+        start: object
+            Initial value.  Defaults to the first submitted element
+        returns_state: boolean
+            If true then func should return both the state and the value to emit
+            If false then both values are the same, and func returns one value
+        **kwargs:
+            Keyword arguments to pass to func
 
         Examples
         --------
@@ -182,7 +193,7 @@ class Stream(object):
         6
         10
         """
-        return scan(func, self, start=start, returns_state=returns_state)
+        return scan(func, self, start=start, returns_state=returns_state, **kwargs)
 
     scan = accumulate
 
@@ -474,8 +485,10 @@ class filter(Stream):
 
 
 class scan(Stream):
-    def __init__(self, func, child, start=no_default, returns_state=False):
+    def __init__(self, func, child, start=no_default, returns_state=False,
+                 **kwargs):
         self.func = func
+        self.kwargs = kwargs
         self.state = start
         self.returns_state = returns_state
         Stream.__init__(self, child)
@@ -485,7 +498,7 @@ class scan(Stream):
             self.state = x
             return self.emit(x)
         else:
-            result = self.func(self.state, x)
+            result = self.func(self.state, x, **self.kwargs)
             if self.returns_state:
                 state, result = result
             else:

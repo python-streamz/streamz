@@ -47,6 +47,20 @@ def test_scan():
     assert L == [0, 1, 3]
 
 
+def test_kwargs():
+    source = Stream()
+
+    def f(acc, x, y=None):
+        acc = acc + x + y
+        return acc
+
+    L = source.scan(f, y=10).sink_to_list()
+    for i in range(3):
+        source.emit(i)
+
+    assert L == [0, 11, 23]
+
+
 def test_filter():
     source = Stream()
     L = source.filter(lambda x: x % 2 == 0).sink_to_list()
