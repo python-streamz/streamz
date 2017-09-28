@@ -311,6 +311,7 @@ class Stream(object):
         ----------
         pluck : object, list
             The element(s) to pick from the incoming element in the stream
+            If an instance of list, will pick multiple elements.
 
         Examples
         --------
