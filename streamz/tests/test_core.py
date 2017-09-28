@@ -437,6 +437,28 @@ def test_union():
     assert L == [1, 2, 3, 4]
 
 
+def test_pluck():
+    a = Stream()
+    b = Stream()
+
+    L = a.pluck([0, 2]).sink_to_list()
+    L2 = b.pluck(1).sink_to_list()
+
+    a.emit([1, 2, 3])
+    assert L == [(1, 3)]
+    a.emit([4, 5, 6, 7, 8, 9])
+    assert L == [(1, 3), (4, 6)]
+    with pytest.raises(IndexError):
+        a.emit([1])
+
+    b.emit([1, 2, 3])
+    assert L2 == [2]
+    b.emit([4, 5, 6, 7, 8, 9])
+    assert L2 == [2, 5]
+    with pytest.raises(IndexError):
+        b.emit([1])
+
+
 def test_collect():
     source1 = Stream()
     source2 = Stream()

@@ -304,6 +304,27 @@ class Stream(object):
         """
         return union(children=(self,) + others)
 
+    def pluck(self, pick):
+        """ Select elements from a tuple in the stream.
+
+        Parameters
+        ----------
+        pluck : list
+            The elements to pick from the incoming element in the stream
+            (note: must be a list)
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> source.pluck([0,3]).sink(print)
+        >>> for x in [[1, 2, 3, 4], [4, 5, 6, 7], [8, 9, 10, 11]]:
+        ...     source.emit(x)
+        (1,4)
+        (4,7)
+        (8,11)
+        """
+        return pluck(self, pick)
+
     def unique(self, history=None, key=identity):
         """ Avoid sending through repeated elements
 
@@ -673,6 +694,18 @@ class unique(Stream):
 class union(Stream):
     def update(self, x, who=None):
         return self.emit(x)
+
+
+class pluck(Stream):
+    def __init__(self, child, pick):
+        self.pick = pick
+        super(pluck, self).__init__(child)
+
+    def update(self, x, who=None):
+        if isinstance(self.pick, list):
+            return self.emit(tuple([x[ind] for ind in self.pick]))
+        else:
+            return self.emit(x[self.pick])
 
 
 class collect(Stream):
