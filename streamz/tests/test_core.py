@@ -2,7 +2,7 @@ from datetime import timedelta
 import itertools
 import operator
 from operator import add
-from time import time
+from time import time, sleep
 
 import pytest
 
@@ -604,7 +604,7 @@ def test_connect():
     source_downstream = Stream()
     # connect assumes this default behaviour
     # of stream initialization
-    assert source_downstream.parents == []
+    assert not(source_downstream.parents)
     assert source_downstream.children == [None]
 
     # initialize the second stream to connect to
@@ -636,3 +636,23 @@ def test_disconnect():
     source.disconnect(upstream)
     source.emit(4)
     assert L == [2, 3]
+
+
+def test_gc():
+    source = Stream()
+
+    L = []
+    a = source.map(L.append)
+
+    source.emit(1)
+    assert L == [1]
+
+    del a
+    import gc; gc.collect()
+    start = time()
+    while source.parents:
+        sleep(0.01)
+        assert time() < start + 1
+
+    source.emit(2)
+    assert L == [1]

@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function
 
 from collections import deque
 from time import time
+import weakref
 
 import toolz
 from tornado import gen
@@ -11,6 +12,8 @@ from tornado.queues import Queue
 from collections import Iterable
 
 no_default = '--no-default--'
+
+_global_sinks = set()
 
 
 def identity(x):
@@ -52,7 +55,7 @@ class Stream(object):
     str_list = ['func', 'predicate', 'n', 'interval']
 
     def __init__(self, child=None, children=None, stream_name=None, **kwargs):
-        self.parents = []
+        self.parents = weakref.WeakSet()
         if children is not None:
             self.children = children
         else:
@@ -61,7 +64,7 @@ class Stream(object):
             self._loop = kwargs.get('loop')
         for child in self.children:
             if child:
-                child.parents.append(self)
+                child.parents.add(self)
         self.name = stream_name
 
     def __str__(self):
@@ -116,7 +119,7 @@ class Stream(object):
             The parent stream (downstream element) to connect to
         '''
         # Note : parents go downstream and children go upstream.
-        self.parents.append(parent)
+        self.parents.add(parent)
 
         if parent.children == [None]:
             parent.children = [self]
@@ -484,6 +487,7 @@ class Sink(Stream):
         self.func = func
 
         Stream.__init__(self, child)
+        _global_sinks.add(self)
 
     def update(self, x, who=None):
         result = self.func(x)
