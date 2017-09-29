@@ -1,4 +1,5 @@
 from datetime import timedelta
+import itertools
 import operator
 from operator import add
 from time import time
@@ -12,7 +13,7 @@ from tornado.ioloop import IOLoop
 import streamz as sz
 
 from ..core import Stream
-from streamz.sources import sink_to_file, Counter
+from streamz.sources import sink_to_file, PeriodicCallback
 from streamz.utils_test import inc, double, gen_test, tmpfile
 
 
@@ -214,9 +215,10 @@ def test_sink_to_file():
 
 @gen_test()
 def test_counter():
-    source = Counter(interval=0.01)
+    counter = itertools.count()
+    source = PeriodicCallback(counter.__next__, 0.001)
     L = source.sink_to_list()
-    yield gen.sleep(0.1)
+    yield gen.sleep(0.05)
 
     assert L
 
