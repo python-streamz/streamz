@@ -319,9 +319,16 @@ class Stream(object):
         >>> source.pluck([0, 3]).sink(print)
         >>> for x in [[1, 2, 3, 4], [4, 5, 6, 7], [8, 9, 10, 11]]:
         ...     source.emit(x)
-        (1,4)
-        (4,7)
-        (8,11)
+        (1, 4)
+        (4, 7)
+        (8, 11)
+
+        >>> source = Stream()
+        >>> source.pluck('name').sink(print)
+        >>> for x in [{'name': 'Alice', 'x': 123}, {'name': 'Bob', 'x': 456}]:
+        ...     source.emit(x)
+        'Alice'
+        'Bob'
         """
         return pluck(self, pick)
 
