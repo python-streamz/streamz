@@ -110,10 +110,10 @@ class Stream(object):
     def connect(self, parent):
         ''' Connect this stream to a downstream element.
 
-            Parameters
-            ----------
-            parent: Stream
-                the parent stream (downstream element) to connect to
+        Parameters
+        ----------
+        parent: Stream
+            The parent stream (downstream element) to connect to
         '''
         # Note : parents go downstream and children go upstream.
         self.parents.append(parent)
@@ -122,6 +122,18 @@ class Stream(object):
             parent.children = [self]
         else:
             parent.children.append(self)
+
+    def disconnect(self, parent):
+        ''' Disconnect this stream to a downstream element.
+
+        Parameters
+        ----------
+        parent: Stream
+            The parent stream (downstream element) to disconnect from
+        '''
+        self.parents.remove(parent)
+
+        parent.children.remove(self)
 
     @property
     def child(self):

@@ -617,3 +617,20 @@ def test_connect():
     source_upstream.emit(4)
 
     assert L == [3, 5]
+
+
+def test_disconnect():
+    source = Stream()
+
+    upstream = Stream()
+    L = upstream.sink_to_list()
+
+    source.emit(1)
+    assert L == []
+    source.connect(upstream)
+    source.emit(2)
+    source.emit(3)
+    assert L == [2, 3]
+    source.disconnect(upstream)
+    source.emit(4)
+    assert L == [2, 3]
