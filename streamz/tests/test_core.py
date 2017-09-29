@@ -216,7 +216,7 @@ def test_sink_to_file():
 @gen_test()
 def test_counter():
     counter = itertools.count()
-    source = PeriodicCallback(counter.__next__, 0.001)
+    source = PeriodicCallback(lambda: next(counter), 0.001)
     L = source.sink_to_list()
     yield gen.sleep(0.05)
 
