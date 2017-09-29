@@ -16,7 +16,7 @@ authors:
  - name: Daniel B. Allan
    orcid: 0000-0002-5947-6017
    affiliation: 4
- - name: Stuart Campbell
+ - name: Stuart I. Campbell
    orcid: 0000-0001-7079-0878
    affiliation: 4
  - name: Kevin G. Yager
