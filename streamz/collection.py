@@ -6,6 +6,22 @@ _subtypes = []
 
 
 class Streaming(object):
+    """
+    Superclass for streaming collections
+
+    Do not create this class directly, use one of the subclasses instead.
+
+    Parameters
+    ----------
+    stream: streamz.Stream
+    example: object
+        An object to represent an example element of this stream
+
+    See also
+    --------
+    streamz.dataframe.StreamingDataFrame
+    streamz.dataframe.StreamingSequence
+    """
     _subtype = object
 
     def __init__(self, stream=None, example=None):
@@ -15,6 +31,15 @@ class Streaming(object):
         self.stream = stream or Stream()
 
     def map_partitions(self, func, *args, **kwargs):
+        """ Map a function across all batch elements of this stream
+
+        The output stream type will be determined by the action of that
+        function on the example
+
+        See Also
+        --------
+        Streaming.accumulate_partitions
+        """
         example = kwargs.pop('example', None)
         if example is None:
             example = func(self.example, *args, **kwargs)
@@ -26,6 +51,12 @@ class Streaming(object):
         return Streaming(stream, example)
 
     def accumulate_partitions(self, func, *args, **kwargs):
+        """ Accumulate a function with state across batch elements
+
+        See Also
+        --------
+        Streaming.map_partitions
+        """
         start = kwargs.pop('start', core.no_default)
         returns_state = kwargs.pop('returns_state', False)
         example = kwargs.pop('example', None)
@@ -78,6 +109,7 @@ class Streaming(object):
         self.stream.emit(x)
 
     def verify(self, x):
+        """ Verify elements that pass through this stream """
         if not isinstance(x, self._subtype):
             raise TypeError("Expected type %s, got type %s" %
                             (self._subtype, type(x)))

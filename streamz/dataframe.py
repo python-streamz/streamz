@@ -26,6 +26,17 @@ class StreamingFrame(Streaming):
 
 
 class StreamingDataFrame(StreamingFrame):
+    """ A Streaming dataframe
+
+    This is a logical collection over a stream of Pandas dataframes.
+    Operations on this object will translate to the appropriate operations on
+    the underlying Pandas dataframes.
+
+    See Also
+    --------
+    streams.dataframe.StreamingSeries
+    streams.sequence.StreamingSequence
+    """
     _subtype = pd.DataFrame
 
     @property
@@ -91,6 +102,17 @@ class StreamingDataFrame(StreamingFrame):
 
 
 class StreamingSeries(StreamingFrame):
+    """ A Streaming series
+
+    This is a logical collection over a stream of Pandas series objects.
+    Operations on this object will translate to the appropriate operations on
+    the underlying Pandas series.
+
+    See Also
+    --------
+    streams.dataframe.StreamingDataFrame
+    streams.sequence.StreamingSequence
+    """
     _subtype = pd.Series
 
     def mean(self):
