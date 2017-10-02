@@ -6,89 +6,15 @@ from streamz import Stream
 from dask.utils import M
 import pandas as pd
 
+from .collection import Streaming, _subtypes
 
-class Streaming(object):
-    _subtype = object
 
-    def __init__(self, stream=None, example=None, columns=None):
-        if columns is not None and example is None:
-            example = pd.DataFrame({c: [] for c in columns})
-        assert example is not None
-        self.example = example
-        assert isinstance(self.example, self._subtype)
-        self.stream = stream or Stream()
+class StreamingFrame(Streaming):
+    def sum(self):
+        return self.accumulate_partitions(_accumulate_sum, start=0)
 
-    def map_partitions(self, func, *args, **kwargs):
-        example = kwargs.pop('example', None)
-        if example is None:
-            example = func(self.example, *args, **kwargs)
-        stream = self.stream.map(func, *args, **kwargs)
-
-        if isinstance(example, pd.DataFrame):
-            return StreamingDataFrame(stream, example)
-        elif isinstance(example, pd.Series):
-            return StreamingSeries(stream, example)
-        else:
-            return Streaming(stream, example)
-
-    def accumulate_partitions(self, func, *args, **kwargs):
-        start = kwargs.pop('start', streamz.core.no_default)
-        returns_state = kwargs.pop('returns_state', False)
-        example = kwargs.pop('example', None)
-        if example is None:
-            example = func(start, self.example, *args, **kwargs)
-        if returns_state:
-            _, example = example
-        stream = self.stream.accumulate(func, *args, start=start,
-                returns_state=returns_state, **kwargs)
-
-        if isinstance(example, pd.DataFrame):
-            return StreamingDataFrame(stream, example)
-        elif isinstance(example, pd.Series):
-            return StreamingSeries(stream, example)
-        else:
-            return Streaming(stream, example)
-
-    def __repr__(self):
-        example = self.example
-        if hasattr(example, 'head'):
-            example = example.head(2)
-        return "%s - elements like:\n%r" % (type(self).__name__, example)
-
-    def _repr_html_(self):
-        example = self.example
-        if hasattr(example, 'head'):
-            example = example.head(2)
-        try:
-            body = example._repr_html_()
-        except AttributeError:
-            body = repr(example)
-
-        return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
-
-    def __add__(self, other):
-        return self.map_partitions(operator.add, other)
-
-    def __mul__(self, other):
-        return self.map_partitions(operator.mul, other)
-
-    def __mod__(self, other):
-        return self.map_partitions(operator.mod, other)
-
-    def __truediv__(self, other):
-        return self.map_partitions(operator.truediv, other)
-
-    def __floordiv__(self, other):
-        return self.map_partitions(operator.floordiv, other)
-
-    def emit(self, x):
-        self.verify(x)
-        self.stream.emit(x)
-
-    def verify(self, x):
-        if not isinstance(x, self._subtype):
-            raise TypeError("Expected type %s, got type %s" %
-                            (self._subtype, type(x)))
+    def round(self, decimals=0):
+        return self.map_partitions(M.round, decimals=decimals)
 
     def rolling(self, window, min_periods=1):
         if not isinstance(window, int):
@@ -99,14 +25,6 @@ class Streaming(object):
                             min_periods=min_periods, returns_state=True)
                       .filter(lambda x: len(x) >= min_periods))
         return type(self)(stream=stream, example=self.example)
-
-
-class StreamingFrame(Streaming):
-    def sum(self):
-        return self.accumulate_partitions(_accumulate_sum, start=0)
-
-    def round(self, decimals=0):
-        return self.map_partitions(M.round, decimals=decimals)
 
 
 class StreamingDataFrame(StreamingFrame):
@@ -304,3 +222,7 @@ def _roll(accumulator, new, window, min_periods):
 
     out = accumulator if len(accumulator) >= min_periods else []
     return accumulator, out
+
+
+_subtypes.append((pd.DataFrame, StreamingDataFrame))
+_subtypes.append((pd.Series, StreamingSeries))

@@ -9,10 +9,10 @@ import pandas.util.testing as tm
 
 
 def test_identity():
-    sdf = StreamingDataFrame(columns=['x', 'y'])
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
     L = sdf.stream.sink_to_list()
 
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf.emit(df)
 
     assert L[0] is df
@@ -29,7 +29,8 @@ def test_identity():
 
 
 def test_exceptions():
-    sdf = StreamingDataFrame(columns=['x', 'y'])
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
     with pytest.raises(TypeError):
         sdf.emit(1)
 
@@ -38,7 +39,8 @@ def test_exceptions():
 
 
 def test_sum():
-    sdf = StreamingDataFrame(columns=['x', 'y'])
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
     df_out = sdf.sum().stream.sink_to_list()
 
     x = sdf.x
@@ -56,7 +58,8 @@ def test_sum():
 
 
 def test_mean():
-    sdf = StreamingDataFrame(columns=['x', 'y'])
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
     mean = sdf.mean()
     assert isinstance(mean, StreamingSeries)
     df_out = mean.stream.sink_to_list()
@@ -76,7 +79,8 @@ def test_mean():
 
 
 def test_arithmetic():
-    a = StreamingDataFrame(columns=['x', 'y'])
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    a = StreamingDataFrame(example=df)
     b = a + 1
 
     L1 = b.stream.sink_to_list()
