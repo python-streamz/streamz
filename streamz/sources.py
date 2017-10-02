@@ -27,7 +27,11 @@ def sink_to_file(filename, child, mode='w', prefix='', suffix='\n', flush=False)
     return file
 
 
-class TextFile(Stream):
+class Source(Stream):
+    _graphviz_shape = 'doubleoctagon'
+
+
+class TextFile(Source):
     """ Stream data from a text file
 
     Parameters
