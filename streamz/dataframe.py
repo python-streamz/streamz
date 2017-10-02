@@ -1,8 +1,6 @@
 from functools import partial
 import operator
 
-import streamz
-from streamz import Stream
 from dask.utils import M
 import pandas as pd
 
