@@ -668,12 +668,13 @@ def test_from_file():
             f.write('{"x": 3, "y": 2}\n')
             f.flush()
 
-            source = Stream()
+            source = Stream.from_textfile(fn, poll_interval=0.010)
             L = source.map(json.loads).pluck('x').sink_to_list()
 
             assert L == []
 
-            source.from_textfile(fn, poll_interval=0.010)
+            source.start()
+
             assert L == [1, 2, 3]
 
             f.write('{"x": 4, "y": 2}\n')

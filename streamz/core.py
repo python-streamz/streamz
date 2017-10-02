@@ -491,8 +491,8 @@ class Stream(object):
         from .sequence import StreamingSequence
         return StreamingSequence(stream=self, **kwargs)
 
-    @gen.coroutine
-    def from_textfile(self, f, poll_interval=None):
+    @staticmethod
+    def from_textfile(f, poll_interval=None):
         """ Read data from file into stream
 
         Parameters
@@ -513,19 +513,8 @@ class Stream(object):
         -------
         Nothing.  This has the side effect of emitting data into the stream.
         """
-        if isinstance(f, str):
-            f = open(f)
-
-        while True:
-            line = f.readline()
-            if line:
-                last = self.emit(line)  # TODO: we should yield on emit
-            else:
-                if poll_interval:
-                    yield gen.sleep(poll_interval)
-                    yield last
-                else:
-                    return
+        from .sources import TextFile
+        return TextFile(f, poll_interval=poll_interval)
 
 
 class Sink(Stream):
