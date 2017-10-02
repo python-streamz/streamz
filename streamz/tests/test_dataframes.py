@@ -1,11 +1,14 @@
+import json
 import time
 
-from streamz.dataframe import StreamingDataFrame, StreamingSeries
 import pytest
 from dask.dataframe.utils import assert_eq
 import numpy as np
 import pandas as pd
 import pandas.util.testing as tm
+
+from streamz import Stream
+from streamz.dataframe import StreamingDataFrame, StreamingSeries
 
 
 def test_identity():
@@ -219,3 +222,15 @@ def test_rolling_time():
     for df in L[3:]:
         assert df.index.max() - df.index.min() < pd.Timedelta('10ms')
         assert df.index.max() - df.index.min() > pd.Timedelta('1ms')
+
+
+def test_integration_from_stream():
+    source = Stream()
+    sdf = source.partition(4).to_sequence(example=['{"x": 0, "y": 0}']).map(json.loads).to_dataframe()
+    result = sdf.groupby(sdf.x).y.sum().mean()
+    L = result.stream.sink_to_list()
+
+    for i in range(12):
+        source.emit(json.dumps({'x': i % 3, 'y': i}))
+
+    assert L == [2, 17/3, 100 / 9]

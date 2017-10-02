@@ -481,6 +481,11 @@ class Stream(object):
         from .graph import visualize
         return visualize(self, filename, **kwargs)
 
+    def to_sequence(self, **kwargs):
+        """ Convert to a stream of batches """
+        from .sequence import StreamingSequence
+        return StreamingSequence(stream=self, **kwargs)
+
     @gen.coroutine
     def from_textfile(self, f, poll_interval=None):
         """ Read data from file into stream

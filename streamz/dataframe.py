@@ -36,7 +36,7 @@ class StreamingDataFrame(StreamingFrame):
         return self.map_partitions(operator.getitem, index)
 
     def __getattr__(self, key):
-        if key in self.columns:
+        if key in self.columns or not len(self.columns):
             return self.map_partitions(getattr, key)
         else:
             raise AttributeError("StreamingDataFrame has no attribute %r" % key)
@@ -125,7 +125,7 @@ class StreamingSeriesGroupby(object):
         return StreamingSeriesGroupby(self.root, self.grouper, index)
 
     def __getattr__(self, key):
-        if key in self.root.columns:
+        if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
             raise AttributeError("StreamingSeriesGroupby has no attribute %r" % key)

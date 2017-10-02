@@ -34,6 +34,7 @@ class StreamingSequence(Streaming):
 
     def to_dataframe(self):
         import pandas as pd
+        import streamz.dataframe
         return self.map_partitions(pd.DataFrame)
 
 
