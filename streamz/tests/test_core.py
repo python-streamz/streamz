@@ -517,28 +517,28 @@ def test_map_str():
 
     source = Stream()
     s = source.map(add, y=10)
-    assert str(s) == '<map; func=add>'
+    assert str(s) == '<map: add>'
 
 
 def test_filter_str():
-    def add(x=0, y=0):
-        return x + y
+    def iseven(x):
+        return x % 2 == 0
 
     source = Stream()
-    s = source.filter(add)
-    assert str(s) == '<filter; predicate=add>'
+    s = source.filter(iseven)
+    assert str(s) == '<filter: iseven>'
 
 
 def test_timed_window_str():
     source = Stream()
     s = source.timed_window(.05)
-    assert str(s) == '<timed_window; interval=0.05>'
+    assert str(s) == '<timed_window: 0.05>'
 
 
 def test_partition_str():
     source = Stream()
     s = source.partition(2)
-    assert str(s) == '<partition; n=2>'
+    assert str(s) == '<partition: 2>'
 
 
 def test_stream_name_str():

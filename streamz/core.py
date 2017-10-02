@@ -52,6 +52,11 @@ class Stream(object):
     >>> L  # and the actions happen at the sinks
     ['1', '2', '3', '4', '5']
     """
+    _graphviz_shape = 'ellipse'
+    _graphviz_style = 'rounded,filled'
+    _graphviz_fillcolor = 'white'
+    _graphviz_orientation = 0
+
     str_list = ['func', 'predicate', 'n', 'interval']
 
     def __init__(self, child=None, children=None, stream_name=None, **kwargs):
@@ -88,9 +93,16 @@ class Stream(object):
                     s = None
             if s:
                 s_list.append('{}={}'.format(m, s))
-        s = "; ".join(s_list)
-        s = "<" + s + ">"
-        return s
+        if len(s_list) <= 2:
+            s_list = [term.split('=')[-1] for term in s_list]
+
+        text = "<"
+        text += s_list[0]
+        if len(s_list) > 1:
+            text += ': '
+            text += ', '.join(s_list[1:])
+        text += '>'
+        return text
 
     def emit(self, x):
         """ Push data into the stream at this point
@@ -518,6 +530,8 @@ class Stream(object):
 
 
 class Sink(Stream):
+    _graphviz_shape = 'invtrapezium'
+
     def __init__(self, func, child):
         self.func = func
 
@@ -564,6 +578,8 @@ class filter(Stream):
 
 
 class scan(Stream):
+    _graphviz_shape = 'box'
+
     def __init__(self, func, child, start=no_default, returns_state=False,
                  **kwargs):
         self.func = func
@@ -697,6 +713,9 @@ class buffer(Stream):
 
 
 class zip(Stream):
+    _graphviz_orientation = 270
+    _graphviz_shape = 'triangle'
+
     def __init__(self, *children, **kwargs):
         self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]

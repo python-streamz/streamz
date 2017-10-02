@@ -16,7 +16,12 @@ def create_graph(node, graph, prior_node=None, pc=None):
     if node is None:
         return
     t = hash(node)
-    graph.add_node(t, str=str(node))
+    graph.add_node(t,
+                   label=str(node).replace(':', ';'),
+                   shape=node._graphviz_shape,
+                   orientation=str(node._graphviz_orientation),
+                   style=node._graphviz_style,
+                   fillcolor=node._graphviz_fillcolor)
     if prior_node:
         tt = hash(prior_node)
         if graph.has_edge(t, tt):
@@ -44,7 +49,7 @@ def readable_graph(node):
     import networkx as nx
     g = nx.DiGraph()
     create_graph(node, g)
-    mapping = {k: '{}'.format(g.node[k]['str']) for k in g}
+    mapping = {k: '{}'.format(g.node[k]['label']) for k in g}
     idx_mapping = {}
     for k, v in mapping.items():
         if v in idx_mapping.keys():
@@ -61,8 +66,8 @@ def readable_graph(node):
 def to_graphviz(graph, **graph_attr):
     import graphviz
     gvz = graphviz.Digraph(graph_attr=graph_attr)
-    for node in graph.nodes():
-        gvz.node(node)
+    for node, attrs in graph.node.items():
+        gvz.node(node, **attrs)
     gvz.edges(graph.edges())
     return gvz
 

@@ -1,4 +1,4 @@
-from operator import add
+from operator import add, mul
 import os
 
 import pytest
@@ -27,7 +27,7 @@ def test_create_file():
     source2 = Stream(stream_name='source2')
 
     n1 = source1.zip(source2)
-    n2 = n1.map(add)
+    n2 = n1.map(add).scan(mul)
     n2.sink(source1.emit)
 
     with tmpfile(extension='png') as fn:
@@ -43,5 +43,6 @@ def test_create_file():
         with open(fn) as f:
             text = f.read()
 
-        for word in ['rankdir', 'source1', 'source2', 'zip', 'map', 'add']:
+        for word in ['rankdir', 'source1', 'source2', 'zip', 'map', 'add',
+                     'shape=box', 'shape=ellipse']:
             assert word in text
