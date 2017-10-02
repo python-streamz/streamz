@@ -481,6 +481,52 @@ class Stream(object):
         from .graph import visualize
         return visualize(self, filename, **kwargs)
 
+    def to_dataframe(self, example):
+        """ Convert a stream of Pandas dataframes to a StreamingDataFrame """
+        from .dataframe import StreamingDataFrame
+        return StreamingDataFrame(stream=self, example=example)
+
+    def to_sequence(self, **kwargs):
+        """ Convert to a stream of lists to a StreamingSequence """
+        from .sequence import StreamingSequence
+        return StreamingSequence(stream=self, **kwargs)
+
+    @gen.coroutine
+    def from_textfile(self, f, poll_interval=None):
+        """ Read data from file into stream
+
+        Parameters
+        ----------
+        f: file or string
+            File object or filename to read
+        poll_interval: number
+            Number of seconds between which to poll the file
+            If None then don't poll, and instead return without waiting
+
+        Example
+        -------
+        >>> source = Stream()
+        >>> source.map(json.loads).pluck('value').sum()
+        >>> source.from_textfile('myfile.json')
+
+        Returns
+        -------
+        Nothing.  This has the side effect of emitting data into the stream.
+        """
+        if isinstance(f, str):
+            f = open(f)
+
+        while True:
+            line = f.readline()
+            if line:
+                last = self.emit(line)  # TODO: we should yield on emit
+            else:
+                if poll_interval:
+                    yield gen.sleep(poll_interval)
+                    yield last
+                else:
+                    return
+
 
 class Sink(Stream):
     def __init__(self, func, child):
