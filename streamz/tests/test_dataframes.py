@@ -156,7 +156,7 @@ def test_repr_html():
     for x in [a, a.y, a.y.mean()]:
         html = x._repr_html_()
         assert type(x).__name__ in html
-        assert '1.0' in html
+        assert '1' in html
 
 
 def test_setitem():

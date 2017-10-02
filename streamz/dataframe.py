@@ -1,7 +1,7 @@
 from functools import partial
 import operator
 
-from dask.utils import M
+from .utils import M
 import pandas as pd
 
 from .collection import Streaming, _subtypes
