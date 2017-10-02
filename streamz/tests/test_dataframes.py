@@ -224,6 +224,18 @@ def test_rolling_time():
         assert df.index.max() - df.index.min() > pd.Timedelta('1ms')
 
 
+def test_stream_to_dataframe():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    source = Stream()
+    L = source.to_dataframe(example=df).x.sum().stream.sink_to_list()
+
+    source.emit(df)
+    source.emit(df)
+    source.emit(df)
+
+    assert L == [6, 12, 18]
+
+
 def test_integration_from_stream():
     source = Stream()
     sdf = source.partition(4).to_sequence(example=['{"x": 0, "y": 0}']).map(json.loads).to_dataframe()
@@ -233,4 +245,4 @@ def test_integration_from_stream():
     for i in range(12):
         source.emit(json.dumps({'x': i % 3, 'y': i}))
 
-    assert L == [2, 17/3, 100 / 9]
+    assert L == [2, 17 / 3, 100 / 9]

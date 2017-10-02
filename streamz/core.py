@@ -481,8 +481,13 @@ class Stream(object):
         from .graph import visualize
         return visualize(self, filename, **kwargs)
 
+    def to_dataframe(self, example):
+        """ Convert a stream of Pandas dataframes to a StreamingDataFrame """
+        from .dataframe import StreamingDataFrame
+        return StreamingDataFrame(stream=self, example=example)
+
     def to_sequence(self, **kwargs):
-        """ Convert to a stream of batches """
+        """ Convert to a stream of lists to a StreamingSequence """
         from .sequence import StreamingSequence
         return StreamingSequence(stream=self, **kwargs)
 
