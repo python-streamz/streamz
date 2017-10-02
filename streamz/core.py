@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
 from collections import deque
+import functools
 from time import time
 import weakref
 
@@ -71,6 +72,14 @@ class Stream(object):
             if child:
                 child.parents.add(self)
         self.name = stream_name
+
+    @classmethod
+    def register_api(cls, func):
+        @functools.wraps(func)
+        def _(*args, **kwargs):
+            return func(*args, **kwargs)
+        setattr(cls, func.__name__, _)
+        return func
 
     def __str__(self):
         s_list = []
@@ -176,121 +185,13 @@ class Stream(object):
         from .dask import scatter
         return scatter(self)
 
-    def map(self, func, *args, **kwargs):
-        """ Apply a function to every element in the stream """
-        return map(func, self, args=args, **kwargs)
-
-    def filter(self, predicate):
-        """ Only pass through elements that satisfy the predicate """
-        return filter(predicate, self)
-
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False
-        """
-        return filter(lambda x: not predicate(x), self)
+        """ Only pass through elements for which the predicate returns False """
+        return self.filter(lambda x: not predicate(x))
 
-    def accumulate(self, func, start=no_default, returns_state=False, **kwargs):
-        """ Accumulate results with previous state
-
-        This preforms running or cumulative reductions, applying the function
-        to the previous total and the new element.  The function should take
-        two arguments, the previous accumulated state and the next element and
-        it should return a new accumulated state.
-
-        Parameters
-        ----------
-        func: callable
-        start: object
-            Initial value.  Defaults to the first submitted element
-        returns_state: boolean
-            If true then func should return both the state and the value to emit
-            If false then both values are the same, and func returns one value
-        **kwargs:
-            Keyword arguments to pass to func
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.accumulate(lambda acc, x: acc + x).sink(print)
-        ...
-        >>> for i in range(5):
-        ...     source.emit(i)
-        1
-        3
-        6
-        10
-        """
-        return scan(func, self, start=start, returns_state=returns_state, **kwargs)
-
-    scan = accumulate
-
-    def partition(self, n):
-        """ Partition stream into tuples of equal size
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.partition(3).sink(print)
-        >>> for i in range(10):
-        ...     source.emit(i)
-        (0, 1, 2)
-        (3, 4, 5)
-        (6, 7, 8)
-        """
-        return partition(n, self)
-
-    def sliding_window(self, n):
-        """ Produce overlapping tuples of size n
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.sliding_window(3).sink(print)
-        >>> for i in range(8):
-        ...     source.emit(i)
-        (0, 1, 2)
-        (1, 2, 3)
-        (2, 3, 4)
-        (3, 4, 5)
-        (4, 5, 6)
-        (5, 6, 7)
-        """
-        return sliding_window(n, self)
-
-    def rate_limit(self, interval):
-        """ Limit the flow of data
-
-        This stops two elements of streaming through in an interval shorter
-        than the provided value.
-
-        Parameters
-        ----------
-        interval: float
-            Time in seconds
-        """
-        return rate_limit(interval, self)
-
-    def buffer(self, n, loop=None):
-        """ Allow results to pile up at this point in the stream
-
-        This allows results to buffer in place at various points in the stream.
-        This can help to smooth flow through the system when backpressure is
-        applied.
-        """
-        return buffer(n, self, loop=loop)
-
-    def timed_window(self, interval, loop=None):
-        """ Emit a tuple of collected results every interval
-
-        Every ``interval`` seconds this emits a tuple of all of the results
-        seen so far.  This can help to batch data coming off of a high-volume
-        stream.
-        """
-        return timed_window(interval, self, loop=loop)
-
-    def delay(self, interval, loop=None):
-        """ Add a time delay to results """
-        return delay(interval, self, loop=None)
+    @property
+    def scan(self):
+        return self.accumulate
 
     def combine_latest(self, *others, **kwargs):
         """ Combine multiple streams together to a stream of tuples
@@ -546,8 +447,10 @@ class Sink(Stream):
             return []
 
 
+@Stream.register_api
 class map(Stream):
-    def __init__(self, func, child, args=(), **kwargs):
+    """ Apply a function to every element in the stream """
+    def __init__(self, child, func, *args, **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.args = args
@@ -564,8 +467,10 @@ def _truthy(x):
     return not not x
 
 
+@Stream.register_api
 class filter(Stream):
-    def __init__(self, predicate, child):
+    """ Only pass through elements that satisfy the predicate """
+    def __init__(self, child, predicate):
         if predicate is None:
             predicate = _truthy
         self.predicate = predicate
@@ -577,10 +482,41 @@ class filter(Stream):
             return self.emit(x)
 
 
-class scan(Stream):
+@Stream.register_api
+class accumulate(Stream):
+    """ Accumulate results with previous state
+
+    This preforms running or cumulative reductions, applying the function
+    to the previous total and the new element.  The function should take
+    two arguments, the previous accumulated state and the next element and
+    it should return a new accumulated state.
+
+    Parameters
+    ----------
+    func: callable
+    start: object
+        Initial value.  Defaults to the first submitted element
+    returns_state: boolean
+        If true then func should return both the state and the value to emit
+        If false then both values are the same, and func returns one value
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.accumulate(lambda acc, x: acc + x).sink(print)
+    ...
+    >>> for i in range(5):
+    ...     source.emit(i)
+    1
+    3
+    6
+    10
+    """
     _graphviz_shape = 'box'
 
-    def __init__(self, func, child, start=no_default, returns_state=False,
+    def __init__(self, child, func, start=no_default, returns_state=False,
                  **kwargs):
         self.func = func
         self.kwargs = kwargs
@@ -602,8 +538,21 @@ class scan(Stream):
             return self.emit(result)
 
 
+@Stream.register_api
 class partition(Stream):
-    def __init__(self, n, child):
+    """ Partition stream into tuples of equal size
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.partition(3).sink(print)
+    >>> for i in range(10):
+    ...     source.emit(i)
+    (0, 1, 2)
+    (3, 4, 5)
+    (6, 7, 8)
+    """
+    def __init__(self, child, n):
         self.n = n
         self.buffer = []
         Stream.__init__(self, child)
@@ -617,8 +566,24 @@ class partition(Stream):
             return []
 
 
+@Stream.register_api
 class sliding_window(Stream):
-    def __init__(self, n, child):
+    """ Produce overlapping tuples of size n
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.sliding_window(3).sink(print)
+    >>> for i in range(8):
+    ...     source.emit(i)
+    (0, 1, 2)
+    (1, 2, 3)
+    (2, 3, 4)
+    (3, 4, 5)
+    (4, 5, 6)
+    (5, 6, 7)
+    """
+    def __init__(self, child, n):
         self.n = n
         self.buffer = deque(maxlen=n)
         Stream.__init__(self, child)
@@ -631,8 +596,15 @@ class sliding_window(Stream):
             return []
 
 
+@Stream.register_api
 class timed_window(Stream):
-    def __init__(self, interval, child, loop=None):
+    """ Emit a tuple of collected results every interval
+
+    Every ``interval`` seconds this emits a tuple of all of the results
+    seen so far.  This can help to batch data coming off of a high-volume
+    stream.
+    """
+    def __init__(self, child, interval, loop=None):
         self.interval = interval
         self.buffer = []
         self.last = gen.moment
@@ -654,8 +626,10 @@ class timed_window(Stream):
             yield gen.sleep(self.interval)
 
 
+@Stream.register_api
 class delay(Stream):
-    def __init__(self, interval, child, loop=None):
+    """ Add a time delay to results """
+    def __init__(self, child, interval, loop=None):
         self.interval = interval
         self.queue = Queue()
 
@@ -677,8 +651,19 @@ class delay(Stream):
         return self.queue.put(x)
 
 
+@Stream.register_api
 class rate_limit(Stream):
-    def __init__(self, interval, child):
+    """ Limit the flow of data
+
+    This stops two elements of streaming through in an interval shorter
+    than the provided value.
+
+    Parameters
+    ----------
+    interval: float
+        Time in seconds
+    """
+    def __init__(self, child, interval):
         self.interval = interval
         self.next = 0
 
@@ -694,8 +679,15 @@ class rate_limit(Stream):
         yield self.emit(x)
 
 
+@Stream.register_api
 class buffer(Stream):
-    def __init__(self, n, child, loop=None):
+    """ Allow results to pile up at this point in the stream
+
+    This allows results to buffer in place at various points in the stream.
+    This can help to smooth flow through the system when backpressure is
+    applied.
+    """
+    def __init__(self, child, n, loop=None):
         self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, child, loop=loop)
