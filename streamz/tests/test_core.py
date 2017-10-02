@@ -1,5 +1,6 @@
 from datetime import timedelta
 import itertools
+import json
 import operator
 from operator import add
 from time import time, sleep
@@ -656,3 +657,29 @@ def test_gc():
 
     source.emit(2)
     assert L == [1]
+
+
+@gen_test()
+def test_from_file():
+    with tmpfile() as fn:
+        with open(fn, 'wt') as f:
+            f.write('{"x": 1, "y": 2}\n')
+            f.write('{"x": 2, "y": 2}\n')
+            f.write('{"x": 3, "y": 2}\n')
+            f.flush()
+
+            source = Stream()
+            L = source.map(json.loads).pluck('x').sink_to_list()
+
+            assert L == []
+
+            source.from_textfile(fn, poll_interval=0.010)
+            assert L == [1, 2, 3]
+
+            f.write('{"x": 4, "y": 2}\n')
+            f.write('{"x": 5, "y": 2}\n')
+            f.flush()
+
+            yield gen.sleep(0.050)
+
+            assert L == [1, 2, 3, 4, 5]
