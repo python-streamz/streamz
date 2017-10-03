@@ -684,3 +684,27 @@ def test_from_file():
             yield gen.sleep(0.050)
 
             assert L == [1, 2, 3, 4, 5]
+
+
+def test_docstrings():
+    for s in [Stream, Stream()]:
+        assert 'every element' in s.map.__doc__
+        assert s.map.__name__ == 'map'
+        assert 'predicate' in s.filter.__doc__
+        assert s.filter.__name__ == 'filter'
+
+
+def test_subclass():
+    class NewStream(Stream):
+        pass
+
+    @NewStream.register_api
+    class foo(NewStream):
+        pass
+
+    assert hasattr(NewStream, 'map')
+    assert hasattr(NewStream(), 'map')
+    assert hasattr(NewStream, 'foo')
+    assert hasattr(NewStream(), 'foo')
+    assert not hasattr(Stream, 'foo')
+    assert not hasattr(Stream(), 'foo')
