@@ -26,6 +26,9 @@ class StreamingBatch(Streaming):
     def sum(self):
         return self.accumulate_partitions(_accumulate_sum, start=0)
 
+    def filter(self, predicate):
+        return self.map_partitions(_filter, predicate)
+
     def pluck(self, ind):
         return self.map_partitions(_pluck, ind)
 
@@ -36,6 +39,17 @@ class StreamingBatch(Streaming):
         import pandas as pd
         import streamz.dataframe  # flake8: noqa
         return self.map_partitions(pd.DataFrame)
+
+    def to_stream(self):
+        """ Concatenate batches and return base Stream
+
+        Returned stream will be composed of single elements
+        """
+        return self.stream.concat()
+
+
+def _filter(seq, predicate):
+    return list(filter(predicate, seq))
 
 
 def _pluck(seq, ind):

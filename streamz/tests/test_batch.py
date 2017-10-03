@@ -35,3 +35,13 @@ def test_dataframes():
 
     result = pd.concat(L)
     assert result.z.tolist() == [3 * i for i in range(10)]
+
+
+def test_filter():
+    a = StreamingBatch()
+    L = a.filter(lambda x: x % 2 == 0).to_stream().sink_to_list()
+
+    a.emit([1, 2, 3, 4])
+    a.emit([5, 6])
+
+    assert L == [2, 4, 6]
