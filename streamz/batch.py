@@ -3,8 +3,8 @@ import toolz
 import toolz.curried
 
 
-class StreamingSequence(Streaming):
-    """ A Stream of Sequences
+class StreamingBatch(Streaming):
+    """ A Stream of batches
 
     This streaming collection manages batches of Python objects such as lists
     of text or dictionaries.  By batching many elements together we reduce
@@ -21,7 +21,7 @@ class StreamingSequence(Streaming):
     def __init__(self, stream=None, example=None):
         if example is None:
             example = []
-        super(StreamingSequence, self).__init__(stream=stream, example=example)
+        super(StreamingBatch, self).__init__(stream=stream, example=example)
 
     def sum(self):
         return self.accumulate_partitions(_accumulate_sum, start=0)
@@ -52,4 +52,4 @@ def _accumulate_sum(accumulator, new):
 
 map_type = type(map(lambda x: x, []))
 
-_subtypes.append(((list, tuple, set), StreamingSequence))
+_subtypes.append(((list, tuple, set), StreamingBatch))

@@ -399,10 +399,10 @@ class Stream(object):
         from .dataframe import StreamingDataFrame
         return StreamingDataFrame(stream=self, example=example)
 
-    def to_sequence(self, **kwargs):
-        """ Convert to a stream of lists to a StreamingSequence """
-        from .sequence import StreamingSequence
-        return StreamingSequence(stream=self, **kwargs)
+    def to_batch(self, **kwargs):
+        """ Convert to a stream of lists to a StreamingBatch """
+        from .batch import StreamingBatch
+        return StreamingBatch(stream=self, **kwargs)
 
     @staticmethod
     def from_textfile(f, poll_interval=None):

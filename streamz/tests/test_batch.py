@@ -1,19 +1,19 @@
 import pytest
 import toolz
 
-from streamz.sequence import StreamingSequence, Streaming
+from streamz.batch import StreamingBatch, Streaming
 from streamz.utils_test import inc
 
 
 def test_core():
-    a = StreamingSequence()
+    a = StreamingBatch()
     b = a.pluck('x').map(inc)
     c = b.sum()
     L = c.stream.sink_to_list()
 
     a.emit([{'x': i, 'y': 0} for i in range(4)])
 
-    assert isinstance(b, StreamingSequence)
+    assert isinstance(b, StreamingBatch)
     assert isinstance(c, Streaming)
     assert L == [1 + 2 + 3 + 4]
 
@@ -23,7 +23,7 @@ def test_dataframes():
     from streamz.dataframe import StreamingDataFrame
     data = [{'x': i, 'y': 2 * i} for i in range(10)]
 
-    s = StreamingSequence(example=[{'x': 0, 'y': 0}])
+    s = StreamingBatch(example=[{'x': 0, 'y': 0}])
     sdf = s.map(lambda d: toolz.assoc(d, 'z', d['x'] + d['y'])).to_dataframe()
 
     assert isinstance(sdf, StreamingDataFrame)

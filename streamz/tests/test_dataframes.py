@@ -220,7 +220,7 @@ def test_rolling_time():
 
     assert L
     for df in L[3:]:
-        assert df.index.max() - df.index.min() < pd.Timedelta('10ms')
+        assert df.index.max() - df.index.min() <= pd.Timedelta('10ms')
         assert df.index.max() - df.index.min() > pd.Timedelta('1ms')
 
 
@@ -238,7 +238,7 @@ def test_stream_to_dataframe():
 
 def test_integration_from_stream():
     source = Stream()
-    sdf = source.partition(4).to_sequence(example=['{"x": 0, "y": 0}']).map(json.loads).to_dataframe()
+    sdf = source.partition(4).to_batch(example=['{"x": 0, "y": 0}']).map(json.loads).to_dataframe()
     result = sdf.groupby(sdf.x).y.sum().mean()
     L = result.stream.sink_to_list()
 
