@@ -431,7 +431,7 @@ class Stream(object):
 
 
 class Sink(Stream):
-    _graphviz_shape = 'invtrapezium'
+    _graphviz_shape = 'trapezium'
 
     def __init__(self, func, child):
         self.func = func
@@ -552,6 +552,8 @@ class partition(Stream):
     (3, 4, 5)
     (6, 7, 8)
     """
+    _graphviz_shape = 'diamond'
+
     def __init__(self, child, n):
         self.n = n
         self.buffer = []
@@ -583,6 +585,8 @@ class sliding_window(Stream):
     (4, 5, 6)
     (5, 6, 7)
     """
+    _graphviz_shape = 'diamond'
+
     def __init__(self, child, n):
         self.n = n
         self.buffer = deque(maxlen=n)
@@ -604,6 +608,8 @@ class timed_window(Stream):
     seen so far.  This can help to batch data coming off of a high-volume
     stream.
     """
+    _graphviz_shape = 'octagon'
+
     def __init__(self, child, interval, loop=None):
         self.interval = interval
         self.buffer = []
@@ -629,6 +635,8 @@ class timed_window(Stream):
 @Stream.register_api
 class delay(Stream):
     """ Add a time delay to results """
+    _graphviz_shape = 'octagon'
+
     def __init__(self, child, interval, loop=None):
         self.interval = interval
         self.queue = Queue()
@@ -663,6 +671,8 @@ class rate_limit(Stream):
     interval: float
         Time in seconds
     """
+    _graphviz_shape = 'octagon'
+
     def __init__(self, child, interval):
         self.interval = interval
         self.next = 0
@@ -687,6 +697,8 @@ class buffer(Stream):
     This can help to smooth flow through the system when backpressure is
     applied.
     """
+    _graphviz_shape = 'diamond'
+
     def __init__(self, child, n, loop=None):
         self.queue = Queue(maxsize=n)
 
@@ -726,6 +738,9 @@ class zip(Stream):
 
 
 class combine_latest(Stream):
+    _graphviz_orientation = 270
+    _graphviz_shape = 'triangle'
+
     def __init__(self, *children, **kwargs):
         emit_on = kwargs.pop('emit_on', None)
         self.last = [None for _ in children]
