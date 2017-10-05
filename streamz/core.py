@@ -259,8 +259,8 @@ class Stream(object):
             Number of seconds between which to poll the file
             If None then don't poll, and instead return without waiting
 
-        Example
-        -------
+        Examples
+        --------
         >>> source = Stream()
         >>> source.map(json.loads).pluck('value').sum()
         >>> source.from_textfile('myfile.json')
