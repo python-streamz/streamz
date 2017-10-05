@@ -6,9 +6,12 @@ from dask.dataframe.utils import assert_eq
 import numpy as np
 import pandas as pd
 import pandas.util.testing as tm
+from tornado import gen
 
 from streamz import Stream
+from streamz.utils_test import gen_test
 from streamz.dataframe import StreamingDataFrame, StreamingSeries
+import streamz.dataframe as sd
 
 
 def test_identity():
@@ -246,3 +249,12 @@ def test_integration_from_stream():
         source.emit(json.dumps({'x': i % 3, 'y': i}))
 
     assert L == [2, 17 / 3, 100 / 9]
+
+
+@gen_test()
+def test_random_source():
+    source = sd.Random(freq='10ms', interval='100ms')
+    L = source.stream.sink_to_list()
+    yield gen.sleep(0.5)
+    assert 2 < len(L) < 8
+    assert all(2 < len(df) < 25 for df in L)

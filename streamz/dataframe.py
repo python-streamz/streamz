@@ -1,9 +1,14 @@
 from functools import partial
 import operator
+from time import time
 
 from .utils import M
+import numpy as np
 import pandas as pd
 
+from . import core
+from .core import Stream
+from .sources import Source
 from .collection import Streaming, _subtypes
 
 
@@ -246,3 +251,50 @@ def _roll(accumulator, new, window, min_periods):
 
 _subtypes.append((pd.DataFrame, StreamingDataFrame))
 _subtypes.append((pd.Series, StreamingSeries))
+
+
+class Random(StreamingDataFrame):
+    """ A streaming dataframe of random data
+
+    The x column is uniformly distributed.
+    The y column is poisson distributed.
+    The z column is normally distributed.
+
+    Parameters
+    ----------
+    freq: timedelta
+        The time interval between records
+    interval: timedelta
+        The time interval between new dataframes, should be significantly
+        larger than freq
+
+    Example
+    -------
+    >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
+    """
+    def __init__(self, freq='100ms', interval='500ms'):
+        from tornado.ioloop import PeriodicCallback
+        self.last = time()
+        self.freq = pd.Timedelta(freq)
+        self.interval = pd.Timedelta(interval).total_seconds() * 1000
+
+        self.pc = PeriodicCallback(self._trigger, self.interval)
+        self.pc.start()
+
+        super(Random, self).__init__(Source(), self._next_df())
+
+    def _next_df(self):
+        now = time()
+        index = pd.DatetimeIndex(start=self.last * 1e9,
+                                 end=time() * 1e9,
+                                 freq=self.freq)
+
+        df = pd.DataFrame({'x': np.random.random(len(index)),
+                           'y': np.random.poisson(size=len(index)),
+                           'z': np.random.normal(0, 1, size=len(index))},
+                           index=index)
+        self.last = now
+        return df
+
+    def _trigger(self):
+        self.emit(self._next_df())
