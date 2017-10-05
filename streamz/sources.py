@@ -1,4 +1,4 @@
-from .core import Stream, Sink
+from .core import Stream
 import tornado.ioloop
 from tornado import gen
 
@@ -23,7 +23,7 @@ def sink_to_file(filename, child, mode='w', prefix='', suffix='\n', flush=False)
         if flush:
             file.flush()
 
-    Sink(write, child)
+    child.sink(write)
     return file
 
 
