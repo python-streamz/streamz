@@ -193,166 +193,9 @@ class Stream(object):
     def scan(self):
         return self.accumulate
 
-    def combine_latest(self, *others, **kwargs):
-        """ Combine multiple streams together to a stream of tuples
-
-        This will emit a new tuple of all of the most recent elements seen from
-        any stream.
-
-        Parameters
-        ---------------
-        emit_on : stream or list of streams or None
-            only emit upon update of the streams listed.
-            If None, emit on update from any stream
-
-        """
-        return combine_latest(self, *others, **kwargs)
-
+    @property
     def concat(self):
-        """ Flatten streams of lists or iterables into a stream of elements
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.concat().sink(print)
-        >>> for x in [[1, 2, 3], [4, 5], [6, 7, 7]]:
-        ...     source.emit(x)
-        1
-        2
-        3
-        4
-        5
-        6
-        7
-        """
-        return concat(self)
-
-    flatten = concat
-
-    def union(self, *others):
-        """ Combine multiple streams into one
-
-        Every element from any of the children streams will immediately flow
-        into the output stream.  They will not be combined with elements from
-        other streams.
-
-        See also
-        --------
-        Stream.zip
-        Stream.combine_latest
-        """
-        return union(children=(self,) + others)
-
-    def pluck(self, pick):
-        """ Select elements from elements in the stream.
-
-        Parameters
-        ----------
-        pluck : object, list
-            The element(s) to pick from the incoming element in the stream
-            If an instance of list, will pick multiple elements.
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.pluck([0, 3]).sink(print)
-        >>> for x in [[1, 2, 3, 4], [4, 5, 6, 7], [8, 9, 10, 11]]:
-        ...     source.emit(x)
-        (1, 4)
-        (4, 7)
-        (8, 11)
-
-        >>> source = Stream()
-        >>> source.pluck('name').sink(print)
-        >>> for x in [{'name': 'Alice', 'x': 123}, {'name': 'Bob', 'x': 456}]:
-        ...     source.emit(x)
-        'Alice'
-        'Bob'
-        """
-        return pluck(self, pick)
-
-    def unique(self, history=None, key=identity):
-        """ Avoid sending through repeated elements
-
-        This deduplicates a stream so that only new elements pass through.
-        You can control how much of a history is stored with the ``history=``
-        parameter.  For example setting ``history=1`` avoids sending through
-        elements when one is repeated right after the other.
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.unique(history=1).sink(print)
-        >>> for x in [1, 1, 2, 2, 2, 1, 3]:
-        ...     source.emit(x)
-        1
-        2
-        1
-        3
-        """
-        return unique(self, history=history, key=key)
-
-    def collect(self, cache=None):
-        """
-        Hold elements in a cache and emit them as a collection when flushed.
-
-        Examples
-        --------
-        >>> source1 = Stream()
-        >>> source2 = Stream()
-        >>> collector = collect(source1)
-        >>> collector.sink(print)
-        >>> source2.sink(collector.flush)
-        >>> source1.emit(1)
-        >>> source1.emit(2)
-        >>> source2.emit('anything')  # flushes collector
-        ...
-        [1, 2]
-        """
-        return collect(self, cache=cache)
-
-    def zip(self, *other):
-        """ Combine two streams together into a stream of tuples """
-        return zip(self, *other)
-
-    def zip_latest(self, *others):
-        """Combine multiple streams together to a stream of tuples
-
-        The stream which this is called from is lossless. All elements from
-        the lossless stream are emitted reguardless of when they came in.
-        This will emit a new tuple consisting of an element from the lossless
-        stream paired with the latest elements from the other streams.
-        Elements are only emitted when an element on the lossless stream are
-        received, similar to ``combine_latest`` with the ``emit_on`` flag.
-
-        See Also
-        --------
-        Stream.combine_latest
-        Stream.zip
-        """
-        return zip_latest(self, *others)
-
-    def sink(self, func):
-        """ Apply a function on every element
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> L = list()
-        >>> source.sink(L.append)
-        >>> source.sink(print)
-        >>> source.sink(print)
-        >>> source.emit(123)
-        123
-        123
-        >>> L
-        [123]
-
-        See Also
-        --------
-        Stream.sink_to_list
-        """
-        return Sink(func, self)
+        return self.flatten
 
     def sink_to_list(self):
         """ Append all elements of a stream to a list as they come in
@@ -367,7 +210,7 @@ class Stream(object):
         [0, 10, 20, 30, 40]
         """
         L = []
-        Sink(L.append, self)
+        self.sink(L.append)
         return L
 
     def frequencies(self):
@@ -430,10 +273,31 @@ class Stream(object):
         return TextFile(f, poll_interval=poll_interval)
 
 
-class Sink(Stream):
+@Stream.register_api
+class sink(Stream):
+    """ Apply a function on every element
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> L = list()
+    >>> source.sink(L.append)
+    >>> source.sink(print)
+    >>> source.sink(print)
+    >>> source.emit(123)
+    123
+    123
+    >>> L
+    [123]
+
+    See Also
+    --------
+    map
+    Stream.sink_to_list
+    """
     _graphviz_shape = 'trapezium'
 
-    def __init__(self, func, child):
+    def __init__(self, child, func):
         self.func = func
 
         Stream.__init__(self, child)
@@ -716,7 +580,15 @@ class buffer(Stream):
             yield self.emit(x)
 
 
+@Stream.register_api
 class zip(Stream):
+    """ Combine two streams together into a stream of tuples
+
+    See also
+    --------
+    combine_latest
+    zip_latest
+    """
     _graphviz_orientation = 270
     _graphviz_shape = 'triangle'
 
@@ -737,7 +609,23 @@ class zip(Stream):
             return self.condition.wait()
 
 
+@Stream.register_api
 class combine_latest(Stream):
+    """ Combine multiple streams together to a stream of tuples
+
+    This will emit a new tuple of all of the most recent elements seen from
+    any stream.
+
+    Parameters
+    ----------
+    emit_on : stream or list of streams or None
+        only emit upon update of the streams listed.
+        If None, emit on update from any stream
+
+    See Also
+    --------
+    zip
+    """
     _graphviz_orientation = 270
     _graphviz_shape = 'triangle'
 
@@ -765,7 +653,28 @@ class combine_latest(Stream):
             return self.emit(tup)
 
 
-class concat(Stream):
+@Stream.register_api
+class flatten(Stream):
+    """ Flatten streams of lists or iterables into a stream of elements
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.flatten().sink(print)
+    >>> for x in [[1, 2, 3], [4, 5], [6, 7, 7]]:
+    ...     source.emit(x)
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+
+    See Also
+    --------
+    partition
+    """
     def update(self, x, who=None):
         L = []
         for item in x:
@@ -777,7 +686,26 @@ class concat(Stream):
         return L
 
 
+@Stream.register_api
 class unique(Stream):
+    """ Avoid sending through repeated elements
+
+    This deduplicates a stream so that only new elements pass through.
+    You can control how much of a history is stored with the ``history=``
+    parameter.  For example setting ``history=1`` avoids sending through
+    elements when one is repeated right after the other.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.unique(history=1).sink(print)
+    >>> for x in [1, 1, 2, 2, 2, 1, 3]:
+    ...     source.emit(x)
+    1
+    2
+    1
+    3
+    """
     def __init__(self, child, history=None, key=identity):
         self.seen = dict()
         self.key = key
@@ -794,12 +722,53 @@ class unique(Stream):
             return self.emit(x)
 
 
+@Stream.register_api
 class union(Stream):
+    """ Combine multiple streams into one
+
+    Every element from any of the children streams will immediately flow
+    into the output stream.  They will not be combined with elements from
+    other streams.
+
+    See also
+    --------
+    Stream.zip
+    Stream.combine_latest
+    """
+    def __init__(self, *children, **kwargs):
+        super(union, self).__init__(children=children, **kwargs)
+
     def update(self, x, who=None):
         return self.emit(x)
 
 
+@Stream.register_api
 class pluck(Stream):
+    """ Select elements from elements in the stream.
+
+    Parameters
+    ----------
+    pluck : object, list
+        The element(s) to pick from the incoming element in the stream
+        If an instance of list, will pick multiple elements.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.pluck([0, 3]).sink(print)
+    >>> for x in [[1, 2, 3, 4], [4, 5, 6, 7], [8, 9, 10, 11]]:
+    ...     source.emit(x)
+    (1, 4)
+    (4, 7)
+    (8, 11)
+
+    >>> source = Stream()
+    >>> source.pluck('name').sink(print)
+    >>> for x in [{'name': 'Alice', 'x': 123}, {'name': 'Bob', 'x': 456}]:
+    ...     source.emit(x)
+    'Alice'
+    'Bob'
+    """
     def __init__(self, child, pick):
         self.pick = pick
         super(pluck, self).__init__(child)
@@ -811,7 +780,24 @@ class pluck(Stream):
             return self.emit(x[self.pick])
 
 
+@Stream.register_api
 class collect(Stream):
+    """
+    Hold elements in a cache and emit them as a collection when flushed.
+
+    Examples
+    --------
+    >>> source1 = Stream()
+    >>> source2 = Stream()
+    >>> collector = collect(source1)
+    >>> collector.sink(print)
+    >>> source2.sink(collector.flush)
+    >>> source1.emit(1)
+    >>> source1.emit(2)
+    >>> source2.emit('anything')  # flushes collector
+    ...
+    [1, 2]
+    """
     def __init__(self, child, cache=None):
         if cache is None:
             cache = deque()
@@ -828,7 +814,22 @@ class collect(Stream):
         self.cache.clear()
 
 
+@Stream.register_api
 class zip_latest(Stream):
+    """Combine multiple streams together to a stream of tuples
+
+    The stream which this is called from is lossless. All elements from
+    the lossless stream are emitted reguardless of when they came in.
+    This will emit a new tuple consisting of an element from the lossless
+    stream paired with the latest elements from the other streams.
+    Elements are only emitted when an element on the lossless stream are
+    received, similar to ``combine_latest`` with the ``emit_on`` flag.
+
+    See Also
+    --------
+    Stream.combine_latest
+    Stream.zip
+    """
     def __init__(self, lossless, *children):
         children = (lossless,) + children
         self.last = [None for _ in children]

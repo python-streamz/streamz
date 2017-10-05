@@ -45,7 +45,7 @@ class StreamingBatch(Streaming):
 
         Returned stream will be composed of single elements
         """
-        return self.stream.concat()
+        return self.stream.flatten()
 
 
 def _filter(seq, predicate):

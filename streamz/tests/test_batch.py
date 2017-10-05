@@ -39,7 +39,9 @@ def test_dataframes():
 
 def test_filter():
     a = StreamingBatch()
-    L = a.filter(lambda x: x % 2 == 0).to_stream().sink_to_list()
+    f = a.filter(lambda x: x % 2 == 0)
+    s = f.to_stream()
+    L = s.sink_to_list()
 
     a.emit([1, 2, 3, 4])
     a.emit([5, 6])
