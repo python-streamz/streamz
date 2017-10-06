@@ -29,7 +29,7 @@ def test_create_file():
     source2 = Stream(stream_name='source2')
 
     n1 = source1.zip(source2)
-    n2 = n1.map(add).scan(mul)
+    n2 = n1.map(add).scan(mul).map(lambda x : x + 1)
     n2.sink(source1.emit)
 
     with tmpfile(extension='png') as fn:
