@@ -37,8 +37,8 @@ periods, feedback into earlier stages, and more.
 Streamz endeavors to be simple in simple cases, while also being powerful
 enough to let you define custom and powerful pipelines for your application.
 
-Why not Python generators expressions?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why not Python generator expressions?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Python users often manage continuous sequences of data with iterators or
 generator expressions.
