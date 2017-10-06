@@ -4,20 +4,27 @@ from __future__ import absolute_import, division, print_function
 from functools import partial
 import os
 
+def _clean_text(text):
+    ''' Clean text, remove forbidden characters.
+    '''
+    text = text.replace("<", " ")
+    text= text.replace(">", " ")
+    text= text.replace(":", ";")
+
 
 def create_graph(node, graph, prior_node=None, pc=None):
     """Create graph from a single node, searching up and down the chain
 
     Parameters
     ----------
-    node: EventStream instance
+    node: Stream instance
     graph: networkx.DiGraph instance
     """
     if node is None:
         return
     t = hash(node)
     graph.add_node(t,
-                   label=str(node).replace(':', ';'),
+                   label=_clean_text(str(node)),
                    shape=node._graphviz_shape,
                    orientation=str(node._graphviz_orientation),
                    style=node._graphviz_style,
@@ -81,8 +88,8 @@ def visualize(node, filename='mystream.png', **kwargs):
 
     Parameters
     ----------
-    dsk : dict
-        The graph to display.
+    node : Stream instance
+        The the stream to display.
     filename : str or None, optional
         The name (without an extension) of the file to write to disk.  If
         `filename` is None, no file will be written, and we communicate with
