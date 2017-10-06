@@ -11,6 +11,7 @@ def _clean_text(text):
     text = text.replace("<", " ")
     text = text.replace(">", " ")
     text = text.replace(":", ";")
+    return text
 
 
 def create_graph(node, graph, prior_node=None, pc=None):
