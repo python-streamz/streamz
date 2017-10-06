@@ -250,7 +250,7 @@ inserts it into a database using an async-aware insertion function.
 
 As we call the ``write_to_database`` function on our parsed JSON data it
 produces a future for us to signal that the writing process has finished.
-Streamz will ensure tha this future is passed all the way back to the
+Streamz will ensure that this future is passed all the way back to the
 ``source.emit`` call, so that user code at the start of our pipeline can await
 on it.  This allows us to avoid buildup even in very large and complex streams.
 We always pass futures back to ensure responsiveness.

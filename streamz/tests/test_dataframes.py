@@ -1,11 +1,9 @@
 import json
-import time
 
 import pytest
 from dask.dataframe.utils import assert_eq
 import numpy as np
 import pandas as pd
-import pandas.util.testing as tm
 from tornado import gen
 
 from streamz import Stream
@@ -188,43 +186,50 @@ def test_setitem():
     assert_eq(L[-1], df.mean())
 
 
-def test_rolling():
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+@pytest.mark.parametrize('kwargs,op', [
+    ({}, 'sum'),
+    ({}, 'mean'),
+    pytest.mark.slow(({}, 'min')),
+    ({}, 'median'),
+    pytest.mark.slow(({}, 'max')),
+    pytest.mark.slow(({}, 'var')),
+    pytest.mark.slow(({}, 'count')),
+    ({'ddof': 0}, 'std'),
+    pytest.mark.slow(({'quantile': 0.5}, 'quantile')),
+    ({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate')
+])
+@pytest.mark.parametrize('window', [
+    pytest.mark.slow(2),
+    7,
+    pytest.mark.slow('3h'),
+    pd.Timedelta('200 minutes')
+])
+@pytest.mark.parametrize('m', [
+    2,
+    pytest.mark.slow(5)
+])
+@pytest.mark.parametrize('pre_get,post_get', [
+    (lambda df: df, lambda df: df),
+    (lambda df: df.x, lambda x: x),
+    (lambda df: df, lambda df: df.x)
+])
+def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs):
+    index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
+    df = pd.DataFrame({'x': np.arange(len(index))}, index=index)
 
-    sdf = StreamingDataFrame(example=df)
-    out = sdf.rolling(3, min_periods=2)
-    L = out.stream.sink_to_list()
+    expected = getattr(post_get(pre_get(df).rolling(window)), op)(**kwargs)
 
-    for i in range(10):
-        df = pd.DataFrame({'x': [i], 'y': [i + 1]})
-        sdf.emit(df)
+    sdf = StreamingDataFrame(example=df.iloc[:0])
+    roll = getattr(post_get(pre_get(sdf).rolling(window)), op)(**kwargs)
+    L = roll.stream.sink_to_list()
+    assert len(L) == 0
 
-    assert len(L) == 9
-    assert all(len(df) >= 2 for df in L)
-    for i, df in enumerate(L[1:]):
-        expected = pd.DataFrame({'x': [i, i + 1, i + 2],
-                                 'y': [i + 1, i + 2, i + 3]})
-        tm.assert_frame_equal(df.reset_index(drop=True), expected)
+    for i in range(0, len(df), m):
+        sdf.emit(df.iloc[i: i + m])
 
+    assert len(L) > 1
 
-def test_rolling_time():
-    now = pd.Timestamp.now()
-    df = pd.DataFrame({'x': [1], 'y': [4]},
-                      index=[now])
-
-    sdf = StreamingDataFrame(example=df)
-    L = sdf.rolling('10ms').stream.sink_to_list()
-
-    for i in range(100):
-        df = pd.DataFrame({'x': [i, i + 0.5], 'y': [i, i + 0.5]},
-                          index=[pd.Timestamp.now(), pd.Timestamp.now()])
-        sdf.emit(df)
-        time.sleep(0.001)
-
-    assert L
-    for df in L[3:]:
-        assert df.index.max() - df.index.min() <= pd.Timedelta('10ms')
-        assert df.index.max() - df.index.min() > pd.Timedelta('1ms')
+    assert_eq(pd.concat(L), expected)
 
 
 def test_stream_to_dataframe():
@@ -258,3 +263,6 @@ def test_random_source():
     yield gen.sleep(0.5)
     assert 2 < len(L) < 8
     assert all(2 < len(df) < 25 for df in L)
+
+    source.x
+    source.rolling('10s')

@@ -6,8 +6,6 @@ from .utils import M
 import numpy as np
 import pandas as pd
 
-from . import core
-from .core import Stream
 from .sources import Source
 from .collection import Streaming, _subtypes
 
@@ -20,14 +18,103 @@ class StreamingFrame(Streaming):
         return self.map_partitions(M.round, decimals=decimals)
 
     def rolling(self, window, min_periods=1):
+        """ Compute rolling aggregations
+
+        When followed by an aggregation method like ``sum``, ``mean``, or
+        ``std`` this produces a new Streaming dataframe whose values are
+        aggregated over that window.
+
+        The window parameter can be either a number of rows or a timedelta like
+        ``"2 minutes"` in which case the index should be a datetime index.
+
+        This operates by keeping enough of a backlog of records to maintain an
+        accurate stream.  It performs a copy at every added dataframe.  Because
+        of this it may be slow if the rolling window is much larger than the
+        average stream element.
+
+        Parameters
+        ----------
+        window: int or timedelta
+            Window over which to roll
+
+        Returns
+        -------
+        Rolling object
+        """
+        return Rolling(self, window, min_periods)
+
+
+class Rolling(object):
+    def __init__(self, sdf, window, min_periods):
+        self.sdf = sdf
         if not isinstance(window, int):
             window = pd.Timedelta(window)
             min_periods = 1
-        stream = (self.stream
-                      .scan(_roll, window=window,
-                            min_periods=min_periods, returns_state=True)
-                      .filter(lambda x: len(x) >= min_periods))
-        return type(self)(stream=stream, example=self.example)
+        self.window = window
+        self.min_periods = min_periods
+
+    def __getitem__(self, key):
+        sdf = self.sdf[key]
+        return Rolling(sdf, self.window, self.min_periods)
+
+    def __getattr__(self, key):
+        if key in self.sdf.columns or not len(self.sdf.columns):
+            return self[key]
+        else:
+            raise AttributeError("StreamingSeriesGroupby has no attribute %r" % key)
+
+    def _known_aggregation(self, op, *args, **kwargs):
+        return self.sdf.accumulate_partitions(rolling_accumulator,
+                                              window=self.window,
+                                              op=op,
+                                              args=args,
+                                              kwargs=kwargs,
+                                              start=(),
+                                              returns_state=True)
+
+    def sum(self):
+        return self._known_aggregation('sum')
+
+    def mean(self):
+        return self._known_aggregation('mean')
+
+    def min(self):
+        return self._known_aggregation('min')
+
+    def max(self):
+        return self._known_aggregation('max')
+
+    def median(self):
+        return self._known_aggregation('median')
+
+    def std(self, *args, **kwargs):
+        return self._known_aggregation('std', *args, **kwargs)
+
+    def var(self, *args, **kwargs):
+        return self._known_aggregation('var', *args, **kwargs)
+
+    def count(self, *args, **kwargs):
+        return self._known_aggregation('count', *args, **kwargs)
+
+    def aggregate(self, *args, **kwargs):
+        return self._known_aggregation('aggregate', *args, **kwargs)
+
+    def quantile(self, *args, **kwargs):
+        return self._known_aggregation('quantile', *args, **kwargs)
+
+
+def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
+    if len(acc):
+        df = pd.concat([acc, new])
+    else:
+        df = new
+    result = getattr(df.rolling(window), op)(*args, **kwargs)
+    if isinstance(window, int):
+        new_acc = df.iloc[-window:]
+    else:
+        new_acc = df.loc[result.index.max() - window:]
+    result = result.iloc[len(acc):]
+    return new_acc, result
 
 
 class StreamingDataFrame(StreamingFrame):
