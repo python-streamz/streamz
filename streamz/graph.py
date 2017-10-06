@@ -3,14 +3,21 @@ from __future__ import absolute_import, division, print_function
 
 from functools import partial
 import os
+import re
 
 
-def _clean_text(text):
+def _clean_text(text, match=None):
     ''' Clean text, remove forbidden characters.
     '''
-    text = text.replace("<", " ")
-    text = text.replace(">", " ")
-    text = text.replace(":", ";")
+    # all non alpha numeric characters, except for _ and :
+    # replace them with space
+    # the + condenses a group of consecutive characters all into one space
+    # (rather than assigning a space to each)
+    if match is None:
+        match = '[^a-zA-Z0-9_:]+'
+    text = re.sub(match, ' ', text)
+    # now replace the colon with semicolon
+    text = re.sub(":", ";", text)
     return text
 
 
