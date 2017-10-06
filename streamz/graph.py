@@ -4,12 +4,13 @@ from __future__ import absolute_import, division, print_function
 from functools import partial
 import os
 
+
 def _clean_text(text):
     ''' Clean text, remove forbidden characters.
     '''
     text = text.replace("<", " ")
-    text= text.replace(">", " ")
-    text= text.replace(":", ";")
+    text = text.replace(">", " ")
+    text = text.replace(":", ";")
 
 
 def create_graph(node, graph, prior_node=None, pc=None):
@@ -89,7 +90,7 @@ def visualize(node, filename='mystream.png', **kwargs):
     Parameters
     ----------
     node : Stream instance
-        The the stream to display.
+        The stream to display.
     filename : str or None, optional
         The name (without an extension) of the file to write to disk.  If
         `filename` is None, no file will be written, and we communicate with
