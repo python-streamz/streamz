@@ -325,17 +325,6 @@ def _accumulate_groupby_mean(accumulator, new, grouper=None, index=None):
     return (sums, counts), sums / counts
 
 
-def _roll(accumulator, new, window, min_periods):
-    accumulator = pd.concat([accumulator, new])
-    if isinstance(window, int):
-        accumulator = accumulator.iloc[-window:]
-    elif isinstance(window, pd.Timedelta):
-        accumulator = accumulator.loc[(accumulator.index.max() - window):]
-
-    out = accumulator if len(accumulator) >= min_periods else []
-    return accumulator, out
-
-
 _subtypes.append((pd.DataFrame, StreamingDataFrame))
 _subtypes.append((pd.Series, StreamingSeries))
 

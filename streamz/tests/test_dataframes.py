@@ -32,6 +32,18 @@ def test_identity():
     assert assert_eq(L2[0], df.x)
 
 
+def test_attributes():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    assert 'x' in dir(sdf)
+    assert 'z' not in dir(sdf)
+
+    sdf.x
+    with pytest.raises(AttributeError):
+        sdf.z
+
+
 def test_exceptions():
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = StreamingDataFrame(example=df)
