@@ -853,3 +853,39 @@ class zip_latest(Stream):
                 self.last[0] = self.lossless_buffer.popleft()
                 L.append(self.emit(tuple(self.last)))
             return L
+
+
+@Stream.register_api
+class latest(Stream):
+    """ Drop held-up data and emit the latest result
+
+    This allows you to skip intermediate elements in the stream if there is
+    some back pressure causing a slowdown.  Use this when you only care about
+    the latest elements, and are willing to lose older data.
+
+    This passes through values without modification otherwise.
+
+    Examples
+    --------
+    >>> source.map(f).latest().map(g)  # doctest: +SKIP
+    """
+    _graphviz_shape = 'octagon'
+
+    def __init__(self, child, loop=None):
+        self.condition = Condition()
+        self.next = []
+
+        Stream.__init__(self, child, loop=loop)
+
+        self.loop.add_callback(self.cb)
+
+    def update(self, x, who=None):
+        self.next = [x]
+        self.loop.add_callback(self.condition.notify)
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            yield self.condition.wait()
+            [x] = self.next
+            yield self.emit(x)
