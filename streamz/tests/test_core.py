@@ -708,3 +708,31 @@ def test_subclass():
     assert hasattr(NewStream(), 'foo')
     assert not hasattr(Stream, 'foo')
     assert not hasattr(Stream(), 'foo')
+
+
+@gen_test()
+def test_latest():
+    source = Stream()
+
+    L = []
+
+    @gen.coroutine
+    def slow_write(x):
+        yield gen.sleep(0.050)
+        L.append(x)
+
+    s = source.map(inc).latest().map(slow_write)  # flake8: noqa
+
+    source.emit(1)
+    yield gen.sleep(0.010)
+    source.emit(2)
+    source.emit(3)
+
+    start = time()
+    while len(L) < 2:
+        yield gen.sleep(0.01)
+        assert time() < start + 3
+    assert L == [2, 4]
+
+    yield gen.sleep(0.060)
+    assert L == [2, 4]
