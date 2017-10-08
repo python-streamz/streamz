@@ -266,3 +266,38 @@ def test_random_source():
 
     source.x
     source.rolling('10s')
+
+
+@pytest.mark.xfail(reason="Does not yet exist")
+@pytest.mark.parametrize('n', [2, 3, 4])
+def test_repartition_n(n):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    source = Stream()
+    L = source.to_dataframe(example=df).repartition(n=n).stream.sink_to_list()
+
+    source.emit(df)
+    source.emit(df)
+    source.emit(df)
+    source.emit(df)
+
+    assert all(len(x) == n for x in L)
+    assert_eq(pd.concat(L), pd.concat([df] * 4))
+
+
+@pytest.mark.xfail(reason="Does not yet exist")
+@gen_test()
+def test_repartition_interval(n):
+    source = sd.Random(freq='10ms', interval='100ms')
+    L = source.stream.sink_to_list()
+    L2 = source.repartition(interval='150ms').stream.sink_to_list()
+
+    yield gen.sleep(0.400)
+
+    assert L2
+
+    for df in L2:
+        assert df.index.max() - df.index.min() <= pd.Timedelta('150ms')
+
+    expected = pd.concat(L).iloc[:sum(map(len, L2))]
+
+    assert_eq(pd.concat(L2), expected)
