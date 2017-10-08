@@ -117,6 +117,7 @@ def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
     return new_acc, result
 
 
+
 class StreamingDataFrame(StreamingFrame):
     """ A Streaming dataframe
 
