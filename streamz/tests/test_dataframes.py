@@ -32,6 +32,15 @@ def test_identity():
     assert assert_eq(L2[0], df.x)
 
 
+def test_dtype():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    assert str(sdf.dtypes) == str(df.dtypes)
+    assert sdf.x.dtype == df.x.dtype
+    assert sdf.index.dtype == df.index.dtype
+
+
 def test_attributes():
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = StreamingDataFrame(example=df)
