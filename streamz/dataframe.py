@@ -43,6 +43,43 @@ class StreamingFrame(Streaming):
         """
         return Rolling(self, window, min_periods)
 
+    def plot(self, backlog=1000, width=800, height=300, **kwargs):
+        """ Plot streaming dataframe as Bokeh plot
+
+        This is fragile.  It only works in the classic Jupyter Notebook.  It
+        only works on numeric data.  It assumes that the index is a datetime
+        index
+        """
+        from bokeh.palettes import viridis
+        from bokeh.io import output_notebook, push_notebook, show
+        from bokeh.models import value
+        from bokeh.plotting import figure, ColumnDataSource
+        output_notebook()
+
+        sdf = self.to_frame()
+
+        colors = viridis(len(sdf.columns))
+        data = {c: [] for c in sdf.columns}
+        data['index'] = []
+        cds = ColumnDataSource(data)
+
+        fig = figure(x_axis_type='datetime', width=width, height=height)
+
+        for column, color in zip(sdf.columns, colors):
+            fig.line(source=cds, x='index', y=column, color=color, legend=value(column))
+
+        fig.legend.click_policy = 'hide'
+        fig.min_border_left = 30
+        fig.min_border_bottom = 30
+
+        result = show(fig, notebook_handle=True)
+
+        def push_data(df):
+            cds.stream(df.reset_index(), backlog)
+            push_notebook(handle=result)
+
+        return {'figure': fig, 'cds': cds, 'stream': sdf.stream.map(push_data)}
+
 
 class Rolling(object):
     def __init__(self, sdf, window, min_periods):
