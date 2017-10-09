@@ -176,6 +176,10 @@ class StreamingDataFrame(StreamingFrame):
     def columns(self):
         return self.example.columns
 
+    @property
+    def dtypes(self):
+        return self.example.dtypes
+
     def __getitem__(self, index):
         return self.map_partitions(operator.getitem, index)
 
@@ -250,6 +254,10 @@ class StreamingSeries(StreamingFrame):
     streams.sequence.StreamingSequence
     """
     _subtype = pd.Series
+
+    @property
+    def dtype(self):
+        return self.example.dtype
 
     def mean(self):
         start = pd.Series({'sums': 0, 'counts': 0})
