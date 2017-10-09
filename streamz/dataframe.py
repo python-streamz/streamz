@@ -6,6 +6,7 @@ from .utils import M
 import numpy as np
 import pandas as pd
 
+from . import core
 from .sources import Source
 from .collection import Streaming, _subtypes, stream_type
 
@@ -175,6 +176,23 @@ class StreamingDataFrame(StreamingFrame):
     streams.sequence.StreamingSequence
     """
     _subtype = pd.DataFrame
+
+    def __init__(self, *args, **kwargs):
+        # {'x': sdf.x + 1, 'y': sdf.y - 1}
+        if len(args) ==1 and not kwargs and isinstance(args[0], dict):
+            def concat(tup, columns=None):
+                result = pd.concat(tup, axis=1)
+                result.columns = columns
+                return result
+
+            columns, values = zip(*args[0].items())
+            stream = core.zip(*[v.stream for v in values])
+            stream = stream.map(concat, columns=list(columns))
+            example = pd.DataFrame({k: getattr(v, 'example', v)
+                                    for k, v in args[0].items()})
+            StreamingDataFrame.__init__(self, stream, example)
+        else:
+            return super(StreamingDataFrame, self).__init__(*args, **kwargs)
 
     @property
     def columns(self):
