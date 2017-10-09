@@ -331,8 +331,21 @@ def _accumulate_groupby_mean(accumulator, new, grouper=None, index=None):
     return (sums, counts), sums / counts
 
 
-_subtypes.append((pd.DataFrame, StreamingDataFrame))
-_subtypes.append((pd.Series, StreamingSeries))
+def _random_accumulator(state, _):
+    last = state['last']
+    freq = state['freq']
+
+    now = time()
+    index = pd.DatetimeIndex(start=(last + freq.total_seconds()) * 1e9,
+                             end=time() * 1e9,
+                             freq=freq)
+
+    df = pd.DataFrame({'x': np.random.random(len(index)),
+                       'y': np.random.poisson(size=len(index)),
+                       'z': np.random.normal(0, 1, size=len(index))},
+                       index=index)
+    last = now
+    return {'last': now, 'freq': freq}, df
 
 
 class Random(StreamingDataFrame):
@@ -355,28 +368,24 @@ class Random(StreamingDataFrame):
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
     def __init__(self, freq='100ms', interval='500ms'):
-        from tornado.ioloop import PeriodicCallback
-        self.last = time()
-        self.freq = pd.Timedelta(freq)
-        self.interval = pd.Timedelta(interval).total_seconds() * 1000
+        self.source = Source()
+        start = {'last': time(), 'freq': pd.Timedelta(freq)}
+        stream = self.source.accumulate(_random_accumulator,
+                                        returns_state=True,
+                                        start=start)
 
+        from tornado.ioloop import PeriodicCallback
+        self.interval = pd.Timedelta(interval).total_seconds() * 1000
         self.pc = PeriodicCallback(self._trigger, self.interval)
         self.pc.start()
 
-        super(Random, self).__init__(Source(), self._next_df())
+        _, example = _random_accumulator(start, None)
 
-    def _next_df(self):
-        now = time()
-        index = pd.DatetimeIndex(start=(self.last + self.freq.total_seconds()) * 1e9,
-                                 end=time() * 1e9,
-                                 freq=self.freq)
-
-        df = pd.DataFrame({'x': np.random.random(len(index)),
-                           'y': np.random.poisson(size=len(index)),
-                           'z': np.random.normal(0, 1, size=len(index))},
-                           index=index)
-        self.last = now
-        return df
+        super(Random, self).__init__(stream, example)
 
     def _trigger(self):
-        self.emit(self._next_df())
+        self.source.emit(None)
+
+
+_subtypes.append((pd.DataFrame, StreamingDataFrame))
+_subtypes.append((pd.Series, StreamingSeries))
