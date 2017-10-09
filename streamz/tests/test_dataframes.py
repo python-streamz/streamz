@@ -313,3 +313,14 @@ def test_repartition_interval(n):
     expected = pd.concat(L).iloc[:sum(map(len, L2))]
 
     assert_eq(pd.concat(L2), expected)
+
+
+def test_to_frame():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    assert sdf.to_frame() is sdf
+
+    a = sdf.x.to_frame()
+    assert isinstance(a, StreamingDataFrame)
+    assert list(a.columns) == ['x']

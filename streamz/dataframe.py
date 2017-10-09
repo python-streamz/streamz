@@ -178,6 +178,9 @@ class StreamingDataFrame(StreamingFrame):
         example = self.example.assign(**{c: v.example for c, v in kwargs.items()})
         return StreamingDataFrame(stream, example)
 
+    def to_frame(self):
+        return self
+
     def __setitem__(self, key, value):
         if isinstance(value, StreamingSeries):
             result = self.assign(**{key: value})
@@ -211,6 +214,9 @@ class StreamingSeries(StreamingFrame):
         start = pd.Series({'sums': 0, 'counts': 0})
         return self.accumulate_partitions(_accumulate_mean, start=start,
                                           returns_state=True)
+
+    def to_frame(self):
+        return self.map_partitions(M.to_frame)
 
 
 def _accumulate_mean(accumulator, new):
@@ -361,7 +367,7 @@ class Random(StreamingDataFrame):
 
     def _next_df(self):
         now = time()
-        index = pd.DatetimeIndex(start=self.last * 1e9,
+        index = pd.DatetimeIndex(start=(self.last + self.freq.total_seconds()) * 1e9,
                                  end=time() * 1e9,
                                  freq=self.freq)
 
