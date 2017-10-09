@@ -365,3 +365,22 @@ def test_plot():
     assert len(set(map(len, cds.data.values()))) == 1
 
     assert set(sdf.x.plot()['cds'].data) == {'x', 'index'}
+
+
+def test_instantiate_with_dict():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    sdf2 = StreamingDataFrame({'a': sdf.x, 'b': sdf.x * 2,
+                               'c': sdf.y % 2})
+    L = sdf2.stream.sink_to_list()
+    assert len(sdf2.columns) == 3
+
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert len(L) == 2
+    for x in L:
+        assert_eq(x[['a', 'b', 'c']],
+                  pd.DataFrame({'a': df.x, 'b': df.x * 2, 'c': df.y % 2},
+                               columns=['a', 'b', 'c']))
