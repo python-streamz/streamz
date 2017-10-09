@@ -51,7 +51,7 @@ class StreamingFrame(Streaming):
         only works on numeric data.  It assumes that the index is a datetime
         index
         """
-        from bokeh.palettes import viridis
+        from bokeh.palettes import Category10
         from bokeh.io import output_notebook, push_notebook, show
         from bokeh.models import value
         from bokeh.plotting import figure, ColumnDataSource
@@ -59,7 +59,7 @@ class StreamingFrame(Streaming):
 
         sdf = self.to_frame()
 
-        colors = viridis(len(sdf.columns))
+        colors = Category10[max(3, min(10, len(sdf.columns)))]
         data = {c: [] for c in sdf.columns}
         data['index'] = []
         cds = ColumnDataSource(data)
@@ -70,7 +70,8 @@ class StreamingFrame(Streaming):
 
         fig = figure(width=width, height=height, **kwargs)
 
-        for column, color in zip(sdf.columns, colors):
+        for i, column in enumerate(sdf.columns):
+            color = colors[i % len(colors)]
             fig.line(source=cds, x='index', y=column, color=color, legend=value(column))
 
         fig.legend.click_policy = 'hide'
@@ -213,7 +214,7 @@ class StreamingDataFrame(StreamingFrame):
 
     def __init__(self, *args, **kwargs):
         # {'x': sdf.x + 1, 'y': sdf.y - 1}
-        if len(args) ==1 and not kwargs and isinstance(args[0], dict):
+        if len(args) == 1 and not kwargs and isinstance(args[0], dict):
             def concat(tup, columns=None):
                 result = pd.concat(tup, axis=1)
                 result.columns = columns
