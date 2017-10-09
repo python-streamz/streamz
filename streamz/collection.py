@@ -92,6 +92,9 @@ class Streaming(object):
     def __add__(self, other):
         return self.map_partitions(operator.add, other)
 
+    def __sub__(self, other):
+        return self.map_partitions(operator.sub, other)
+
     def __mul__(self, other):
         return self.map_partitions(operator.mul, other)
 
