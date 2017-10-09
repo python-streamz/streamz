@@ -113,3 +113,11 @@ class Streaming(object):
         if not isinstance(x, self._subtype):
             raise TypeError("Expected type %s, got type %s" %
                             (self._subtype, type(x)))
+
+
+def stream_type(example):
+    for typ, s_type in _subtypes:
+        if isinstance(example, typ):
+            return s_type
+    raise TypeError("No streaming equivalent found for type %s" %
+                    type(example).__name__)

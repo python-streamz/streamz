@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from .sources import Source
-from .collection import Streaming, _subtypes
+from .collection import Streaming, _subtypes, stream_type
 
 
 class StreamingFrame(Streaming):
@@ -79,6 +79,10 @@ class StreamingFrame(Streaming):
             push_notebook(handle=result)
 
         return {'figure': fig, 'cds': cds, 'stream': sdf.stream.map(push_data)}
+
+    @property
+    def index(self):
+        return self.map_partitions(lambda x: x.index)
 
 
 class Rolling(object):
@@ -256,6 +260,10 @@ class StreamingSeries(StreamingFrame):
         return self.map_partitions(M.to_frame)
 
 
+class StreamingIndex(StreamingSeries):
+    _subtype = pd.Index
+
+
 def _accumulate_mean(accumulator, new):
     accumulator = accumulator.copy()
     accumulator['sums'] += new.sum()
@@ -305,10 +313,7 @@ class StreamingSeriesGroupby(object):
                 example = example[self.index]
             example = example.sum()
             stream = self.root.stream.accumulate(func, start=start)
-        if isinstance(example, pd.DataFrame):
-            return StreamingDataFrame(stream, example)
-        else:
-            return StreamingSeries(stream, example)
+        return stream_type(example)(stream, example)
 
     def mean(self):
         # TODO, there is a lot of copy-paste with the code above
@@ -331,10 +336,7 @@ class StreamingSeriesGroupby(object):
             example = example.mean()
             stream = self.root.stream.accumulate(func, start=start,
                                                  returns_state=True)
-        if isinstance(example, pd.DataFrame):
-            return StreamingDataFrame(stream, example)
-        else:
-            return StreamingSeries(stream, example)
+        return stream_type(example)(stream, example)
 
 
 def _accumulate_groupby_sum(accumulator, new, grouper=None, index=None):
@@ -425,4 +427,5 @@ class Random(StreamingDataFrame):
 
 
 _subtypes.append((pd.DataFrame, StreamingDataFrame))
+_subtypes.append((pd.Index, StreamingIndex))
 _subtypes.append((pd.Series, StreamingSeries))

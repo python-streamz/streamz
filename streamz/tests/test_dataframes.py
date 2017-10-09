@@ -112,6 +112,19 @@ def test_arithmetic():
     assert assert_eq(L2[0], (df + 1).x * 10)
 
 
+def test_index():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    a = StreamingDataFrame(example=df)
+    b = a.index + 5
+    L = b.stream.sink_to_list()
+
+    a.emit(df)
+    a.emit(df)
+
+    assert_eq(L[0], df.index + 5)
+    assert_eq(L[1], df.index + 5)
+
+
 @pytest.mark.xfail(reason='need to zip two streaming dataframes together')
 def test_pair_arithmetic():
     df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
@@ -129,6 +142,7 @@ def test_pair_arithmetic():
 @pytest.mark.parametrize('agg', ['sum', 'mean'])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',
+                                     lambda a: a.index % 2,
                                      lambda a: ['x']])
 @pytest.mark.parametrize('indexer', [lambda g: g.y,
                                      lambda g: g,
