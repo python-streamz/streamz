@@ -63,7 +63,11 @@ class StreamingFrame(Streaming):
         data['index'] = []
         cds = ColumnDataSource(data)
 
-        fig = figure(x_axis_type='datetime', width=width, height=height)
+        if ('x_axis_type' not in kwargs and
+                np.issubdtype(self.index.dtype, np.datetime64)):
+            kwargs['x_axis_type'] = 'datetime'
+
+        fig = figure(width=width, height=height, **kwargs)
 
         for column, color in zip(sdf.columns, colors):
             fig.line(source=cds, x='index', y=column, color=color, legend=value(column))
