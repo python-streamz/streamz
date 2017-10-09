@@ -384,3 +384,22 @@ def test_instantiate_with_dict():
         assert_eq(x[['a', 'b', 'c']],
                   pd.DataFrame({'a': df.x, 'b': df.x * 2, 'c': df.y % 2},
                                columns=['a', 'b', 'c']))
+
+
+@pytest.mark.parametrize('op', ['cumsum', 'cummax', 'cumprod', 'cummin'])
+@pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
+def test_cumulative_aggregations(op, getter):
+    df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
+    expected = getattr(getter(df), op)()
+
+    sdf = StreamingDataFrame(example=df)
+
+    L = getattr(getter(sdf), op)().stream.sink_to_list()
+
+    for i in range(0, 10, 3):
+        sdf.emit(df.iloc[i: i + 3])
+    sdf.emit(df.iloc[:0])
+
+    assert len(L) > 1
+
+    assert_eq(pd.concat(L), expected)

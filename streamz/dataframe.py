@@ -89,6 +89,40 @@ class StreamingFrame(Streaming):
     def index(self):
         return self.map_partitions(lambda x: x.index)
 
+    def _cumulative_aggregation(self, op):
+        return self.accumulate_partitions(_cumulative_accumulator,
+                                          returns_state=True,
+                                          start=(),
+                                          op=op)
+
+    def cumsum(self):
+        return self._cumulative_aggregation(op='cumsum')
+
+    def cumprod(self):
+        return self._cumulative_aggregation(op='cumprod')
+
+    def cummin(self):
+        return self._cumulative_aggregation(op='cummin')
+
+    def cummax(self):
+        return self._cumulative_aggregation(op='cummax')
+
+
+def _cumulative_accumulator(state, new, op=None):
+    if not len(new):
+        return state, new
+
+    if not len(state):
+        df = new
+    else:
+        df = pd.concat([state, new])  # ouch, full copy
+
+    result = getattr(df, op)()
+    new_state = result.iloc[-1:]
+    if len(state):
+        result = result[1:]
+    return new_state, result
+
 
 class Rolling(object):
     def __init__(self, sdf, window, min_periods):
