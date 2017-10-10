@@ -115,6 +115,8 @@ class Stream(object):
         text += '>'
         return text
 
+    __repr__ = __str__
+
     def emit(self, x):
         """ Push data into the stream at this point
 
@@ -240,12 +242,37 @@ class Stream(object):
         return visualize(self, filename, **kwargs)
 
     def to_dataframe(self, example):
-        """ Convert a stream of Pandas dataframes to a StreamingDataFrame """
+        """ Convert a stream of Pandas dataframes to a StreamingDataFrame
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> sdf = source.to_dataframe()
+        >>> L = sdf.groupby(sdf.x).y.mean().stream.sink_to_list()
+        >>> source.emit(pd.DataFrame(...))  # doctest: +SKIP
+        >>> source.emit(pd.DataFrame(...))  # doctest: +SKIP
+        >>> source.emit(pd.DataFrame(...))  # doctest: +SKIP
+        """
         from .dataframe import StreamingDataFrame
         return StreamingDataFrame(stream=self, example=example)
 
     def to_batch(self, **kwargs):
-        """ Convert to a stream of lists to a StreamingBatch """
+        """ Convert a stream of lists to a StreamingBatch
+
+        All elements of the stream are assumed to be lists or tuples
+
+        Examples
+        --------
+        >>> source = Stream()
+        >>> batches = source.to_batch()
+        >>> L = batches.pluck('value').map(inc).sum().stream.sink_to_list()
+        >>> source.emit([{'name': 'Alice', 'value': 1},
+        ...              {'name': 'Bob', 'value': 2},
+        ...              {'name': 'Charlie', 'value': 3}])
+        >>> source.emit([{'name': 'Alice', 'value': 4},
+        ...              {'name': 'Bob', 'value': 5},
+        ...              {'name': 'Charlie', 'value': 6}])
+        """
         from .batch import StreamingBatch
         return StreamingBatch(stream=self, **kwargs)
 

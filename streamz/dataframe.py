@@ -13,9 +13,11 @@ from .collection import Streaming, _subtypes, stream_type
 
 class StreamingFrame(Streaming):
     def sum(self):
+        """ Sum frame """
         return self.accumulate_partitions(_accumulate_sum, start=0)
 
     def round(self, decimals=0):
+        """ Round elements in frame """
         return self.map_partitions(M.round, decimals=decimals)
 
     def rolling(self, window, min_periods=1):
@@ -97,15 +99,19 @@ class StreamingFrame(Streaming):
                                           op=op)
 
     def cumsum(self):
+        """ Cumulative sum """
         return self._cumulative_aggregation(op='cumsum')
 
     def cumprod(self):
+        """ Cumulative product """
         return self._cumulative_aggregation(op='cumprod')
 
     def cummin(self):
+        """ Cumulative minimum """
         return self._cumulative_aggregation(op='cummin')
 
     def cummax(self):
+        """ Cumulative maximum """
         return self._cumulative_aggregation(op='cummax')
 
 
@@ -126,6 +132,16 @@ def _cumulative_accumulator(state, new, op=None):
 
 
 class Rolling(object):
+    """ Rolling aggregations
+
+    This intermediate class enables rolling aggregations across either a fixed
+    number of rows or a time window.
+
+    Examples
+    --------
+    >>> sdf.rolling(10).x.mean()  # doctest: +SKIP
+    >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
+    """
     def __init__(self, sdf, window, min_periods):
         self.sdf = sdf
         if not isinstance(window, int):
@@ -154,33 +170,43 @@ class Rolling(object):
                                               returns_state=True)
 
     def sum(self):
+        """ Rolling sum """
         return self._known_aggregation('sum')
 
     def mean(self):
+        """ Rolling mean """
         return self._known_aggregation('mean')
 
     def min(self):
+        """ Rolling minimum """
         return self._known_aggregation('min')
 
     def max(self):
+        """ Rolling maximum """
         return self._known_aggregation('max')
 
     def median(self):
+        """ Rolling median """
         return self._known_aggregation('median')
 
     def std(self, *args, **kwargs):
+        """ Rolling standard deviation """
         return self._known_aggregation('std', *args, **kwargs)
 
     def var(self, *args, **kwargs):
+        """ Rolling variance """
         return self._known_aggregation('var', *args, **kwargs)
 
     def count(self, *args, **kwargs):
+        """ Rolling count """
         return self._known_aggregation('count', *args, **kwargs)
 
     def aggregate(self, *args, **kwargs):
+        """ Rolling aggregation """
         return self._known_aggregation('aggregate', *args, **kwargs)
 
     def quantile(self, *args, **kwargs):
+        """ Rolling quantile """
         return self._known_aggregation('quantile', *args, **kwargs)
 
 
@@ -255,21 +281,33 @@ class StreamingDataFrame(StreamingFrame):
         return list(o)
 
     def verify(self, x):
+        """ Verify consistency of elements that pass through this stream """
         super(StreamingDataFrame, self).verify(x)
         if list(x.columns) != list(self.example.columns):
             raise IndexError("Input expected to have columns %s, got %s" %
                              (self.example.columns, x.columns))
 
     def mean(self):
+        """ Average """
         start = pd.DataFrame({'sums': 0, 'counts': 0},
                              index=self.example.columns)
         return self.accumulate_partitions(_accumulate_mean, start=start,
                                           returns_state=True)
 
     def groupby(self, other):
+        """ Groupby aggreagtions """
         return StreamingSeriesGroupby(self, other)
 
     def assign(self, **kwargs):
+        """ Assign new columns to this dataframe
+
+        Alternatively use setitem syntax
+
+        Examples
+        --------
+        >>> sdf = sdf.assign(z=sdf.x + sdf.y)  # doctest: +SKIP
+        >>> sdf['z'] = sdf.x + sdf.y  # doctest: +SKIP
+        """
         def concat(tup, columns=None):
             result = pd.concat(tup, axis=1)
             result.columns = columns
@@ -281,6 +319,7 @@ class StreamingDataFrame(StreamingFrame):
         return StreamingDataFrame(stream, example)
 
     def to_frame(self):
+        """ Convert to a streaming dataframe """
         return self
 
     def __setitem__(self, key, value):
@@ -317,11 +356,13 @@ class StreamingSeries(StreamingFrame):
         return self.example.dtype
 
     def mean(self):
+        """ Average """
         start = pd.Series({'sums': 0, 'counts': 0})
         return self.accumulate_partitions(_accumulate_mean, start=start,
                                           returns_state=True)
 
     def to_frame(self):
+        """ Convert to a streaming dataframe """
         return self.map_partitions(M.to_frame)
 
 
@@ -458,6 +499,8 @@ class Random(StreamingDataFrame):
     The x column is uniformly distributed.
     The y column is poisson distributed.
     The z column is normally distributed.
+
+    This class is experimental and will likely be removed in the future
 
     Parameters
     ----------

@@ -20,7 +20,7 @@ class Streaming(object):
     See also
     --------
     streamz.dataframe.StreamingDataFrame
-    streamz.dataframe.StreamingSequence
+    streamz.dataframe.StreamingBatch
     """
     _subtype = object
 
