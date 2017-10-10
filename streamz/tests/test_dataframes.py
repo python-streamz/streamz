@@ -139,8 +139,8 @@ def test_binary_operators(op, getter):
 
     a.emit(df)
 
-    assert assert_eq(l[0], left)
-    assert assert_eq(r[0], right)
+    assert_eq(l[0], left)
+    assert_eq(r[0], right)
 
 
 @pytest.mark.parametrize('op', [
@@ -163,7 +163,20 @@ def test_unary_operators(op, getter):
 
     a.emit(df)
 
-    assert assert_eq(b[0], expected)
+    assert_eq(b[0], expected)
+
+
+def test_binary_stream_operators():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+
+    expected = df.x + df.y
+
+    a = StreamingDataFrame(example=df)
+    b = (a.x + a.y).stream.sink_to_list()
+
+    a.emit(df)
+
+    assert_eq(b[0], expected)
 
 
 def test_index():

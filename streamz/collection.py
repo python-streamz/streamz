@@ -227,16 +227,19 @@ def map_partitions(func, *args, **kwargs):
     streams = [arg for arg in args if isinstance(arg, Streaming)]
 
     if len(streams) > 1:
-        raise NotImplementedError()
+        stream = core.zip(*[getattr(arg, 'stream', arg) for arg in args])
+        stream = stream.map(apply_args, func, kwargs)
 
-    s = streams[0]
-
-    if isinstance(args[0], Streaming):
-        stream = args[0].stream.map(func, *args[1:], **kwargs)
     else:
-        other = [(i, arg) for i, arg in enumerate(args)
-                 if not isinstance(arg, Streaming)]
-        stream = s.stream.map(partial_by_order, function=func, other=other)
+        s = streams[0]
+
+        if isinstance(args[0], Streaming):
+            stream = s.stream.map(func, *args[1:], **kwargs)
+        else:
+            other = [(i, arg) for i, arg in enumerate(args)
+                     if not isinstance(arg, Streaming)]
+            stream = s.stream.map(partial_by_order, function=func, other=other,
+                                  **kwargs)
 
     for typ, stream_type in _subtypes:
         if isinstance(example, typ):
@@ -257,3 +260,7 @@ def partial_by_order(*args, **kwargs):
     for i, arg in other:
         args2.insert(i, arg)
     return function(*args2, **kwargs)
+
+
+def apply_args(args, func, kwargs):
+    return func(*args, **kwargs)
