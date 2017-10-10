@@ -20,6 +20,10 @@ class StreamingFrame(Streaming):
         """ Round elements in frame """
         return self.map_partitions(M.round, decimals=decimals)
 
+    def tail(self, n=5):
+        """ Round elements in frame """
+        return self.map_partitions(M.tail, n=n)
+
     def rolling(self, window, min_periods=1):
         """ Compute rolling aggregations
 

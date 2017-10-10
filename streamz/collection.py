@@ -1,8 +1,11 @@
 import operator
+import weakref
 
 from streamz import Stream, core
 
 _subtypes = []
+
+_html_update_streams = set()
 
 
 class Streaming(object):
@@ -88,6 +91,43 @@ class Streaming(object):
             body = repr(example)
 
         return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
+
+    def _ipython_display_(self, **kwargs):
+        try:
+            from ipywidgets import Output
+            import IPython
+        except ImportError:
+            return self._repr_html_()
+        output = Output(_view_count=0)
+        output_ref = weakref.ref(output)
+
+        def update_cell(val):
+            output = output_ref()
+            if output is None:
+                return
+            with output:
+                IPython.display.clear_output(wait=True)
+                IPython.display.display(val)
+
+        s = self.stream.latest().rate_limit(0.5).map(update_cell)
+        _html_update_streams.add(s)
+
+        self.output_ref = output_ref
+        s_ref = weakref.ref(s)
+
+        def remove_stream(change):
+            output = output_ref()
+            if output is None:
+                return
+
+            if output._view_count == 0:
+                ss = s_ref()
+                ss.destroy()
+                _html_update_streams.remove(ss)  # trigger gc
+
+        output.observe(remove_stream, '_view_count')
+
+        return output._ipython_display_(**kwargs)
 
     def __abs__(self):
         return map_partitions(operator.abs, self)

@@ -499,3 +499,28 @@ def test_gc_random():
     w[3] = a
     yield gen.sleep(0.1)
     assert len(w) == 1
+
+
+def test_display():
+    pytest.importorskip('ipywidgets')
+    pytest.importorskip('IPython')
+
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    s = sdf.x.sum()
+
+    s._ipython_display_()
+
+
+def test_tail():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = StreamingDataFrame(example=df)
+
+    L = sdf.tail(2).stream.sink_to_list()
+
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert_eq(L[0], df.tail(2))
+    assert_eq(L[1], df.tail(2))
