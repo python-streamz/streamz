@@ -11,7 +11,10 @@ API
    buffer
    collect
    combine_latest
+   connect
    delay
+   destroy
+   disconnect
    filter
    flatten
    map
