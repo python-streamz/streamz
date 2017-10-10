@@ -461,3 +461,41 @@ def test_cumulative_aggregations(op, getter):
     assert len(L) > 1
 
     assert_eq(pd.concat(L), expected)
+
+
+@gen_test()
+def test_gc():
+    sdf = sd.Random(freq='5ms', interval='100ms')
+    a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
+                            'sub': sdf.x - sdf.x.rolling('100ms').mean()})
+    n = len(sdf.stream.parents)
+    yield gen.sleep(0.1)
+    a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
+                            'sub': sdf.x - sdf.x.rolling('100ms').mean()})
+    yield gen.sleep(0.1)
+    a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
+                            'sub': sdf.x - sdf.x.rolling('100ms').mean()})
+    yield gen.sleep(0.1)
+    a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
+                            'sub': sdf.x - sdf.x.rolling('100ms').mean()})
+
+    assert len(sdf.stream.parents) == n
+    del a
+    import gc; gc.collect()
+    assert len(sdf.stream.parents) == 0
+
+
+@gen_test()
+def test_gc_random():
+    from weakref import WeakValueDictionary
+    w = WeakValueDictionary()
+    a = sd.Random(freq='5ms', interval='100ms')
+    w[1] = a
+    yield gen.sleep(0.1)
+    a = sd.Random(freq='5ms', interval='100ms')
+    w[2] = a
+    yield gen.sleep(0.1)
+    a = sd.Random(freq='5ms', interval='100ms')
+    w[3] = a
+    yield gen.sleep(0.1)
+    assert len(w) == 1
