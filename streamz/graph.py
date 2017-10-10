@@ -3,6 +3,22 @@ from __future__ import absolute_import, division, print_function
 
 from functools import partial
 import os
+import re
+
+
+def _clean_text(text, match=None):
+    ''' Clean text, remove forbidden characters.
+    '''
+    # all non alpha numeric characters, except for _ and :
+    # replace them with space
+    # the + condenses a group of consecutive characters all into one space
+    # (rather than assigning a space to each)
+    if match is None:
+        match = '[^a-zA-Z0-9_:]+'
+    text = re.sub(match, ' ', text)
+    # now replace the colon with semicolon
+    text = re.sub(":", ";", text)
+    return text
 
 
 def create_graph(node, graph, prior_node=None, pc=None):
@@ -10,14 +26,14 @@ def create_graph(node, graph, prior_node=None, pc=None):
 
     Parameters
     ----------
-    node: EventStream instance
+    node: Stream instance
     graph: networkx.DiGraph instance
     """
     if node is None:
         return
     t = hash(node)
     graph.add_node(t,
-                   label=str(node).replace(':', ';'),
+                   label=_clean_text(str(node)),
                    shape=node._graphviz_shape,
                    orientation=str(node._graphviz_orientation),
                    style=node._graphviz_style,
@@ -81,8 +97,8 @@ def visualize(node, filename='mystream.png', **kwargs):
 
     Parameters
     ----------
-    dsk : dict
-        The graph to display.
+    node : Stream instance
+        The stream to display.
     filename : str or None, optional
         The name (without an extension) of the file to write to disk.  If
         `filename` is None, no file will be written, and we communicate with

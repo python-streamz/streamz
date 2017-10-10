@@ -7,6 +7,8 @@ nx = pytest.importorskip('networkx')
 from streamz import Stream, create_graph, visualize
 from streamz.utils_test import tmpfile
 
+from ..graph import _clean_text
+
 
 def test_create_graph():
     source1 = Stream(stream_name='source1')
@@ -27,7 +29,7 @@ def test_create_file():
     source2 = Stream(stream_name='source2')
 
     n1 = source1.zip(source2)
-    n2 = n1.map(add).scan(mul)
+    n2 = n1.map(add).scan(mul).map(lambda x : x + 1)
     n2.sink(source1.emit)
 
     with tmpfile(extension='png') as fn:
@@ -46,3 +48,10 @@ def test_create_file():
         for word in ['rankdir', 'source1', 'source2', 'zip', 'map', 'add',
                      'shape=box', 'shape=ellipse']:
             assert word in text
+
+
+def test_cleantext():
+    text = "JFDSM*(@&$:FFDS:;;"
+    expected_text = "JFDSM ;FFDS; "
+    cleaned_text = _clean_text(text)
+    assert cleaned_text == expected_text
