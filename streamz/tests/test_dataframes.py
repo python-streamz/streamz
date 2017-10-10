@@ -1,4 +1,5 @@
 import json
+import operator
 
 import pytest
 from dask.dataframe.utils import assert_eq
@@ -103,22 +104,63 @@ def test_mean():
     assert x_out[1] == df.x.mean()
 
 
-def test_arithmetic():
+@pytest.mark.parametrize('op', [
+    operator.add,
+    operator.and_,
+    operator.eq,
+    operator.floordiv,
+    operator.ge,
+    operator.gt,
+    operator.le,
+    operator.lshift,
+    operator.lt,
+    operator.mod,
+    operator.mul,
+    operator.ne,
+    operator.or_,
+    operator.pow,
+    operator.rshift,
+    operator.sub,
+    operator.truediv,
+    operator.xor,
+])
+@pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
+def test_binary_operators(op, getter):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    try:
+        expected = op(getter(df), 2)
+    except Exception:
+        return
+
     a = StreamingDataFrame(example=df)
-    b = a + 1
+    b = op(getter(a), 2).stream.sink_to_list()
 
-    L1 = b.stream.sink_to_list()
-
-    c = b.x * 10
-
-    L2 = c.stream.sink_to_list()
-
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     a.emit(df)
 
-    assert assert_eq(L1[0], df + 1)
-    assert assert_eq(L2[0], (df + 1).x * 10)
+    assert assert_eq(b[0], expected)
+
+
+@pytest.mark.parametrize('op', [
+    operator.abs,
+    operator.inv,
+    operator.invert,
+    operator.neg,
+    operator.not_,
+])
+@pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
+def test_unary_operators(op, getter):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    try:
+        expected = op(getter(df))
+    except Exception:
+        return
+
+    a = StreamingDataFrame(example=df)
+    b = op(getter(a)).stream.sink_to_list()
+
+    a.emit(df)
+
+    assert assert_eq(b[0], expected)
 
 
 def test_index():

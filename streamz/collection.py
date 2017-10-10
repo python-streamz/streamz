@@ -89,23 +89,71 @@ class Streaming(object):
 
         return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
 
+    def __abs__(self):
+        return self.map_partitions(operator.abs)
+
     def __add__(self, other):
         return self.map_partitions(operator.add, other)
 
-    def __sub__(self, other):
-        return self.map_partitions(operator.sub, other)
+    def __and__(self, other):
+        return self.map_partitions(operator.and_, other)
 
-    def __mul__(self, other):
-        return self.map_partitions(operator.mul, other)
+    def __eq__(self, other):
+        return self.map_partitions(operator.eq, other)
+
+    def __floordiv__(self, other):
+        return self.map_partitions(operator.floordiv, other)
+
+    def __ge__(self, other):
+        return self.map_partitions(operator.ge, other)
+
+    def __gt__(self, other):
+        return self.map_partitions(operator.gt, other)
+
+    def __inv__(self):
+        return self.map_partitions(operator.inv)
+
+    def __invert__(self):
+        return self.map_partitions(operator.invert)
+
+    def __le__(self, other):
+        return self.map_partitions(operator.le, other)
+
+    def __lshift__(self, other):
+        return self.map_partitions(operator.lshift, other)
+
+    def __lt__(self, other):
+        return self.map_partitions(operator.lt, other)
 
     def __mod__(self, other):
         return self.map_partitions(operator.mod, other)
 
+    def __mul__(self, other):
+        return self.map_partitions(operator.mul, other)
+
+    def __ne__(self, other):
+        return self.map_partitions(operator.ne, other)
+
+    def __neg__(self):
+        return self.map_partitions(operator.neg)
+
+    def __or__(self, other):
+        return self.map_partitions(operator.or_, other)
+
+    def __pow__(self, other):
+        return self.map_partitions(operator.pow, other)
+
+    def __rshift__(self, other):
+        return self.map_partitions(operator.rshift, other)
+
+    def __sub__(self, other):
+        return self.map_partitions(operator.sub, other)
+
     def __truediv__(self, other):
         return self.map_partitions(operator.truediv, other)
 
-    def __floordiv__(self, other):
-        return self.map_partitions(operator.floordiv, other)
+    def __xor__(self, other):
+        return self.map_partitions(operator.xor, other)
 
     def emit(self, x):
         self.verify(x)
