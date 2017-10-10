@@ -128,16 +128,19 @@ def test_mean():
 def test_binary_operators(op, getter):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     try:
-        expected = op(getter(df), 2)
+        left = op(getter(df), 2)
+        right = op(2, getter(df))
     except Exception:
         return
 
     a = StreamingDataFrame(example=df)
-    b = op(getter(a), 2).stream.sink_to_list()
+    l = op(getter(a), 2).stream.sink_to_list()
+    r = op(2, getter(a)).stream.sink_to_list()
 
     a.emit(df)
 
-    assert assert_eq(b[0], expected)
+    assert assert_eq(l[0], left)
+    assert assert_eq(r[0], right)
 
 
 @pytest.mark.parametrize('op', [
