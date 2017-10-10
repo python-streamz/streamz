@@ -472,7 +472,8 @@ class Random(StreamingDataFrame):
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
     def __init__(self, freq='100ms', interval='500ms'):
-        self.source = Source()
+        source = Source()
+        self.source = source
         start = {'last': time(), 'freq': pd.Timedelta(freq)}
         stream = self.source.accumulate(_random_accumulator,
                                         returns_state=True,
@@ -480,7 +481,11 @@ class Random(StreamingDataFrame):
 
         from tornado.ioloop import PeriodicCallback
         self.interval = pd.Timedelta(interval).total_seconds() * 1000
-        self.pc = PeriodicCallback(self._trigger, self.interval)
+
+        def trigger():
+            source.emit(None)
+
+        self.pc = PeriodicCallback(trigger, self.interval)
         self.pc.start()
 
         _, example = _random_accumulator(start, None)
@@ -489,6 +494,9 @@ class Random(StreamingDataFrame):
 
     def _trigger(self):
         self.source.emit(None)
+
+    def __del__(self):
+        self.pc.stop()
 
 
 _subtypes.append((pd.DataFrame, StreamingDataFrame))
