@@ -84,5 +84,6 @@ data streaming systems like `Apache Flink <https://flink.apache.org/>`_,
    :caption: Contents
 
    core.rst
+   collections.rst
    api.rst
-
+   collections-api.rst

@@ -11,7 +11,7 @@ Map, emit, and sink
 .. currentmodule:: streamz
 
 .. autosummary::
-   Streamz.emit
+   Stream.emit
    map
    sink
 
