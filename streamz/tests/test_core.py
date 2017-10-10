@@ -754,3 +754,19 @@ def test_latest():
 
     yield gen.sleep(0.060)
     assert L == [2, 4]
+
+
+def test_destroy():
+    source = Stream()
+    s = source.map(inc)
+    L = s.sink_to_list()
+
+    source.emit(1)
+    assert L == [2]
+
+    s.destroy()
+
+    assert not list(source.parents)
+    assert not s.children
+    source.emit(2)
+    assert L == [2]

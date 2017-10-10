@@ -178,12 +178,22 @@ class Stream(object):
             pass
         for child in self.children:
             if child:
-                loop = self.child.loop
+                loop = child.loop
                 if loop:
                     self._loop = loop
                     return loop
         self._loop = IOLoop.current()
         return self._loop
+
+    def destroy(self, streams=None):
+        """
+        Disconnect this stream from any upstream sources
+        """
+        if streams is None:
+            streams = self.children
+        for child in list(streams):
+            child.parents.remove(self)
+            self.children.remove(child)
 
     def scatter(self):
         from .dask import scatter
