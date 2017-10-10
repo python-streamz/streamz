@@ -12,6 +12,8 @@ from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
 
+from .compatibility import builtins
+
 no_default = '--no-default--'
 
 _global_sinks = set()
@@ -582,7 +584,9 @@ class buffer(Stream):
 
 @Stream.register_api
 class zip(Stream):
-    """ Combine two streams together into a stream of tuples
+    """ Combine streams together into a stream of tuples
+
+    We emit a new tuple once all streams have produce a new tuple.
 
     See also
     --------
@@ -596,14 +600,31 @@ class zip(Stream):
         self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]
         self.condition = Condition()
-        Stream.__init__(self, children=children)
+        self.literals = [(i, val) for i, val in enumerate(children)
+                         if not isinstance(val, Stream)]
+        self.pack_literals()
+
+        self.buffers_by_stream = {child: buffer
+                    for child, buffer in builtins.zip(children, self.buffers)
+                    if isinstance(child, Stream)}
+
+        children2 = [child for child in children if isinstance(child, Stream)]
+
+        Stream.__init__(self, children=children2)
+
+    def pack_literals(self):
+        """ Fill buffers for literals whenver we empty them """
+        for i, val in self.literals:
+            self.buffers[i].append(val)
 
     def update(self, x, who=None):
-        L = self.buffers[self.children.index(who)]
+        L = self.buffers_by_stream[who]  # get buffer for stream
         L.append(x)
         if len(L) == 1 and all(self.buffers):
             tup = tuple(buf.popleft() for buf in self.buffers)
             self.condition.notify_all()
+            if self.literals:
+                self.pack_literals()
             return self.emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()

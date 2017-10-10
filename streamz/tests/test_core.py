@@ -303,6 +303,24 @@ def test_zip():
     assert L2 == [(1, 2, 3)]
 
 
+def test_zip_literals():
+    a = Stream()
+    b = Stream()
+    c = sz.zip(a, 123, b)
+
+    L = c.sink_to_list()
+    a.emit(1)
+    b.emit(2)
+
+    assert L == [(1, 123, 2)]
+
+    a.emit(4)
+    b.emit(5)
+
+    assert L == [(1, 123, 2),
+                 (4, 123, 5)]
+
+
 def test_combine_latest():
     a = Stream()
     b = Stream()
