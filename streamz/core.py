@@ -62,14 +62,14 @@ class Stream(object):
 
     str_list = ['func', 'predicate', 'n', 'interval']
 
-    def __init__(self, child=None, children=None, stream_name=None, **kwargs):
+    def __init__(self, child=None, children=None, stream_name=None, loop=None):
         self.parents = weakref.WeakSet()
         if children is not None:
             self.children = children
         else:
             self.children = [child]
-        if kwargs.get('loop'):
-            self._loop = kwargs.get('loop')
+        if self.loop is not None:
+            self._loop = loop
         for child in self.children:
             if child:
                 child.parents.add(self)
