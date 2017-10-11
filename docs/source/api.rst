@@ -33,8 +33,11 @@ API
 .. autofunction:: accumulate
 .. autofunction:: buffer
 .. autofunction:: collect
+.. autofunction:: connect
 .. autofunction:: combine_latest
 .. autofunction:: delay
+.. autofunction:: destroy
+.. autofunction:: disconnect
 .. autofunction:: filter
 .. autofunction:: flatten
 .. autofunction:: map
