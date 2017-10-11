@@ -68,7 +68,7 @@ class Stream(object):
             self.children = children
         else:
             self.children = [child]
-        if self.loop is not None:
+        if loop is not None:
             self._loop = loop
         for child in self.children:
             if child:
