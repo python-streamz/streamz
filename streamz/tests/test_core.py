@@ -3,6 +3,7 @@ import itertools
 import json
 import operator
 from operator import add
+import os
 from time import time, sleep
 from functools import partial
 
@@ -703,6 +704,33 @@ def test_from_file():
             yield gen.sleep(0.050)
 
             assert L == [1, 2, 3, 4, 5]
+
+
+@gen_test()
+def test_filenames():
+    with tmpfile() as fn:
+        os.mkdir(fn)
+        with open(os.path.join(fn, 'a'), 'w') as f:
+            pass
+        with open(os.path.join(fn, 'b'), 'w') as f:
+            pass
+
+        source = Stream.filenames(fn)
+        L = source.sink_to_list()
+        source.start()
+
+        while len(L) < 2:
+            yield gen.sleep(0.01)
+
+        assert L == [os.path.join(fn, x) for x in ['a', 'b']]
+
+        with open(os.path.join(fn, 'c'), 'w') as f:
+            pass
+
+        while len(L) < 3:
+            yield gen.sleep(0.01)
+
+        assert L == [os.path.join(fn, x) for x in ['a', 'b', 'c']]
 
 
 def test_docstrings():
