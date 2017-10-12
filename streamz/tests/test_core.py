@@ -772,8 +772,11 @@ def test_destroy():
     source.emit(2)
     assert L == [2]
 
-def test_stream_name():
-    ''' Test that stream_name is passed correctly to the core methods.'''
+
+def test_stream_kwargs():
+    ''' Test the good and bad kwargs for the stream
+        Currently just stream_name
+    '''
     test_name = "some test name"
 
     sin = Stream(stream_name=test_name)
@@ -787,6 +790,7 @@ def test_stream_name():
     # these should be functions, use partial to partially initialize them
     # (if they require more arguments)
     streams = [
+               # some filter kwargs, so we comment them out
                partial(sin.map, lambda x : x),
                partial(sin.accumulate, lambda x1, x2 : x1),
                partial(sin.filter, lambda x : True),
@@ -810,47 +814,21 @@ def test_stream_name():
     bad_kwargs = dict(foo="bar")
     for s in streams:
         # try good kwargs
-        stmp = s(**good_kwargs)
-        assert stmp.name == test_name
+        sout = s(**good_kwargs)
+        assert sout.name == test_name
+        del sout
 
-
-def test_stream_bad_kwargs():
-    ''' Test the bad kwargs for the stream'''
-    test_name = "some test name"
-
-    sin = Stream(stream_name=test_name)
-    sin2 = Stream()
-
-    assert sin.name == test_name
-    # when not defined, should be None
-    assert sin2.name is None
-
-    # add new core methods here, initialized
-    # these should be functions, use partial to partially initialize them
-    # (if they require more arguments)
-    streams = [
-               # some filter kwargs, so we comment them out
-               # partial(sin.map, lambda x : x),
-               # partial(sin.accumulate, lambda x1, x2 : x1),
-               partial(sin.filter, lambda x : True),
-               partial(sin.partition, 2),
-               partial(sin.sliding_window, 2),
-               partial(sin.timed_window, .01),
-               partial(sin.rate_limit, .01),
-               partial(sin.delay, .02),
-               partial(sin.buffer, 2),
-               partial(sin.zip, sin2),
-               partial(sin.combine_latest, sin2),
-               # sin.frequencies,
-               sin.flatten,
-               sin.unique,
-               sin.union,
-               partial(sin.pluck, 0),
-               sin.collect,
-               ]
-
-    good_kwargs = dict(stream_name=test_name)
-    bad_kwargs = dict(foo="bar")
-    for s in streams:
         with pytest.raises(TypeError):
-            s(**bad_kwargs)
+            sout = s(**bad_kwargs)
+            sin.emit(1)
+            # need a second emit for accumulate
+            sin.emit(1)
+            del sout
+
+    print(list(sin.parents))
+    # verify that sout is properly deleted each time by emitting once into sin
+    # and not getting TypeError
+    # garbage collect and then try
+    import gc
+    gc.collect()
+    sin.emit(1)
