@@ -825,7 +825,6 @@ def test_stream_kwargs():
             sin.emit(1)
             del sout
 
-    print(list(sin.parents))
     # verify that sout is properly deleted each time by emitting once into sin
     # and not getting TypeError
     # garbage collect and then try
