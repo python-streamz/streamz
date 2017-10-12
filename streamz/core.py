@@ -211,7 +211,7 @@ class Stream(object):
     def concat(self):
         return self.flatten
 
-    def sink_to_list(self, **kwargs):
+    def sink_to_list(self):
         """ Append all elements of a stream to a list as they come in
 
         Examples
@@ -638,6 +638,7 @@ class zip(Stream):
     _graphviz_shape = 'triangle'
 
     def __init__(self, *children, **kwargs):
+        stream_name = kwargs.pop('stream_name', None)
         self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]
         self.condition = Condition()
@@ -651,9 +652,8 @@ class zip(Stream):
 
         children2 = [child for child in children if isinstance(child, Stream)]
 
-        # this is one of a few stream specific kwargs
-        stream_name = kwargs.pop('stream_name', None)
-        Stream.__init__(self, children=children2, stream_name=stream_name)
+        Stream.__init__(self, children=children2, stream_name=stream_name,
+                        **kwargs)
 
     def pack_literals(self):
         """ Fill buffers for literals whenver we empty them """
