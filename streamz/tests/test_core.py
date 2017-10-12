@@ -745,7 +745,7 @@ def test_subclass():
     class NewStream(Stream):
         pass
 
-    @NewStream.register_api
+    @NewStream.register_api()
     class foo(NewStream):
         pass
 

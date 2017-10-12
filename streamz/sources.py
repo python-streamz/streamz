@@ -77,7 +77,7 @@ class TextFile(Source):
                     return
 
 
-@Stream.register_api
+@Stream.register_api(staticmethod)
 class filenames(Source):
     """ Stream over filenames in a directory
 
