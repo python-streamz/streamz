@@ -2,6 +2,7 @@ from glob import glob
 import os
 
 import tornado.ioloop
+from tornado.ioloop import IOLoop
 from tornado import gen
 
 from .core import Stream
@@ -114,3 +115,43 @@ class filenames(Source):
                 self.seen.add(fn)
                 yield self._emit(fn)
             yield gen.sleep(self.poll_interval)  # TODO: remove poll if delayed
+
+
+@Stream.register_api(staticmethod)
+class Kafka(Source):
+    """ Accepts messages from Kafka
+
+    Parameters
+    ----------
+    topics: list of str
+        Labels of Kafka topics to consume from
+    url: str
+        Connection string (host:port) by which to reach Kafka
+    group: str
+        Identity of the consumer. If multiple sources share the same group,
+        each message will be passed to only one of them.
+    poll_interval: number
+        Seconds that the thread sleeps between polling Kafka for new messages
+    """
+    def __init__(self, topics, url='localhost:9092', group='streamz',
+                 poll_interval=0.1):
+        import confluent_kafka as ck
+        IOLoop.current().add_callback(self.poll_kafka)
+        self.consumer = ck.Consumer(
+            {'bootstrap.servers': url, 'group.id': group})
+        self.consumer.subscribe(topics)
+        self.topics = topics
+        self.url = url
+        self.group = group
+        self.sleep = poll_interval
+
+        super(Kafka, self).__init__()
+
+    @gen.coroutine
+    def poll_kafka(self):
+        while True:
+            msg = self.consumer.poll(0)
+            if msg is None or msg.error():
+                yield gen.sleep(self.sleep)
+            else:
+                self.emit(msg.value())

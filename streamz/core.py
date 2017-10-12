@@ -388,6 +388,25 @@ class Stream(object):
         from .sources import TextFile
         return TextFile(f, poll_interval=poll_interval)
 
+    @staticmethod
+    def from_kafka(topics, url='localhost:9092', group='streamz',
+                   poll_interval=0.2):
+        """ Accepts messages from Kafka
+
+        Parameters
+        ----------
+        topics: list of str
+            Labels of Kafka topics to consume from
+        url: str
+            Connection string (host:port) by which to reach Kafka
+        group: str
+            Identity of the consumer. If multiple sources share the same group,
+            each message will be passed to only one of them.
+        poll_interval: number
+            Seconds that the thread sleeps between polling Kafka for new messages
+        """
+        from .sources import Kafka
+        return Kafka(topics, url, group, poll_interval)
 
 @Stream.register_api()
 class sink(Stream):
