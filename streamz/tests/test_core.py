@@ -770,3 +770,37 @@ def test_destroy():
     assert not s.children
     source.emit(2)
     assert L == [2]
+
+def test_stream_name():
+    ''' Test that stream_name is passed correctly to the core methods.'''
+    test_name = "some test name"
+    sin = Stream(stream_name=test_name)
+    sin2 = Stream()
+
+    # add new core methods here, initialized
+    streams = [
+               sin.map(lambda x : x, stream_name=test_name),
+               sin.accumulate(lambda x1, x2 : x1, stream_name=test_name),
+               sin.filter(lambda x : True, stream_name=test_name),
+               sin.partition(2, stream_name=test_name),
+               sin.sliding_window(2, stream_name=test_name),
+               sin.timed_window(.01, stream_name=test_name),
+               sin.rate_limit(.01, stream_name=test_name),
+               sin.delay(.02, stream_name=test_name),
+               sin.buffer(2, stream_name=test_name),
+               sin.zip(sin2, stream_name=test_name),
+               sin.combine_latest(sin2, stream_name=test_name),
+               sin.frequencies(stream_name=test_name),
+               sin.flatten(stream_name=test_name),
+               sin.unique(stream_name=test_name),
+               sin.union(stream_name=test_name),
+               sin.pluck(0, stream_name=test_name),
+               sin.collect(stream_name=test_name),
+               ]
+
+    for s in streams:
+        assert s.name == test_name
+
+    assert sin.name == test_name
+    # when not defined, should be None
+    assert sin2.name is None
