@@ -76,12 +76,39 @@ class Stream(object):
         self.name = stream_name
 
     @classmethod
-    def register_api(cls, func):
-        @functools.wraps(func)
-        def _(*args, **kwargs):
-            return func(*args, **kwargs)
-        setattr(cls, func.__name__, _)
-        return func
+    def register_api(cls, modifier=identity):
+        """ Add callable to Stream API
+
+        This allows you to register a new method onto this class.  You can use
+        it as a decorator.::
+
+            >>> @Stream.register_api()
+            ... class foo(Stream):
+            ...     ...
+
+            >>> Stream().foo(...)  # this works now
+
+        It attaches the callable as a normal attribute to the class object.  In
+        doing so it respsects inheritance (all subclasses of Stream will also
+        get the foo attribute).
+
+        By default callables are assumed to be instance methods.  If you like
+        you can include modifiers to apply before attaching to the class as in
+        the following case where we construct a ``staticmethod``.
+
+            >>> @Stream.register_api(staticmethod)
+            ... class foo(Stream):
+            ...     ...
+
+            >>> Stream.foo(...)  # Foo operates as a static method
+        """
+        def _(func):
+            @functools.wraps(func)
+            def wrapped(*args, **kwargs):
+                return func(*args, **kwargs)
+            setattr(cls, func.__name__, modifier(wrapped))
+            return func
+        return _
 
     def __str__(self):
         s_list = []
@@ -312,7 +339,7 @@ class Stream(object):
         return TextFile(f, poll_interval=poll_interval)
 
 
-@Stream.register_api
+@Stream.register_api()
 class sink(Stream):
     """ Apply a function on every element
 
@@ -350,7 +377,7 @@ class sink(Stream):
             return []
 
 
-@Stream.register_api
+@Stream.register_api()
 class map(Stream):
     """ Apply a function to every element in the stream """
     def __init__(self, child, func, *args, **kwargs):
@@ -370,7 +397,7 @@ def _truthy(x):
     return not not x
 
 
-@Stream.register_api
+@Stream.register_api()
 class filter(Stream):
     """ Only pass through elements that satisfy the predicate """
     def __init__(self, child, predicate):
@@ -385,7 +412,7 @@ class filter(Stream):
             return self.emit(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class accumulate(Stream):
     """ Accumulate results with previous state
 
@@ -441,7 +468,7 @@ class accumulate(Stream):
             return self.emit(result)
 
 
-@Stream.register_api
+@Stream.register_api()
 class partition(Stream):
     """ Partition stream into tuples of equal size
 
@@ -471,7 +498,7 @@ class partition(Stream):
             return []
 
 
-@Stream.register_api
+@Stream.register_api()
 class sliding_window(Stream):
     """ Produce overlapping tuples of size n
 
@@ -503,7 +530,7 @@ class sliding_window(Stream):
             return []
 
 
-@Stream.register_api
+@Stream.register_api()
 class timed_window(Stream):
     """ Emit a tuple of collected results every interval
 
@@ -535,7 +562,7 @@ class timed_window(Stream):
             yield gen.sleep(self.interval)
 
 
-@Stream.register_api
+@Stream.register_api()
 class delay(Stream):
     """ Add a time delay to results """
     _graphviz_shape = 'octagon'
@@ -562,7 +589,7 @@ class delay(Stream):
         return self.queue.put(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class rate_limit(Stream):
     """ Limit the flow of data
 
@@ -592,7 +619,7 @@ class rate_limit(Stream):
         yield self.emit(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class buffer(Stream):
     """ Allow results to pile up at this point in the stream
 
@@ -619,7 +646,7 @@ class buffer(Stream):
             yield self.emit(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class zip(Stream):
     """ Combine streams together into a stream of tuples
 
@@ -667,7 +694,7 @@ class zip(Stream):
             return self.condition.wait()
 
 
-@Stream.register_api
+@Stream.register_api()
 class combine_latest(Stream):
     """ Combine multiple streams together to a stream of tuples
 
@@ -711,7 +738,7 @@ class combine_latest(Stream):
             return self.emit(tup)
 
 
-@Stream.register_api
+@Stream.register_api()
 class flatten(Stream):
     """ Flatten streams of lists or iterables into a stream of elements
 
@@ -744,7 +771,7 @@ class flatten(Stream):
         return L
 
 
-@Stream.register_api
+@Stream.register_api()
 class unique(Stream):
     """ Avoid sending through repeated elements
 
@@ -780,7 +807,7 @@ class unique(Stream):
             return self.emit(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class union(Stream):
     """ Combine multiple streams into one
 
@@ -800,7 +827,7 @@ class union(Stream):
         return self.emit(x)
 
 
-@Stream.register_api
+@Stream.register_api()
 class pluck(Stream):
     """ Select elements from elements in the stream.
 
@@ -838,7 +865,7 @@ class pluck(Stream):
             return self.emit(x[self.pick])
 
 
-@Stream.register_api
+@Stream.register_api()
 class collect(Stream):
     """
     Hold elements in a cache and emit them as a collection when flushed.
@@ -872,7 +899,7 @@ class collect(Stream):
         self.cache.clear()
 
 
-@Stream.register_api
+@Stream.register_api()
 class zip_latest(Stream):
     """Combine multiple streams together to a stream of tuples
 
@@ -913,7 +940,7 @@ class zip_latest(Stream):
             return L
 
 
-@Stream.register_api
+@Stream.register_api()
 class latest(Stream):
     """ Drop held-up data and emit the latest result
 
