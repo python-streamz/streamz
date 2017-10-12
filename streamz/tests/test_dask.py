@@ -13,6 +13,8 @@ from distributed import Future, Client
 from distributed.utils import sync
 from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # flake8: noqa
 
+from dask.base import normalize_token
+
 
 @gen_cluster(client=True)
 def test_map(c, s, a, b):
@@ -152,3 +154,70 @@ def test_buffer_sync(loop):
                 assert time.time() - start < 5
 
             assert L == list(map(inc, range(10)))
+
+@gen_cluster(client=True)
+def test_obj(c, s, a, b):
+    ''' Test pickling of an arbitrary object, as well as caching.
+        Some requirements :
+            1. the object constructor must either be locally importable or
+            provided. (Here it's provided)
+
+        This test attempts to test the following two ideas:
+            1. An arbitrary object is picklable
+            2. An arbitrary object with a defined token (normalize_token) is
+            cached (default is not to cache, each future is assigned a random
+            hash)
+    '''
+    class myObj:
+        def __init__(self, *args):
+            if len(args) == 1:
+                obj = args[0]
+                self.a = obj.a
+                self.b = obj.b
+            elif len(args) == 2:
+                a, b = args[0], args[1]
+                self.a = a
+                self.b = b
+
+    @normalize_token.register(myObj)
+    def tokenize_myObj(obj):
+        ''' just tokenize a, ignore b.
+            This is meant to test that we can cache same object based on a
+        '''
+        return obj.a,
+
+    def inca(tt):
+        ''' increment member a'''
+        cls, obj = tt
+        # make a copy
+        obj2 = cls(obj)
+        obj2.a = obj.a + 1
+        return cls, obj2
+
+
+    def incb(tt):
+        ''' increment member b'''
+        cls, obj = tt
+        # make a copy
+        obj2 = cls(obj)
+        obj2.b = obj.b + 1
+        return cls, obj2
+
+    source = Stream()
+    futures = scatter(source).map(inca).map(incb)
+    # cache results
+    futures_L = futures.sink_to_list()
+    L = futures.gather().sink_to_list()
+
+    obj1 = myObj, myObj(1,2)
+    obj2 = myObj, myObj(1,4)
+    obj3 = myObj, myObj(2,4)
+    yield source.emit(obj1)
+    yield source.emit(obj2)
+    yield source.emit(obj3)
+    time.sleep(.1)
+
+    assert L[0][1].b == 3
+    # should have used cached result, not actual
+    assert L[1][1].b == 3
+    assert L[2][1].b == 5
