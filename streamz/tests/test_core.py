@@ -4,6 +4,7 @@ import json
 import operator
 from operator import add
 from time import time, sleep
+from functools import partial
 
 import pytest
 
@@ -774,33 +775,82 @@ def test_destroy():
 def test_stream_name():
     ''' Test that stream_name is passed correctly to the core methods.'''
     test_name = "some test name"
+
     sin = Stream(stream_name=test_name)
     sin2 = Stream()
-
-    # add new core methods here, initialized
-    streams = [
-               sin.map(lambda x : x, stream_name=test_name),
-               sin.accumulate(lambda x1, x2 : x1, stream_name=test_name),
-               sin.filter(lambda x : True, stream_name=test_name),
-               sin.partition(2, stream_name=test_name),
-               sin.sliding_window(2, stream_name=test_name),
-               sin.timed_window(.01, stream_name=test_name),
-               sin.rate_limit(.01, stream_name=test_name),
-               sin.delay(.02, stream_name=test_name),
-               sin.buffer(2, stream_name=test_name),
-               sin.zip(sin2, stream_name=test_name),
-               sin.combine_latest(sin2, stream_name=test_name),
-               sin.frequencies(stream_name=test_name),
-               sin.flatten(stream_name=test_name),
-               sin.unique(stream_name=test_name),
-               sin.union(stream_name=test_name),
-               sin.pluck(0, stream_name=test_name),
-               sin.collect(stream_name=test_name),
-               ]
-
-    for s in streams:
-        assert s.name == test_name
 
     assert sin.name == test_name
     # when not defined, should be None
     assert sin2.name is None
+
+    # add new core methods here, initialized
+    # these should be functions, use partial to partially initialize them
+    # (if they require more arguments)
+    streams = [
+               partial(sin.map, lambda x : x),
+               partial(sin.accumulate, lambda x1, x2 : x1),
+               partial(sin.filter, lambda x : True),
+               partial(sin.partition, 2),
+               partial(sin.sliding_window, 2),
+               partial(sin.timed_window, .01),
+               partial(sin.rate_limit, .01),
+               partial(sin.delay, .02),
+               partial(sin.buffer, 2),
+               partial(sin.zip, sin2),
+               partial(sin.combine_latest, sin2),
+               sin.frequencies,
+               sin.flatten,
+               sin.unique,
+               sin.union,
+               partial(sin.pluck, 0),
+               sin.collect,
+               ]
+
+    good_kwargs = dict(stream_name=test_name)
+    bad_kwargs = dict(foo="bar")
+    for s in streams:
+        # try good kwargs
+        stmp = s(**good_kwargs)
+        assert stmp.name == test_name
+
+
+def test_stream_bad_kwargs():
+    ''' Test the bad kwargs for the stream'''
+    test_name = "some test name"
+
+    sin = Stream(stream_name=test_name)
+    sin2 = Stream()
+
+    assert sin.name == test_name
+    # when not defined, should be None
+    assert sin2.name is None
+
+    # add new core methods here, initialized
+    # these should be functions, use partial to partially initialize them
+    # (if they require more arguments)
+    streams = [
+               # some filter kwargs, so we comment them out
+               # partial(sin.map, lambda x : x),
+               # partial(sin.accumulate, lambda x1, x2 : x1),
+               partial(sin.filter, lambda x : True),
+               partial(sin.partition, 2),
+               partial(sin.sliding_window, 2),
+               partial(sin.timed_window, .01),
+               partial(sin.rate_limit, .01),
+               partial(sin.delay, .02),
+               partial(sin.buffer, 2),
+               partial(sin.zip, sin2),
+               partial(sin.combine_latest, sin2),
+               # sin.frequencies,
+               sin.flatten,
+               sin.unique,
+               sin.union,
+               partial(sin.pluck, 0),
+               sin.collect,
+               ]
+
+    good_kwargs = dict(stream_name=test_name)
+    bad_kwargs = dict(foo="bar")
+    for s in streams:
+        with pytest.raises(TypeError):
+            s(**bad_kwargs)
