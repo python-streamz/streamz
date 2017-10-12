@@ -638,7 +638,6 @@ class zip(Stream):
     _graphviz_shape = 'triangle'
 
     def __init__(self, *children, **kwargs):
-        stream_name = kwargs.pop('stream_name', None)
         self.maxsize = kwargs.pop('maxsize', 10)
         self.buffers = [deque() for _ in children]
         self.condition = Condition()
@@ -652,8 +651,7 @@ class zip(Stream):
 
         children2 = [child for child in children if isinstance(child, Stream)]
 
-        Stream.__init__(self, children=children2, stream_name=stream_name,
-                        **kwargs)
+        Stream.__init__(self, children=children2, **kwargs)
 
     def pack_literals(self):
         """ Fill buffers for literals whenver we empty them """
