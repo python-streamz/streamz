@@ -255,10 +255,24 @@ Streamz will ensure that this future is passed all the way back to the
 on it.  This allows us to avoid buildup even in very large and complex streams.
 We always pass futures back to ensure responsiveness.
 
-Of course, you may want to shape how these futures move around.  For example
-you might add a ``buffer`` at certain points in the graph to allow work to
-build up.  You may add additional stages like ``rate_limit`` that introduce
-artificial slowdowns to avoid hitting external API limits, and so on..
+But wait, maybe we don't mind having a few messages in memory at once, this
+will help steady the flow of data so that we can continue to work even if our
+sources or sinks become less productive for brief periods.  We might add a
+``buffer``  just before writing to the database.
+
+.. code-block:: python
+
+   source.map(json.loads).buffer(100).sink(write_to_database)
+
+And if we are pulling from an API with known limits then we might want to
+introduce artificial rate limits at 10ms.
+
+.. code-block:: python
+
+    source.rate_limit(0.010).map(json.loads).buffer(100).sink(write_to_database)
+
+Operations like these (and more) allow us to shape the flow of data through our
+pipelines.
 
 
 Modifying and Cleaning up Streams
