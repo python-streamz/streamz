@@ -30,7 +30,7 @@ class map(DaskStream):
     def update(self, x, who=None):
         client = default_client()
         result = client.submit(self.func, x, *self.args, **self.kwargs)
-        return self.emit(result)
+        return self._emit(result)
 
 
 @DaskStream.register_api()
@@ -44,7 +44,7 @@ class scan(DaskStream):
     def update(self, x, who=None):
         if self.state is core.no_default:
             self.state = x
-            return self.emit(self.state)
+            return self._emit(self.state)
         else:
             client = default_client()
             result = client.submit(self.func, self.state, x)
@@ -54,7 +54,7 @@ class scan(DaskStream):
             else:
                 state = result
             self.state = state
-            return self.emit(result)
+            return self._emit(result)
 
 
 @DaskStream.register_api()
@@ -67,7 +67,7 @@ class scatter(DaskStream):
     def _update(self, x, who=None):
         client = default_client()
         future = yield client.scatter(x, asynchronous=True)
-        yield self.emit(future)
+        yield self._emit(future)
 
     def update(self, x, who=None):
         client = default_client()
@@ -82,7 +82,7 @@ class gather(core.Stream):
         client = default_client()
         result = yield client.gather(x, asynchronous=True)
         with set_thread_state(asynchronous=True):
-            result = self.emit(result)
+            result = self._emit(result)
         yield result
 
     def update(self, x, who=None):
@@ -91,10 +91,51 @@ class gather(core.Stream):
 
 
 @DaskStream.register_api()
+class buffer(DaskStream, core.buffer):
+    pass
+
+
+@DaskStream.register_api()
+class combine_latest(DaskStream, core.combine_latest):
+    pass
+
+
+@DaskStream.register_api()
+class delay(DaskStream, core.delay):
+    pass
+
+
+@DaskStream.register_api()
+class partition(DaskStream, core.partition):
+    pass
+
+
+@DaskStream.register_api()
+class rate_limit(DaskStream, core.rate_limit):
+    pass
+
+
+@DaskStream.register_api()
+class sliding_window(DaskStream, core.sliding_window):
+    pass
+
+
+@DaskStream.register_api()
+class timed_window(DaskStream, core.timed_window):
+    pass
+
+
+@DaskStream.register_api()
+class union(DaskStream, core.union):
+    pass
+
+
+@DaskStream.register_api()
 class zip(DaskStream, core.zip):
     pass
 
 
+"""
 @DaskStream.register_api()
 class buffer(DaskStream):
     def __init__(self, upstream, n, loop=None):
@@ -110,7 +151,7 @@ class buffer(DaskStream):
         while True:
             x = yield self.queue.get(asynchronous=True)
             with set_thread_state(asynchronous=True):
-                result = self.emit(x)
+                result = self._emit(x)
             yield result
 
     @gen.coroutine
@@ -120,3 +161,4 @@ class buffer(DaskStream):
 
     def update(self, x, who=None):
         return self.queue.put(x)
+"""

@@ -18,6 +18,7 @@ import streamz as sz
 from ..core import Stream
 from streamz.sources import sink_to_file, PeriodicCallback
 from streamz.utils_test import inc, double, gen_test, tmpfile
+from distributed.utils_test import loop
 
 
 def test_basic():
@@ -139,7 +140,7 @@ def test_sliding_window():
 def test_backpressure():
     q = Queue(maxsize=2)
 
-    source = Stream()
+    source = Stream(asynchronous=True)
     source.map(inc).scan(add, start=0).sink(q.put)
 
     @gen.coroutine
@@ -160,9 +161,10 @@ def test_backpressure():
 
 @gen_test()
 def test_timed_window():
-    source = Stream()
+    source = Stream(asynchronous=True)
     a = source.timed_window(0.01)
 
+    assert a.loop is IOLoop.current()
     L = a.sink_to_list()
 
     for i in range(10):
@@ -183,7 +185,7 @@ def test_timed_window():
 def test_timed_window_backpressure():
     q = Queue(maxsize=1)
 
-    source = Stream()
+    source = Stream(asynchronous=True)
     source.timed_window(0.01).sink(q.put)
 
     @gen.coroutine
@@ -228,7 +230,7 @@ def test_counter():
 
 @gen_test()
 def test_rate_limit():
-    source = Stream()
+    source = Stream(asynchronous=True)
     L = source.rate_limit(0.05).sink_to_list()
 
     start = time()
@@ -241,7 +243,7 @@ def test_rate_limit():
 
 @gen_test()
 def test_delay():
-    source = Stream()
+    source = Stream(asynchronous=True)
     L = source.delay(0.02).sink_to_list()
 
     for i in range(5):
@@ -260,7 +262,7 @@ def test_delay():
 
 @gen_test()
 def test_buffer():
-    source = Stream()
+    source = Stream(asynchronous=True)
     L = source.map(inc).buffer(10).map(inc).rate_limit(0.05).sink_to_list()
 
     start = time()
@@ -378,8 +380,8 @@ def test_combine_latest_emit_on_stream():
 
 @gen_test()
 def test_zip_timeout():
-    a = Stream()
-    b = Stream()
+    a = Stream(asynchronous=True)
+    b = Stream(asynchronous=True)
     c = sz.zip(a, b, maxsize=2)
 
     L = c.sink_to_list()
@@ -759,7 +761,7 @@ def test_subclass():
 
 @gen_test()
 def test_latest():
-    source = Stream()
+    source = Stream(asynchronous=True)
 
     L = []
 
@@ -801,7 +803,7 @@ def test_destroy():
     assert L == [2]
 
 
-def test_stream_kwargs():
+def dont_test_stream_kwargs():
     ''' Test the good and bad kwargs for the stream
         Currently just stream_name
     '''
@@ -859,3 +861,52 @@ def test_stream_kwargs():
     import gc
     gc.collect()
     sin.emit(1)
+
+
+@pytest.fixture
+def thread(loop):
+    from threading import Thread
+    thread = Thread(target=loop.start)
+    thread.daemon = True
+    thread.start()
+
+    while not loop._running:
+        sleep(0.01)
+
+    return thread
+
+
+def test_percolate_loop_information(loop, thread):
+    source = Stream()
+    assert not source.loop
+    s = source.timed_window(0.5)
+    assert source.loop is IOLoop.current()
+
+
+def test_separate_thread_without_time(loop, thread):
+    assert thread.is_alive()
+    source = Stream(loop=loop)
+    L = source.map(inc).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+        assert L[-1] == i + 1
+
+
+def test_separate_thread_with_time(loop, thread):
+    L = []
+
+    @gen.coroutine
+    def slow_write(x):
+        yield gen.sleep(0.1)
+        L.append(x)
+
+    source = Stream(loop=loop)
+    source.map(inc).sink(slow_write)
+
+    start = time()
+    source.emit(1)
+    stop = time()
+
+    assert stop - start > 0.1
+    assert L == [2]
