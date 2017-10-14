@@ -91,10 +91,51 @@ class gather(core.Stream):
 
 
 @DaskStream.register_api()
+class buffer(DaskStream, core.buffer):
+    pass
+
+
+@DaskStream.register_api()
+class combine_latest(DaskStream, core.combine_latest):
+    pass
+
+
+@DaskStream.register_api()
+class delay(DaskStream, core.delay):
+    pass
+
+
+@DaskStream.register_api()
+class partition(DaskStream, core.partition):
+    pass
+
+
+@DaskStream.register_api()
+class rate_limit(DaskStream, core.rate_limit):
+    pass
+
+
+@DaskStream.register_api()
+class sliding_window(DaskStream, core.sliding_window):
+    pass
+
+
+@DaskStream.register_api()
+class timed_window(DaskStream, core.timed_window):
+    pass
+
+
+@DaskStream.register_api()
+class union(DaskStream, core.union):
+    pass
+
+
+@DaskStream.register_api()
 class zip(DaskStream, core.zip):
     pass
 
 
+"""
 @DaskStream.register_api()
 class buffer(DaskStream):
     def __init__(self, child, n, loop=None):
@@ -120,3 +161,4 @@ class buffer(DaskStream):
 
     def update(self, x, who=None):
         return self.queue.put(x)
+"""
