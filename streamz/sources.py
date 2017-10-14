@@ -19,7 +19,7 @@ def PeriodicCallback(callback, callback_time, **kwargs):
     return source
 
 
-def sink_to_file(filename, child, mode='w', prefix='', suffix='\n', flush=False):
+def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=False):
     file = open(filename, mode=mode)
 
     def write(text):
@@ -27,7 +27,7 @@ def sink_to_file(filename, child, mode='w', prefix='', suffix='\n', flush=False)
         if flush:
             file.flush()
 
-    child.sink(write)
+    upstream.sink(write)
     return file
 
 

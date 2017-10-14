@@ -62,17 +62,17 @@ class Stream(object):
 
     str_list = ['func', 'predicate', 'n', 'interval']
 
-    def __init__(self, child=None, children=None, stream_name=None, loop=None):
-        self.parents = weakref.WeakSet()
-        if children is not None:
-            self.children = children
+    def __init__(self, upstream=None, upstreams=None, stream_name=None, loop=None):
+        self.downstreams = weakref.WeakSet()
+        if upstreams is not None:
+            self.upstreams = upstreams
         else:
-            self.children = [child]
+            self.upstreams = [upstream]
         if loop is not None:
             self._loop = loop
-        for child in self.children:
-            if child:
-                child.parents.add(self)
+        for upstream in self.upstreams:
+            if upstream:
+                upstream.downstreams.add(self)
         self.name = stream_name
 
     @classmethod
@@ -151,8 +151,8 @@ class Stream(object):
         done at any point
         """
         result = []
-        for parent in self.parents:
-            r = parent.update(x, who=self)
+        for downstream in self.downstreams:
+            r = downstream.update(x, who=self)
             if type(r) is list:
                 result.extend(r)
             else:
@@ -162,40 +162,39 @@ class Stream(object):
     def update(self, x, who=None):
         self.emit(x)
 
-    def connect(self, parent):
+    def connect(self, downstream):
         ''' Connect this stream to a downstream element.
 
         Parameters
         ----------
-        parent: Stream
-            The parent stream (downstream element) to connect to
+        downstream: Stream
+            The downstream stream to connect to
         '''
-        # Note : parents go downstream and children go upstream.
-        self.parents.add(parent)
+        self.downstreams.add(downstream)
 
-        if parent.children == [None]:
-            parent.children = [self]
+        if downstream.upstreams == [None]:
+            downstream.upstreams = [self]
         else:
-            parent.children.append(self)
+            downstream.upstreams.append(self)
 
-    def disconnect(self, parent):
+    def disconnect(self, downstream):
         ''' Disconnect this stream to a downstream element.
 
         Parameters
         ----------
-        parent: Stream
-            The parent stream (downstream element) to disconnect from
+        downstream: Stream
+            The downstream stream to disconnect from
         '''
-        self.parents.remove(parent)
+        self.downstreams.remove(downstream)
 
-        parent.children.remove(self)
+        downstream.upstreams.remove(self)
 
     @property
-    def child(self):
-        if len(self.children) != 1:
-            raise ValueError("Stream has multiple children")
+    def upstream(self):
+        if len(self.upstreams) != 1:
+            raise ValueError("Stream has multiple upstreams")
         else:
-            return self.children[0]
+            return self.upstreams[0]
 
     @property
     def loop(self):
@@ -203,9 +202,9 @@ class Stream(object):
             return self._loop
         except AttributeError:
             pass
-        for child in self.children:
-            if child:
-                loop = child.loop
+        for upstream in self.upstreams:
+            if upstream:
+                loop = upstream.loop
                 if loop:
                     self._loop = loop
                     return loop
@@ -217,10 +216,10 @@ class Stream(object):
         Disconnect this stream from any upstream sources
         """
         if streams is None:
-            streams = self.children
-        for child in list(streams):
-            child.parents.remove(self)
-            self.children.remove(child)
+            streams = self.upstreams
+        for upstream in list(streams):
+            upstream.downstreams.remove(self)
+            self.upstreams.remove(upstream)
 
     def scatter(self, **kwargs):
         from .dask import scatter
@@ -363,10 +362,10 @@ class sink(Stream):
     """
     _graphviz_shape = 'trapezium'
 
-    def __init__(self, child, func, **kwargs):
+    def __init__(self, upstream, func, **kwargs):
         self.func = func
 
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
         _global_sinks.add(self)
 
     def update(self, x, who=None):
@@ -380,14 +379,14 @@ class sink(Stream):
 @Stream.register_api()
 class map(Stream):
     """ Apply a function to every element in the stream """
-    def __init__(self, child, func, *args, **kwargs):
+    def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
 
-        Stream.__init__(self, child, stream_name=stream_name)
+        Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
         result = self.func(x, *self.args, **self.kwargs)
@@ -402,12 +401,12 @@ def _truthy(x):
 @Stream.register_api()
 class filter(Stream):
     """ Only pass through elements that satisfy the predicate """
-    def __init__(self, child, predicate, **kwargs):
+    def __init__(self, upstream, predicate, **kwargs):
         if predicate is None:
             predicate = _truthy
         self.predicate = predicate
 
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         if self.predicate(x):
@@ -448,7 +447,7 @@ class accumulate(Stream):
     """
     _graphviz_shape = 'box'
 
-    def __init__(self, child, func, start=no_default, returns_state=False,
+    def __init__(self, upstream, func, start=no_default, returns_state=False,
                  **kwargs):
         self.func = func
         self.kwargs = kwargs
@@ -456,7 +455,7 @@ class accumulate(Stream):
         self.returns_state = returns_state
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
-        Stream.__init__(self, child, stream_name=stream_name)
+        Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
         if self.state is no_default:
@@ -488,10 +487,10 @@ class partition(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n, **kwargs):
+    def __init__(self, upstream, n, **kwargs):
         self.n = n
         self.buffer = []
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -521,10 +520,10 @@ class sliding_window(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n, **kwargs):
+    def __init__(self, upstream, n, **kwargs):
         self.n = n
         self.buffer = deque(maxlen=n)
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         self.buffer.append(x)
@@ -544,12 +543,12 @@ class timed_window(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval, loop=None, **kwargs):
+    def __init__(self, upstream, interval, loop=None, **kwargs):
         self.interval = interval
         self.buffer = []
         self.last = gen.moment
 
-        Stream.__init__(self, child, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, loop=loop, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -571,11 +570,11 @@ class delay(Stream):
     """ Add a time delay to results """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval, loop=None, **kwargs):
+    def __init__(self, upstream, interval, loop=None, **kwargs):
         self.interval = interval
         self.queue = Queue()
 
-        Stream.__init__(self, child, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, loop=loop, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -607,11 +606,11 @@ class rate_limit(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, interval, **kwargs):
+    def __init__(self, upstream, interval, **kwargs):
         self.interval = interval
         self.next = 0
 
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     @gen.coroutine
     def update(self, x, who=None):
@@ -633,10 +632,10 @@ class buffer(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, child, n, loop=None, **kwargs):
+    def __init__(self, upstream, n, loop=None, **kwargs):
         self.queue = Queue(maxsize=n)
 
-        Stream.__init__(self, child, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, loop=loop, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -664,21 +663,21 @@ class zip(Stream):
     _graphviz_orientation = 270
     _graphviz_shape = 'triangle'
 
-    def __init__(self, *children, **kwargs):
+    def __init__(self, *upstreams, **kwargs):
         self.maxsize = kwargs.pop('maxsize', 10)
-        self.buffers = [deque() for _ in children]
+        self.buffers = [deque() for _ in upstreams]
         self.condition = Condition()
-        self.literals = [(i, val) for i, val in enumerate(children)
+        self.literals = [(i, val) for i, val in enumerate(upstreams)
                          if not isinstance(val, Stream)]
         self.pack_literals()
 
-        self.buffers_by_stream = {child: buffer
-                    for child, buffer in builtins.zip(children, self.buffers)
-                    if isinstance(child, Stream)}
+        self.buffers_by_stream = {upstream: buffer
+                    for upstream, buffer in builtins.zip(upstreams, self.buffers)
+                    if isinstance(upstream, Stream)}
 
-        children2 = [child for child in children if isinstance(child, Stream)]
+        upstreams2 = [upstream for upstream in upstreams if isinstance(upstream, Stream)]
 
-        Stream.__init__(self, children=children2, **kwargs)
+        Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
     def pack_literals(self):
         """ Fill buffers for literals whenver we empty them """
@@ -718,26 +717,26 @@ class combine_latest(Stream):
     _graphviz_orientation = 270
     _graphviz_shape = 'triangle'
 
-    def __init__(self, *children, **kwargs):
+    def __init__(self, *upstreams, **kwargs):
         emit_on = kwargs.pop('emit_on', None)
 
-        self.last = [None for _ in children]
-        self.missing = set(children)
+        self.last = [None for _ in upstreams]
+        self.missing = set(upstreams)
         if emit_on is not None:
             if not isinstance(emit_on, Iterable):
                 emit_on = (emit_on, )
             emit_on = tuple(
-                children[x] if isinstance(x, int) else x for x in emit_on)
+                upstreams[x] if isinstance(x, int) else x for x in emit_on)
             self.emit_on = emit_on
         else:
-            self.emit_on = children
-        Stream.__init__(self, children=children, **kwargs)
+            self.emit_on = upstreams
+        Stream.__init__(self, upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
             self.missing.remove(who)
 
-        self.last[self.children.index(who)] = x
+        self.last[self.upstreams.index(who)] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
             return self.emit(tup)
@@ -796,14 +795,14 @@ class unique(Stream):
     1
     3
     """
-    def __init__(self, child, history=None, key=identity, **kwargs):
+    def __init__(self, upstream, history=None, key=identity, **kwargs):
         self.seen = dict()
         self.key = key
         if history:
             from zict import LRU
             self.seen = LRU(history, self.seen)
 
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
@@ -816,7 +815,7 @@ class unique(Stream):
 class union(Stream):
     """ Combine multiple streams into one
 
-    Every element from any of the children streams will immediately flow
+    Every element from any of the upstreams streams will immediately flow
     into the output stream.  They will not be combined with elements from
     other streams.
 
@@ -825,8 +824,8 @@ class union(Stream):
     Stream.zip
     Stream.combine_latest
     """
-    def __init__(self, *children, **kwargs):
-        super(union, self).__init__(children=children, **kwargs)
+    def __init__(self, *upstreams, **kwargs):
+        super(union, self).__init__(upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
         return self.emit(x)
@@ -859,9 +858,9 @@ class pluck(Stream):
     'Alice'
     'Bob'
     """
-    def __init__(self, child, pick, **kwargs):
+    def __init__(self, upstream, pick, **kwargs):
         self.pick = pick
-        super(pluck, self).__init__(child, **kwargs)
+        super(pluck, self).__init__(upstream, **kwargs)
 
     def update(self, x, who=None):
         if isinstance(self.pick, list):
@@ -888,12 +887,12 @@ class collect(Stream):
     ...
     [1, 2]
     """
-    def __init__(self, child, cache=None, **kwargs):
+    def __init__(self, upstream, cache=None, **kwargs):
         if cache is None:
             cache = deque()
         self.cache = cache
 
-        Stream.__init__(self, child, **kwargs)
+        Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         self.cache.append(x)
@@ -920,16 +919,16 @@ class zip_latest(Stream):
     Stream.combine_latest
     Stream.zip
     """
-    def __init__(self, lossless, *children, **kwargs):
-        children = (lossless,) + children
-        self.last = [None for _ in children]
-        self.missing = set(children)
+    def __init__(self, lossless, *upstreams, **kwargs):
+        upstreams = (lossless,) + upstreams
+        self.last = [None for _ in upstreams]
+        self.missing = set(upstreams)
         self.lossless = lossless
         self.lossless_buffer = deque()
-        Stream.__init__(self, children=children, **kwargs)
+        Stream.__init__(self, upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
-        idx = self.children.index(who)
+        idx = self.upstreams.index(who)
         if who is self.lossless:
             self.lossless_buffer.append(x)
 
@@ -961,11 +960,11 @@ class latest(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, child, loop=None):
+    def __init__(self, upstream, loop=None):
         self.condition = Condition()
         self.next = []
 
-        Stream.__init__(self, child, loop=loop)
+        Stream.__init__(self, upstream, loop=loop)
 
         self.loop.add_callback(self.cb)
 

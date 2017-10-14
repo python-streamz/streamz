@@ -42,13 +42,13 @@ def create_graph(node, graph, prior_node=None, pc=None):
         tt = hash(prior_node)
         if graph.has_edge(t, tt):
             return
-        if pc == 'parent':
+        if pc == 'downstream':
             graph.add_edge(tt, t)
         else:
             graph.add_edge(t, tt)
 
-    for nodes, pc in zip([list(node.parents), list(node.children)],
-                         ['parent', 'children']):
+    for nodes, pc in zip([list(node.downstreams), list(node.upstreams)],
+                         ['downstream', 'upstreams']):
         for node2 in nodes:
             if node2 is not None:
                 create_graph(node2, graph, node, pc=pc)

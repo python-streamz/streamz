@@ -625,8 +625,8 @@ def test_connect():
     source_downstream = Stream()
     # connect assumes this default behaviour
     # of stream initialization
-    assert not(source_downstream.parents)
-    assert source_downstream.children == [None]
+    assert not(source_downstream.downstreams)
+    assert source_downstream.upstreams == [None]
 
     # initialize the second stream to connect to
     source_upstream = Stream()
@@ -671,7 +671,7 @@ def test_gc():
     del a
     import gc; gc.collect()
     start = time()
-    while source.parents:
+    while source.downstreams:
         sleep(0.01)
         assert time() < start + 1
 
@@ -795,8 +795,8 @@ def test_destroy():
 
     s.destroy()
 
-    assert not list(source.parents)
-    assert not s.children
+    assert not list(source.downstreams)
+    assert not s.upstreams
     source.emit(2)
     assert L == [2]
 
