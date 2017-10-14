@@ -12,35 +12,15 @@ from . import core
 
 
 class DaskStream(core.Stream):
-    def map(self, func, *args, **kwargs):
-        """ Apply a function to every element in the stream """
-        return map(func, self, args=args, **kwargs)
 
-    def gather(self):
-        return gather(self)
-
-    def accumulate(self, func, start=core.no_default, returns_state=False):
-        """ Accumulate results with previous state """
-        return scan(func, self, start=start, returns_state=returns_state)
-
-    scan = accumulate
-
-    def zip(self, *other):
-        """ Combine two streams together into a stream of tuples """
-        return zip(self, *other)
-
-    def buffer(self, n, loop=None):
-        """ Allow results to pile up at this point in the stream
-
-        This allows results to buffer in place at various points in the stream.
-        This can help to smooth flow through the system when backpressure is
-        applied.
-        """
-        return buffer(n, self, loop=loop)
+    @property
+    def scan(self):
+        return self.accumulate
 
 
+@DaskStream.register_api()
 class map(DaskStream):
-    def __init__(self, func, child, args=(), **kwargs):
+    def __init__(self, child, func, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.args = args
@@ -53,8 +33,9 @@ class map(DaskStream):
         return self.emit(result)
 
 
+@DaskStream.register_api()
 class scan(DaskStream):
-    def __init__(self, func, child, start=core.no_default, returns_state=False):
+    def __init__(self, child, func, start=core.no_default, returns_state=False):
         self.func = func
         self.state = start
         self.returns_state = returns_state
@@ -76,6 +57,7 @@ class scan(DaskStream):
             return self.emit(result)
 
 
+@DaskStream.register_api()
 class scatter(DaskStream):
     """ Convert local stream to Dask Stream
 
@@ -92,6 +74,7 @@ class scatter(DaskStream):
         return client.sync(self._update, x, who)
 
 
+@DaskStream.register_api()
 class gather(core.Stream):
     """ Convert Dask stream to local Stream """
     @gen.coroutine
@@ -107,12 +90,14 @@ class gather(core.Stream):
         return client.sync(self._update, x, who)
 
 
+@DaskStream.register_api()
 class zip(DaskStream, core.zip):
     pass
 
 
+@DaskStream.register_api()
 class buffer(DaskStream):
-    def __init__(self, n, child, loop=None):
+    def __init__(self, child, n, loop=None):
         client = default_client()
         self.queue = dask.distributed.Queue(maxsize=n, client=client)
 
