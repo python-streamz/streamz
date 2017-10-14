@@ -1,5 +1,3 @@
-
-
 _method_cache = {}
 
 

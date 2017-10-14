@@ -1,7 +1,12 @@
 from __future__ import absolute_import, division, print_function
 
 from collections import deque
+from datetime import timedelta
 import functools
+import logging
+import six
+import sys
+import threading
 from time import time
 import weakref
 
@@ -12,11 +17,15 @@ from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
 
-from .compatibility import builtins
+from .compatibility import builtins, get_thread_identity
 
 no_default = '--no-default--'
 
 _global_sinks = set()
+
+thread_state = threading.local()
+
+logger = logging.getLogger(__name__)
 
 
 def identity(x):
@@ -62,18 +71,45 @@ class Stream(object):
 
     str_list = ['func', 'predicate', 'n', 'interval']
 
-    def __init__(self, upstream=None, upstreams=None, stream_name=None, loop=None):
+    def __init__(self, upstream=None, upstreams=None, stream_name=None,
+                 loop=None, asynchronous=False):
+        self.asynchronous = asynchronous
         self.downstreams = weakref.WeakSet()
         if upstreams is not None:
             self.upstreams = upstreams
         else:
             self.upstreams = [upstream]
-        if loop is not None:
-            self._loop = loop
+        if loop is None:
+            for upstream in self.upstreams:
+                if upstream and upstream.loop:
+                    loop = upstream.loop
+                    break
+        self.loop = loop
         for upstream in self.upstreams:
             if upstream:
                 upstream.downstreams.add(self)
         self.name = stream_name
+        if loop:
+            for upstream in self.upstreams:
+                if upstream:
+                    upstream._inform_loop(loop)
+
+    def _inform_loop(self, loop):
+        """
+        Percolate information about an event loop to the rest of the stream
+        """
+        if self.loop is loop:
+            return
+        elif self.loop is None:
+            self.loop = loop
+            for upstream in self.upstreams:
+                if upstream:
+                    upstream._inform_loop(loop)
+            for downstream in self.downstreams:
+                if downstream:
+                    downstream._inform_loop(loop)
+        else:
+            raise ValueError("Two different event loops active")
 
     @classmethod
     def register_api(cls, modifier=identity):
@@ -144,12 +180,7 @@ class Stream(object):
 
     __repr__ = __str__
 
-    def emit(self, x):
-        """ Push data into the stream at this point
-
-        This is typically done only at source Streams but can theortically be
-        done at any point
-        """
+    def _emit(self, x):
         result = []
         for downstream in self.downstreams:
             r = downstream.update(x, who=self)
@@ -157,7 +188,35 @@ class Stream(object):
                 result.extend(r)
             else:
                 result.append(r)
+
         return [element for element in result if element is not None]
+
+    def emit(self, x, asynchronous=False):
+        """ Push data into the stream at this point
+
+        This is typically done only at source Streams but can theortically be
+        done at any point
+        """
+        ts_async = getattr(thread_state, 'asynchronous', False)
+        if asynchronous or self.loop is None or ts_async or self.asynchronous:
+            if not ts_async:
+                thread_state.asynchronous = True
+            try:
+                result = self._emit(x)
+                return result
+            finally:
+                thread_state.asynchronous = ts_async
+        else:
+            @gen.coroutine
+            def _():
+                thread_state.asynchronous = True
+                try:
+                    result = yield self._emit(x)
+                finally:
+                    del thread_state.asynchronous
+
+                raise gen.Return(result)
+            return sync(self.loop, _)
 
     def update(self, x, who=None):
         self.emit(x)
@@ -195,21 +254,6 @@ class Stream(object):
             raise ValueError("Stream has multiple upstreams")
         else:
             return self.upstreams[0]
-
-    @property
-    def loop(self):
-        try:
-            return self._loop
-        except AttributeError:
-            pass
-        for upstream in self.upstreams:
-            if upstream:
-                loop = upstream.loop
-                if loop:
-                    self._loop = loop
-                    return loop
-        self._loop = IOLoop.current()
-        return self._loop
 
     def destroy(self, streams=None):
         """
@@ -544,6 +588,7 @@ class timed_window(Stream):
     _graphviz_shape = 'octagon'
 
     def __init__(self, upstream, interval, loop=None, **kwargs):
+        loop = loop or upstream.loop or IOLoop.current()
         self.interval = interval
         self.buffer = []
         self.last = gen.moment
@@ -560,7 +605,7 @@ class timed_window(Stream):
     def cb(self):
         while True:
             L, self.buffer = self.buffer, []
-            self.last = self.emit(L)
+            self.last = self.emit(L, asynchronous=True)
             yield self.last
             yield gen.sleep(self.interval)
 
@@ -571,6 +616,7 @@ class delay(Stream):
     _graphviz_shape = 'octagon'
 
     def __init__(self, upstream, interval, loop=None, **kwargs):
+        loop = loop or upstream.loop or IOLoop.current()
         self.interval = interval
         self.queue = Queue()
 
@@ -583,7 +629,7 @@ class delay(Stream):
         while True:
             last = time()
             x = yield self.queue.get()
-            yield self.emit(x)
+            yield self.emit(x, asynchronous=True)
             duration = self.interval - (time() - last)
             if duration > 0:
                 yield gen.sleep(duration)
@@ -619,7 +665,7 @@ class rate_limit(Stream):
         self.next = max(now, self.next) + self.interval
         if now < old_next:
             yield gen.sleep(old_next - now)
-        yield self.emit(x)
+        yield self.emit(x, asynchronous=True)
 
 
 @Stream.register_api()
@@ -633,6 +679,7 @@ class buffer(Stream):
     _graphviz_shape = 'diamond'
 
     def __init__(self, upstream, n, loop=None, **kwargs):
+        loop = loop or upstream.loop or IOLoop.current()
         self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, upstream, loop=loop, **kwargs)
@@ -646,7 +693,7 @@ class buffer(Stream):
     def cb(self):
         while True:
             x = yield self.queue.get()
-            yield self.emit(x)
+            yield self.emit(x, asynchronous=True)
 
 
 @Stream.register_api()
@@ -961,6 +1008,7 @@ class latest(Stream):
     _graphviz_shape = 'octagon'
 
     def __init__(self, upstream, loop=None):
+        loop = loop or upstream.loop or IOLoop.current()
         self.condition = Condition()
         self.next = []
 
@@ -977,4 +1025,53 @@ class latest(Stream):
         while True:
             yield self.condition.wait()
             [x] = self.next
-            yield self.emit(x)
+            yield self.emit(x, asynchronous=True)
+
+
+def sync(loop, func, *args, **kwargs):
+    """
+    Run coroutine in loop running in separate thread.
+    """
+    # This was taken from distrbuted/utils.py
+    timeout = kwargs.pop('callback_timeout', None)
+
+    def make_coro():
+        coro = gen.maybe_future(func(*args, **kwargs))
+        if timeout is None:
+            return coro
+        else:
+            return gen.with_timeout(timedelta(seconds=timeout), coro)
+
+    if not loop._running:
+        try:
+            return loop.run_sync(make_coro)
+        except RuntimeError:  # loop already running
+            pass
+
+    e = threading.Event()
+    main_tid = get_thread_identity()
+    result = [None]
+    error = [False]
+
+    @gen.coroutine
+    def f():
+        try:
+            if main_tid == get_thread_identity():
+                raise RuntimeError("sync() called from thread of running loop")
+            yield gen.moment
+            thread_state.asynchronous = True
+            result[0] = yield make_coro()
+        except Exception as exc:
+            logger.exception(exc)
+            error[0] = sys.exc_info()
+        finally:
+            thread_state.asynchronous = False
+            e.set()
+
+    loop.add_callback(f)
+    while not e.is_set():
+        e.wait(1000000)
+    if error[0]:
+        six.reraise(*error[0])
+    else:
+        return result[0]

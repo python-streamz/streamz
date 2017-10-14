@@ -12,7 +12,7 @@ def PeriodicCallback(callback, callback_time, **kwargs):
 
     def _():
         result = callback()
-        source.emit(result)
+        source._emit(result)
 
     pc = tornado.ioloop.PeriodicCallback(_, callback_time, **kwargs)
     pc.start()
@@ -68,7 +68,7 @@ class TextFile(Source):
         while True:
             line = self.file.readline()
             if line:
-                last = self.emit(line)  # TODO: we should yield on emit
+                last = self._emit(line)  # TODO: we should yield on emit
             else:
                 if self.poll_interval:
                     yield gen.sleep(self.poll_interval)
@@ -112,5 +112,5 @@ class filenames(Source):
             new = filenames - self.seen
             for fn in sorted(new):
                 self.seen.add(fn)
-                yield self.emit(fn)
+                yield self._emit(fn)
             yield gen.sleep(self.poll_interval)  # TODO: remove poll if delayed

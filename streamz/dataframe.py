@@ -530,7 +530,7 @@ class Random(StreamingDataFrame):
         self.interval = pd.Timedelta(interval).total_seconds() * 1000
 
         def trigger():
-            source.emit(None)
+            source._emit(None)
 
         self.pc = PeriodicCallback(trigger, self.interval)
         self.pc.start()
@@ -540,7 +540,7 @@ class Random(StreamingDataFrame):
         super(Random, self).__init__(stream, example)
 
     def _trigger(self):
-        self.source.emit(None)
+        self.source._emit(None)
 
     def __del__(self):
         self.pc.stop()
