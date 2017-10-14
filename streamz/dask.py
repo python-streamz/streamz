@@ -20,12 +20,12 @@ class DaskStream(core.Stream):
 
 @DaskStream.register_api()
 class map(DaskStream):
-    def __init__(self, child, func, args=(), **kwargs):
+    def __init__(self, upstream, func, args=(), **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.args = args
 
-        DaskStream.__init__(self, child)
+        DaskStream.__init__(self, upstream)
 
     def update(self, x, who=None):
         client = default_client()
@@ -35,11 +35,11 @@ class map(DaskStream):
 
 @DaskStream.register_api()
 class scan(DaskStream):
-    def __init__(self, child, func, start=core.no_default, returns_state=False):
+    def __init__(self, upstream, func, start=core.no_default, returns_state=False):
         self.func = func
         self.state = start
         self.returns_state = returns_state
-        DaskStream.__init__(self, child)
+        DaskStream.__init__(self, upstream)
 
     def update(self, x, who=None):
         if self.state is core.no_default:
@@ -97,11 +97,11 @@ class zip(DaskStream, core.zip):
 
 @DaskStream.register_api()
 class buffer(DaskStream):
-    def __init__(self, child, n, loop=None):
+    def __init__(self, upstream, n, loop=None):
         client = default_client()
         self.queue = dask.distributed.Queue(maxsize=n, client=client)
 
-        core.Stream.__init__(self, child, loop=loop or client.loop)
+        core.Stream.__init__(self, upstream, loop=loop or client.loop)
 
         self.loop.add_callback(self.cb)
 

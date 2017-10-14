@@ -468,7 +468,7 @@ def test_gc():
     sdf = sd.Random(freq='5ms', interval='100ms')
     a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
-    n = len(sdf.stream.parents)
+    n = len(sdf.stream.downstreams)
     yield gen.sleep(0.1)
     a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
@@ -479,10 +479,10 @@ def test_gc():
     a = StreamingDataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
 
-    assert len(sdf.stream.parents) == n
+    assert len(sdf.stream.downstreams) == n
     del a
     import gc; gc.collect()
-    assert len(sdf.stream.parents) == 0
+    assert len(sdf.stream.downstreams) == 0
 
 
 @gen_test()
