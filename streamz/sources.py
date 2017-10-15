@@ -118,34 +118,43 @@ class filenames(Source):
 
 
 @Stream.register_api(staticmethod)
-class Kafka(Source):
+class from_kafka(Source):
     """ Accepts messages from Kafka
+
+    Uses the confluent-kafka library,
+    https://docs.confluent.io/current/clients/confluent-kafka-python/
+
 
     Parameters
     ----------
     topics: list of str
         Labels of Kafka topics to consume from
-    url: str
-        Connection string (host:port) by which to reach Kafka
-    group: str
-        Identity of the consumer. If multiple sources share the same group,
-        each message will be passed to only one of them.
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        Examples:
+        url: Connection string (host:port) by which to reach Kafka
+        group: Identity of the consumer. If multiple sources share the same
+            group, each message will be passed to only one of them.
     poll_interval: number
-        Seconds that the thread sleeps between polling Kafka for new messages
+        Seconds that elapse between polling Kafka for new messages
+
+    Example
+    -------
+
+    >>> source = Stream.from_kafka(['mytopic'],
+    ...        dict(url='localhost:9092', group='streamz'))  # doctest: +SKIP
     """
-    def __init__(self, topics, url='localhost:9092', group='streamz',
-                 poll_interval=0.1):
+    def __init__(self, topics, consumer_params, poll_interval=0.1):
         import confluent_kafka as ck
         IOLoop.current().add_callback(self.poll_kafka)
-        self.consumer = ck.Consumer(
-            {'bootstrap.servers': url, 'group.id': group})
+        self.cpars = consumer_params
+        self.consumer = ck.Consumer(consumer_params)
         self.consumer.subscribe(topics)
         self.topics = topics
-        self.url = url
-        self.group = group
         self.sleep = poll_interval
 
-        super(Kafka, self).__init__()
+        super(from_kafka, self).__init__()
 
     @gen.coroutine
     def poll_kafka(self):
@@ -154,4 +163,4 @@ class Kafka(Source):
             if msg is None or msg.error():
                 yield gen.sleep(self.sleep)
             else:
-                self.emit(msg.value())
+                yield self.emit(msg.value())
