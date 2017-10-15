@@ -203,7 +203,7 @@ class Stream(object):
                 thread_state.asynchronous = True
             try:
                 result = self._emit(x)
-                return result
+                return gen.convert_yielded(result)
             finally:
                 thread_state.asynchronous = ts_async
         else:
@@ -414,7 +414,7 @@ class sink(Stream):
 
     def update(self, x, who=None):
         result = self.func(x)
-        if type(result) is gen.Future:
+        if gen.isawaitable(result):
             return result
         else:
             return []

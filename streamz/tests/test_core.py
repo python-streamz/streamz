@@ -1,11 +1,12 @@
 from datetime import timedelta
+from functools import partial
 import itertools
 import json
 import operator
 from operator import add
 import os
 from time import time, sleep
-from functools import partial
+import sys
 
 import pytest
 
@@ -910,3 +911,7 @@ def test_separate_thread_with_time(loop, thread):
 
     assert stop - start > 0.1
     assert L == [2]
+
+
+if sys.version_info >= (3, 5):
+    from streamz.tests.py3_test_core import *  # noqa
