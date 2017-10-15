@@ -4,18 +4,16 @@ from operator import getitem
 
 from tornado import gen
 
-import dask.distributed
-from distributed.utils import set_thread_state
 from distributed.client import default_client
 
 from . import core
 
 
 class DaskStream(core.Stream):
-
-    @property
-    def scan(self):
-        return self.accumulate
+    def __init__(self, *args, **kwargs):
+        if 'loop' not in kwargs:
+            kwargs['loop'] = default_client().loop
+        super(DaskStream, self).__init__(*args, **kwargs)
 
 
 @DaskStream.register_api()
@@ -57,6 +55,7 @@ class scan(DaskStream):
             return self._emit(result)
 
 
+@core.Stream.register_api()
 @DaskStream.register_api()
 class scatter(DaskStream):
     """ Convert local stream to Dask Stream
@@ -64,30 +63,22 @@ class scatter(DaskStream):
     All elements flowing through the input will be scattered out to the cluster
     """
     @gen.coroutine
-    def _update(self, x, who=None):
-        client = default_client()
-        future = yield client.scatter(x, asynchronous=True)
-        yield self._emit(future)
-
     def update(self, x, who=None):
         client = default_client()
-        return client.sync(self._update, x, who)
+        future = yield client.scatter(x, asynchronous=True)
+        f = yield self._emit(future)
+        raise gen.Return(f)
 
 
 @DaskStream.register_api()
 class gather(core.Stream):
     """ Convert Dask stream to local Stream """
     @gen.coroutine
-    def _update(self, x, who=None):
-        client = default_client()
-        result = yield client.gather(x, asynchronous=True)
-        with set_thread_state(asynchronous=True):
-            result = self._emit(result)
-        yield result
-
     def update(self, x, who=None):
         client = default_client()
-        return client.sync(self._update, x, who)
+        result = yield client.gather(x, asynchronous=True)
+        result2 = yield self._emit(result)
+        raise gen.Return(result2)
 
 
 @DaskStream.register_api()
@@ -133,32 +124,3 @@ class union(DaskStream, core.union):
 @DaskStream.register_api()
 class zip(DaskStream, core.zip):
     pass
-
-
-"""
-@DaskStream.register_api()
-class buffer(DaskStream):
-    def __init__(self, upstream, n, loop=None):
-        client = default_client()
-        self.queue = dask.distributed.Queue(maxsize=n, client=client)
-
-        core.Stream.__init__(self, upstream, loop=loop or client.loop)
-
-        self.loop.add_callback(self.cb)
-
-    @gen.coroutine
-    def cb(self):
-        while True:
-            x = yield self.queue.get(asynchronous=True)
-            with set_thread_state(asynchronous=True):
-                result = self._emit(x)
-            yield result
-
-    @gen.coroutine
-    def _update(self, x, who=None):
-        result = yield self.queue.put(x, asynchronous=True)
-        raise gen.Return(result)
-
-    def update(self, x, who=None):
-        return self.queue.put(x)
-"""

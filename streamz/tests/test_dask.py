@@ -16,7 +16,7 @@ from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # f
 
 @gen_cluster(client=True)
 def test_map(c, s, a, b):
-    source = Stream()
+    source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
@@ -30,7 +30,7 @@ def test_map(c, s, a, b):
 
 @gen_cluster(client=True)
 def test_scan(c, s, a, b):
-    source = Stream()
+    source = Stream(asynchronous=True)
     futures = scatter(source).map(inc).scan(add)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
@@ -44,7 +44,7 @@ def test_scan(c, s, a, b):
 
 @gen_cluster(client=True)
 def test_scan_state(c, s, a, b):
-    source = Stream()
+    source = Stream(asynchronous=True)
 
     def f(acc, i):
         acc = acc + i
@@ -59,8 +59,8 @@ def test_scan_state(c, s, a, b):
 
 @gen_cluster(client=True)
 def test_zip(c, s, a, b):
-    a = Stream()
-    b = Stream()
+    a = Stream(asynchronous=True)
+    b = Stream(asynchronous=True)
     c = scatter(a).zip(scatter(b))
 
     L = c.gather().sink_to_list()
@@ -83,7 +83,7 @@ def test_sync(loop):
             @gen.coroutine
             def f():
                 for i in range(10):
-                    yield source.emit(i)
+                    yield source.emit(i, asynchronous=True)
 
             sync(loop, f)
 
@@ -99,6 +99,7 @@ def test_sync_2(loop):
 
             for i in range(10):
                 source.emit(i)
+                assert len(L) == i + 1
 
             assert L == list(map(inc, range(10)))
 
@@ -106,7 +107,7 @@ def test_sync_2(loop):
 @pytest.mark.slow
 @gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
 def test_buffer(c, s, a, b):
-    source = Stream()
+    source = Stream(asynchronous=True)
     L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()
 
     start = time.time()
@@ -139,7 +140,6 @@ def test_buffer_sync(loop):
             start = time.time()
             for i in range(5):
                 source.emit(i)
-                print(i)
             end = time.time()
             assert end - start < 0.5
 

@@ -739,7 +739,7 @@ class zip(Stream):
             self.condition.notify_all()
             if self.literals:
                 self.pack_literals()
-            return self.emit(tup)
+            return self._emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
 
