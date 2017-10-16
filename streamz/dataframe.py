@@ -6,7 +6,6 @@ from .utils import M
 import numpy as np
 import pandas as pd
 
-from . import core
 from .sources import Source
 from .collection import Streaming, _subtypes, stream_type
 
@@ -87,10 +86,11 @@ class StreamingFrame(Streaming):
         result = show(fig, notebook_handle=True)
 
         def push_data(df):
+            print(df.reset_index())
             cds.stream(df.reset_index(), backlog)
             push_notebook(handle=result)
 
-        return {'figure': fig, 'cds': cds, 'stream': sdf.stream.map(push_data)}
+        return {'figure': fig, 'cds': cds, 'stream': sdf.stream.gather().map(push_data)}
 
     @property
     def index(self):
@@ -251,7 +251,7 @@ class StreamingDataFrame(StreamingFrame):
                 return result
 
             columns, values = zip(*args[0].items())
-            stream = core.zip(*[v.stream for v in values])
+            stream = type(values[0].stream).zip(*[v.stream for v in values])
             stream = stream.map(concat, columns=list(columns))
             example = pd.DataFrame({k: getattr(v, 'example', v)
                                     for k, v in args[0].items()})
@@ -518,8 +518,12 @@ class Random(StreamingDataFrame):
     -------
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
-    def __init__(self, freq='100ms', interval='500ms'):
-        source = Source()
+    def __init__(self, freq='100ms', interval='500ms', dask=False):
+        if dask:
+            from streamz.dask import DaskStream
+            source = DaskStream()
+        else:
+            source = Source()
         self.source = source
         start = {'last': time(), 'freq': pd.Timedelta(freq)}
         stream = self.source.accumulate(_random_accumulator,
@@ -538,9 +542,6 @@ class Random(StreamingDataFrame):
         _, example = _random_accumulator(start, None)
 
         super(Random, self).__init__(stream, example)
-
-    def _trigger(self):
-        self.source._emit(None)
 
     def __del__(self):
         self.pc.stop()

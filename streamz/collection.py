@@ -109,7 +109,7 @@ class Streaming(object):
                 IPython.display.clear_output(wait=True)
                 IPython.display.display(val)
 
-        s = self.stream.latest().rate_limit(0.5).map(update_cell)
+        s = self.stream.latest().rate_limit(0.5).gather().map(update_cell)
         _html_update_streams.add(s)
 
         self.output_ref = output_ref
@@ -267,7 +267,7 @@ def map_partitions(func, *args, **kwargs):
     streams = [arg for arg in args if isinstance(arg, Streaming)]
 
     if len(streams) > 1:
-        stream = core.zip(*[getattr(arg, 'stream', arg) for arg in args])
+        stream = type(streams[0].stream).zip(*[getattr(arg, 'stream', arg) for arg in args])
         stream = stream.map(apply_args, func, kwargs)
 
     else:
