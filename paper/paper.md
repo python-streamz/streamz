@@ -10,7 +10,7 @@ authors:
  - name: Christopher J. Wright
    orcid: 0000-0003-2522-7028
    affiliation: 2
- - name: Julien Lhermitte
+ - name: Julien R. Lhermitte
    orcid: 0000-0003-0660-975X
    affiliation: 5
  - name: Daniel B. Allan
@@ -42,12 +42,37 @@ bibliography: paper.bib
 
 # Summary
 
-- This is a small library to manage continuous streams of data, particularly when complex branching and control flow situations arise. 
-- This provides a framework for streaming data analysis in pure Python with hooks into the Dask task scheduler for automatic parallelization.
-- Streamz is similar to reactive
-programming systems like RxPY [@RxPy] or big
-data streaming systems like Apache Flink [@Flink], Apache Beam [@Beam] or Apache Spark Streaming [@Spark].
-- This software forms the backbone for data processing at the NSLS-II X-ray powder diffraction and complex materials scattering data analysis pipelines.
+Streamz is a small library to manage continuous streams of data, 
+particularly when complex branching and control flow situations arise.
+The library is similar to reactive programming systems like RxPY [@RxPy] or big
+data streaming systems like Apache Flink [@Flink], Apache Beam [@Beam] or 
+Apache Spark Streaming [@Spark].
+This software forms the backbone for data processing at the 
+NSLS-II X-ray powder diffraction and complex materials scattering data 
+analysis pipelines.
+
+Streamz is designed specifically to be:
+1. Lightweight: You can import it and go without setting up any infrastructure. It can run (in a limited way) on a Dask cluster or on an event loop, but it’s also fully operational in your local Python thread. There is no magic in the common case. Everything up until time-handling runs with tools that you learn in an introductory programming class.
+1. Small and maintainable: The codebase is currently a few hundred lines. It is also, I claim, easy for other people to understand. Here is the code for filter:
+1. Composable with Dask: Handling distributed computing is tricky to do well. Fortunately this project can offload much of that worry to Dask. The dividing line between the two systems is pretty clear and, I think, could lead to a decently powerful and maintainable system if we spend time here.
+1. Low performance overhead: Because this project is so simple it has overheads in the few-microseconds range when in a single process.
+1. Pythonic: All other streaming systems were originally designed for Java/Scala engineers. While they have APIs that are clearly well thought through they are sometimes not ideal for Python users or common Python applications.
+
+## Architecture
+Pipelines are created by combine various operation nodes which listen to each 
+other, perform some operation on the data, and emit the mutated data downstream.
+The basic structure of each node has three components: an init which describes
+the which upstream nodes the current node listens to, an update which describes
+what the node does when it receives the data (applies a function, 
+filters the data, combines data, etc.), and an emit which describes how the data
+is passed to downstream nodes which are listening. 
+
+## Usage
+This library is used at two X-ray beamlines at the NSLS-II. SHED and xpdAn at
+the x-ray powder diffraction beamline and SciStreams at CMS use streamz to 
+process incoming data live. In these cases streamz is combined with pieces
+of the scientific stack (numpy, scipy, and matplotlib among others) to process
+2D images to interpretable data.
 
 # References
 
