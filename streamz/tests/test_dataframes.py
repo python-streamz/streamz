@@ -11,12 +11,33 @@ from streamz import Stream
 from streamz.utils_test import gen_test
 from streamz.dataframe import StreamingDataFrame, StreamingSeries
 import streamz.dataframe as sd
+from streamz.dask import DaskStream
+
+from distributed import Client
+from distributed.utils_test import loop  # flake8: noqa
 
 
-def test_identity():
+@pytest.fixture(scope="module")
+def client():
+    client = Client(processes=False)
+    try:
+        yield
+    finally:
+        client.close()
+
+
+@pytest.fixture(params=['core', 'dask'])
+def stream(loop, request, client):  # flake8: noqa
+    if request.param == 'core':
+        return Stream()
+    else:
+        return DaskStream()
+
+
+def test_identity(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
-    L = sdf.stream.sink_to_list()
+    sdf = StreamingDataFrame(example=df, stream=stream)
+    L = sdf.stream.gather().sink_to_list()
 
     sdf.emit(df)
 
@@ -25,7 +46,7 @@ def test_identity():
 
     x = sdf.x
     assert isinstance(x, StreamingSeries)
-    L2 = x.stream.sink_to_list()
+    L2 = x.stream.gather().sink_to_list()
     assert not L2
 
     sdf.emit(df)
@@ -33,9 +54,9 @@ def test_identity():
     assert assert_eq(L2[0], df.x)
 
 
-def test_dtype():
+def test_dtype(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
     assert str(sdf.dtypes) == str(df.dtypes)
     assert sdf.x.dtype == df.x.dtype
@@ -54,9 +75,9 @@ def test_attributes():
         sdf.z
 
 
-def test_exceptions():
+def test_exceptions(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
     with pytest.raises(TypeError):
         sdf.emit(1)
 
@@ -64,13 +85,13 @@ def test_exceptions():
         sdf.emit(pd.DataFrame())
 
 
-def test_sum():
+def test_sum(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
-    df_out = sdf.sum().stream.sink_to_list()
+    sdf = StreamingDataFrame(example=df, stream=stream)
+    df_out = sdf.sum().stream.gather().sink_to_list()
 
     x = sdf.x
-    x_out = (x.sum() + 1).stream.sink_to_list()
+    x_out = (x.sum() + 1).stream.gather().sink_to_list()
 
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf.emit(df)
@@ -83,15 +104,15 @@ def test_sum():
     assert x_out[1] == df.x.sum() + df.x.sum() + 1
 
 
-def test_mean():
+def test_mean(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
     mean = sdf.mean()
     assert isinstance(mean, StreamingSeries)
-    df_out = mean.stream.sink_to_list()
+    df_out = mean.stream.gather().sink_to_list()
 
     x = sdf.x
-    x_out = x.mean().stream.sink_to_list()
+    x_out = x.mean().stream.gather().sink_to_list()
 
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf.emit(df)
@@ -125,7 +146,7 @@ def test_mean():
     operator.xor,
 ])
 @pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
-def test_binary_operators(op, getter):
+def test_binary_operators(op, getter, stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     try:
         left = op(getter(df), 2)
@@ -133,9 +154,9 @@ def test_binary_operators(op, getter):
     except Exception:
         return
 
-    a = StreamingDataFrame(example=df)
-    l = op(getter(a), 2).stream.sink_to_list()
-    r = op(2, getter(a)).stream.sink_to_list()
+    a = StreamingDataFrame(example=df, stream=stream)
+    l = op(getter(a), 2).stream.gather().sink_to_list()
+    r = op(2, getter(a)).stream.gather().sink_to_list()
 
     a.emit(df)
 
@@ -166,24 +187,24 @@ def test_unary_operators(op, getter):
     assert_eq(b[0], expected)
 
 
-def test_binary_stream_operators():
+def test_binary_stream_operators(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
 
     expected = df.x + df.y
 
-    a = StreamingDataFrame(example=df)
-    b = (a.x + a.y).stream.sink_to_list()
+    a = StreamingDataFrame(example=df, stream=stream)
+    b = (a.x + a.y).stream.gather().sink_to_list()
 
     a.emit(df)
 
     assert_eq(b[0], expected)
 
 
-def test_index():
+def test_index(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    a = StreamingDataFrame(example=df)
+    a = StreamingDataFrame(example=df, stream=stream)
     b = a.index + 5
-    L = b.stream.sink_to_list()
+    L = b.stream.gather().sink_to_list()
 
     a.emit(df)
     a.emit(df)
@@ -192,12 +213,11 @@ def test_index():
     assert_eq(L[1], df.index + 5)
 
 
-@pytest.mark.xfail(reason='need to zip two streaming dataframes together')
-def test_pair_arithmetic():
+def test_pair_arithmetic(stream):
     df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
 
-    a = StreamingDataFrame(example=df.iloc[0])
-    L = ((a.x + a.y) * 2).sink_to_list()
+    a = StreamingDataFrame(example=df.iloc[:0], stream=stream)
+    L = ((a.x + a.y) * 2).stream.gather().sink_to_list()
 
     a.emit(df.iloc[:5])
     a.emit(df.iloc[5:])
@@ -215,12 +235,12 @@ def test_pair_arithmetic():
                                      lambda g: g,
                                      lambda g: g[['y']],
                                      lambda g: g[['x', 'y']]])
-def test_groupby_aggregate(agg, grouper, indexer):
+def test_groupby_aggregate(agg, grouper, indexer, stream):
     df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0] * 10})
 
-    a = StreamingDataFrame(example=df.iloc[:0])
+    a = StreamingDataFrame(example=df.iloc[:0], stream=stream)
 
-    L = getattr(indexer(a.groupby(grouper(a))), agg)().stream.sink_to_list()
+    L = getattr(indexer(a.groupby(grouper(a))), agg)().stream.gather().sink_to_list()
 
     a.emit(df.iloc[:3])
     a.emit(df.iloc[3:7])
@@ -229,9 +249,9 @@ def test_groupby_aggregate(agg, grouper, indexer):
     assert assert_eq(L[-1], getattr(indexer(df.groupby(grouper(df))), agg)())
 
 
-def test_repr():
+def test_repr(stream):
     df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0] * 10})
-    a = StreamingDataFrame(example=df)
+    a = StreamingDataFrame(example=df, stream=stream)
 
     text = repr(a)
     assert type(a).__name__ in text
@@ -246,9 +266,9 @@ def test_repr():
     assert type(a.x.sum()).__name__ in text
 
 
-def test_repr_html():
+def test_repr_html(stream):
     df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0] * 10})
-    a = StreamingDataFrame(example=df)
+    a = StreamingDataFrame(example=df, stream=stream)
 
     for x in [a, a.y, a.y.mean()]:
         html = x._repr_html_()
@@ -256,17 +276,17 @@ def test_repr_html():
         assert '1' in html
 
 
-def test_setitem():
+def test_setitem(stream):
     df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
 
-    sdf = StreamingDataFrame(example=df.iloc[:0])
+    sdf = StreamingDataFrame(example=df.iloc[:0], stream=stream)
     stream = sdf.stream
 
     sdf['z'] = sdf['x'] * 2
     sdf['a'] = 10
     sdf[['c', 'd']] = sdf[['x', 'y']]
 
-    L = sdf.mean().stream.sink_to_list()
+    L = sdf.mean().stream.gather().sink_to_list()
 
     stream.emit(df.iloc[:3])
     stream.emit(df.iloc[3:7])
@@ -306,15 +326,16 @@ def test_setitem():
     (lambda df: df.x, lambda x: x),
     (lambda df: df, lambda df: df.x)
 ])
-def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs):
+def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
+        stream):
     index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
     df = pd.DataFrame({'x': np.arange(len(index))}, index=index)
 
     expected = getattr(post_get(pre_get(df).rolling(window)), op)(**kwargs)
 
-    sdf = StreamingDataFrame(example=df.iloc[:0])
+    sdf = StreamingDataFrame(example=df.iloc[:0], stream=stream)
     roll = getattr(post_get(pre_get(sdf).rolling(window)), op)(**kwargs)
-    L = roll.stream.sink_to_list()
+    L = roll.stream.gather().sink_to_list()
     assert len(L) == 0
 
     for i in range(0, len(df), m):
@@ -325,10 +346,10 @@ def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs):
     assert_eq(pd.concat(L), expected)
 
 
-def test_stream_to_dataframe():
+def test_stream_to_dataframe(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    source = Stream()
-    L = source.to_dataframe(example=df).x.sum().stream.sink_to_list()
+    source = stream
+    L = source.to_dataframe(example=df).x.sum().stream.gather().sink_to_list()
 
     source.emit(df)
     source.emit(df)
@@ -337,11 +358,11 @@ def test_stream_to_dataframe():
     assert L == [6, 12, 18]
 
 
-def test_integration_from_stream():
-    source = Stream()
+def test_integration_from_stream(stream):
+    source = stream
     sdf = source.partition(4).to_batch(example=['{"x": 0, "y": 0}']).map(json.loads).to_dataframe()
     result = sdf.groupby(sdf.x).y.sum().mean()
-    L = result.stream.sink_to_list()
+    L = result.stream.gather().sink_to_list()
 
     for i in range(12):
         source.emit(json.dumps({'x': i % 3, 'y': i}))
@@ -363,10 +384,10 @@ def test_random_source():
 
 @pytest.mark.xfail(reason="Does not yet exist")
 @pytest.mark.parametrize('n', [2, 3, 4])
-def test_repartition_n(n):
+def test_repartition_n(n, stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    source = Stream()
-    L = source.to_dataframe(example=df).repartition(n=n).stream.sink_to_list()
+    source = stream
+    L = source.to_dataframe(example=df).repartition(n=n).stream.gather().sink_to_list()
 
     source.emit(df)
     source.emit(df)
@@ -396,9 +417,9 @@ def test_repartition_interval(n):
     assert_eq(pd.concat(L2), expected)
 
 
-def test_to_frame():
+def test_to_frame(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
     assert sdf.to_frame() is sdf
 
@@ -425,13 +446,13 @@ def test_plot():
     assert set(sdf.x.plot()['cds'].data) == {'x', 'index'}
 
 
-def test_instantiate_with_dict():
+def test_instantiate_with_dict(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
     sdf2 = StreamingDataFrame({'a': sdf.x, 'b': sdf.x * 2,
                                'c': sdf.y % 2})
-    L = sdf2.stream.sink_to_list()
+    L = sdf2.stream.gather().sink_to_list()
     assert len(sdf2.columns) == 3
 
     sdf.emit(df)
@@ -446,13 +467,13 @@ def test_instantiate_with_dict():
 
 @pytest.mark.parametrize('op', ['cumsum', 'cummax', 'cumprod', 'cummin'])
 @pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
-def test_cumulative_aggregations(op, getter):
+def test_cumulative_aggregations(op, getter, stream):
     df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
     expected = getattr(getter(df), op)()
 
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
-    L = getattr(getter(sdf), op)().stream.sink_to_list()
+    L = getattr(getter(sdf), op)().stream.gather().sink_to_list()
 
     for i in range(0, 10, 3):
         sdf.emit(df.iloc[i: i + 3])
@@ -501,23 +522,23 @@ def test_gc_random():
     assert len(w) == 1
 
 
-def test_display():
+def test_display(stream):
     pytest.importorskip('ipywidgets')
     pytest.importorskip('IPython')
 
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
     s = sdf.x.sum()
 
     s._ipython_display_()
 
 
-def test_tail():
+def test_tail(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df)
+    sdf = StreamingDataFrame(example=df, stream=stream)
 
-    L = sdf.tail(2).stream.sink_to_list()
+    L = sdf.tail(2).stream.gather().sink_to_list()
 
     sdf.emit(df)
     sdf.emit(df)

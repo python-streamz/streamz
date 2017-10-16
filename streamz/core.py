@@ -221,6 +221,13 @@ class Stream(object):
     def update(self, x, who=None):
         self.emit(x)
 
+    def gather(self):
+        """ This is a no-op for core streamz
+
+        This allows gather to be used in both dask and core streams
+        """
+        return self
+
     def connect(self, downstream):
         ''' Connect this stream to a downstream element.
 
@@ -435,7 +442,7 @@ class map(Stream):
     def update(self, x, who=None):
         result = self.func(x, *self.args, **self.kwargs)
 
-        return self.emit(result)
+        return self._emit(result)
 
 
 def _truthy(x):

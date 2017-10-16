@@ -6,10 +6,11 @@ from tornado import gen
 
 from distributed.client import default_client
 
+from .core import Stream
 from . import core
 
 
-class DaskStream(core.Stream):
+class DaskStream(Stream):
     def __init__(self, *args, **kwargs):
         if 'loop' not in kwargs:
             kwargs['loop'] = default_client().loop
@@ -18,7 +19,7 @@ class DaskStream(core.Stream):
 
 @DaskStream.register_api()
 class map(DaskStream):
-    def __init__(self, upstream, func, args=(), **kwargs):
+    def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         self.kwargs = kwargs
         self.args = args
@@ -32,11 +33,13 @@ class map(DaskStream):
 
 
 @DaskStream.register_api()
-class scan(DaskStream):
-    def __init__(self, upstream, func, start=core.no_default, returns_state=False):
+class accumulate(DaskStream):
+    def __init__(self, upstream, func, start=core.no_default,
+                 returns_state=False, **kwargs):
         self.func = func
         self.state = start
         self.returns_state = returns_state
+        self.kwargs = kwargs
         DaskStream.__init__(self, upstream)
 
     def update(self, x, who=None):
@@ -45,7 +48,7 @@ class scan(DaskStream):
             return self._emit(self.state)
         else:
             client = default_client()
-            result = client.submit(self.func, self.state, x)
+            result = client.submit(self.func, self.state, x, **self.kwargs)
             if self.returns_state:
                 state = client.submit(getitem, result, 0)
                 result = client.submit(getitem, result, 1)
@@ -93,6 +96,11 @@ class combine_latest(DaskStream, core.combine_latest):
 
 @DaskStream.register_api()
 class delay(DaskStream, core.delay):
+    pass
+
+
+@DaskStream.register_api()
+class latest(DaskStream, core.latest):
     pass
 
 
