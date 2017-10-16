@@ -1,5 +1,5 @@
-Asynchronous and Synchronous Computation
-========================================
+Asynchronous Computation
+========================
 
 *This section is only relevant if you want to use time-based functionality.  If
 you are only using operations like map and accumulate then you can safely skip
