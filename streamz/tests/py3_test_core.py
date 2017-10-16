@@ -1,3 +1,4 @@
+# flake8: noqa
 from time import time
 from distributed.utils_test import loop, inc  # noqa
 from tornado import gen

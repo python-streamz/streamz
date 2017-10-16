@@ -85,10 +85,17 @@ class StreamingFrame(Streaming):
 
         result = show(fig, notebook_handle=True)
 
+        from tornado.ioloop import IOLoop
+        loop = IOLoop.current()
+
         def push_data(df):
-            print(df.reset_index())
-            cds.stream(df.reset_index(), backlog)
-            push_notebook(handle=result)
+            df = df.reset_index()
+            d = {c: df[c] for c in df.columns}
+
+            def _():
+                cds.stream(d, backlog)
+                push_notebook(handle=result)
+            loop.add_callback(_)
 
         return {'figure': fig, 'cds': cds, 'stream': sdf.stream.gather().map(push_data)}
 
