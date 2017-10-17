@@ -2,12 +2,14 @@ from functools import partial
 import operator
 from time import time
 
-from .utils import M
 import numpy as np
 import pandas as pd
+from tornado.ioloop import IOLoop
+from tornado import gen
 
-from .sources import Source
 from .collection import Streaming, _subtypes, stream_type
+from .sources import Source
+from .utils import M
 
 
 class StreamingFrame(Streaming):
@@ -85,7 +87,6 @@ class StreamingFrame(Streaming):
 
         result = show(fig, notebook_handle=True)
 
-        from tornado.ioloop import IOLoop
         loop = IOLoop.current()
 
         def push_data(df):
@@ -487,21 +488,17 @@ def _accumulate_groupby_mean(accumulator, new, grouper=None, index=None):
     return (sums, counts), sums / counts
 
 
-def _random_accumulator(state, _):
-    last = state['last']
-    freq = state['freq']
-
-    now = time()
+def _random_df(tup):
+    last, now, freq = tup
     index = pd.DatetimeIndex(start=(last + freq.total_seconds()) * 1e9,
-                             end=time() * 1e9,
+                             end=now * 1e9,
                              freq=freq)
 
     df = pd.DataFrame({'x': np.random.random(len(index)),
                        'y': np.random.poisson(size=len(index)),
                        'z': np.random.normal(0, 1, size=len(index))},
                        index=index)
-    last = now
-    return {'last': now, 'freq': freq}, df
+    return df
 
 
 class Random(StreamingDataFrame):
@@ -529,29 +526,38 @@ class Random(StreamingDataFrame):
         if dask:
             from streamz.dask import DaskStream
             source = DaskStream()
+            loop = source.loop
         else:
             source = Source()
+            loop = IOLoop.current()
+        self.freq = pd.Timedelta(freq)
+        self.interval = pd.Timedelta(interval).total_seconds()
         self.source = source
-        start = {'last': time(), 'freq': pd.Timedelta(freq)}
-        stream = self.source.accumulate(_random_accumulator,
-                                        returns_state=True,
-                                        start=start)
+        self.continue_ = [True]
 
-        from tornado.ioloop import PeriodicCallback
-        self.interval = pd.Timedelta(interval).total_seconds() * 1000
-
-        def trigger():
-            source._emit(None)
-
-        self.pc = PeriodicCallback(trigger, self.interval)
-        self.pc.start()
-
-        _, example = _random_accumulator(start, None)
+        stream = self.source.map(_random_df)
+        example = _random_df((time(), time(), self.freq))
 
         super(Random, self).__init__(stream, example)
 
+        loop.add_callback(self._cb, self.interval, self.freq, self.source,
+                          self.continue_)
+
     def __del__(self):
-        self.pc.stop()
+        self.stop()
+
+    def stop(self):
+        self.continue_[0] = False
+
+    @staticmethod
+    @gen.coroutine
+    def _cb(interval, freq, source, continue_):
+        last = time()
+        while continue_[0]:
+            yield gen.sleep(interval)
+            now = time()
+            yield source._emit((last, now, freq))
+            last = now
 
 
 _subtypes.append((pd.DataFrame, StreamingDataFrame))

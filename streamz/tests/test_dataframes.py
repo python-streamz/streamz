@@ -1,5 +1,6 @@
 import json
 import operator
+from time import sleep
 
 import pytest
 from dask.dataframe.utils import assert_eq
@@ -21,7 +22,7 @@ from distributed.utils_test import loop  # flake8: noqa
 def client():
     client = Client(processes=False)
     try:
-        yield
+        yield client
     finally:
         client.close()
 
@@ -299,6 +300,7 @@ def test_setitem(stream):
     assert_eq(L[-1], df.mean())
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize('kwargs,op', [
     ({}, 'sum'),
     ({}, 'mean'),
@@ -545,3 +547,11 @@ def test_tail(stream):
 
     assert_eq(L[0], df.tail(2))
     assert_eq(L[1], df.tail(2))
+
+
+def test_random_source(loop):
+    with Client(processes=False, diagnostics_port=False, loop=loop) as client:
+        source = sd.Random(freq='1ms', interval='10ms', dask=True)
+        L = source.x.stream.gather().sink_to_list()
+        sleep(0.20)
+        assert len(client.cluster.scheduler.tasks) < 10
