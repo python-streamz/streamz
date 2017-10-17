@@ -36,7 +36,8 @@ class Source(Stream):
     _graphviz_shape = 'doubleoctagon'
 
 
-class TextFile(Source):
+@Stream.register_api(staticmethod)
+class from_textfile(Source):
     """ Stream data from a text file
 
     Parameters
@@ -62,7 +63,7 @@ class TextFile(Source):
         self.file = f
 
         self.poll_interval = poll_interval
-        super(TextFile, self).__init__()
+        super(from_textfile, self).__init__()
 
     @gen.coroutine
     def start(self):
