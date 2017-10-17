@@ -219,7 +219,7 @@ class Stream(object):
             return sync(self.loop, _)
 
     def update(self, x, who=None):
-        self.emit(x)
+        self._emit(x)
 
     def gather(self):
         """ This is a no-op for core streamz
@@ -461,7 +461,7 @@ class filter(Stream):
 
     def update(self, x, who=None):
         if self.predicate(x):
-            return self.emit(x)
+            return self._emit(x)
 
 
 @Stream.register_api()
@@ -511,7 +511,7 @@ class accumulate(Stream):
     def update(self, x, who=None):
         if self.state is no_default:
             self.state = x
-            return self.emit(x)
+            return self._emit(x)
         else:
             result = self.func(self.state, x, **self.kwargs)
             if self.returns_state:
@@ -519,7 +519,7 @@ class accumulate(Stream):
             else:
                 state = result
             self.state = state
-            return self.emit(result)
+            return self._emit(result)
 
 
 @Stream.register_api()
@@ -547,7 +547,7 @@ class partition(Stream):
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             result, self.buffer = self.buffer, []
-            return self.emit(tuple(result))
+            return self._emit(tuple(result))
         else:
             return []
 
@@ -579,7 +579,7 @@ class sliding_window(Stream):
     def update(self, x, who=None):
         self.buffer.append(x)
         if len(self.buffer) == self.n:
-            return self.emit(tuple(self.buffer))
+            return self._emit(tuple(self.buffer))
         else:
             return []
 
@@ -612,7 +612,7 @@ class timed_window(Stream):
     def cb(self):
         while True:
             L, self.buffer = self.buffer, []
-            self.last = self.emit(L, asynchronous=True)
+            self.last = self._emit(L)
             yield self.last
             yield gen.sleep(self.interval)
 
@@ -636,7 +636,7 @@ class delay(Stream):
         while True:
             last = time()
             x = yield self.queue.get()
-            yield self.emit(x, asynchronous=True)
+            yield self._emit(x)
             duration = self.interval - (time() - last)
             if duration > 0:
                 yield gen.sleep(duration)
@@ -672,7 +672,7 @@ class rate_limit(Stream):
         self.next = max(now, self.next) + self.interval
         if now < old_next:
             yield gen.sleep(old_next - now)
-        yield self.emit(x, asynchronous=True)
+        yield self._emit(x)
 
 
 @Stream.register_api()
@@ -700,7 +700,7 @@ class buffer(Stream):
     def cb(self):
         while True:
             x = yield self.queue.get()
-            yield self.emit(x, asynchronous=True)
+            yield self._emit(x)
 
 
 @Stream.register_api()
@@ -821,7 +821,7 @@ class flatten(Stream):
     def update(self, x, who=None):
         L = []
         for item in x:
-            y = self.emit(item)
+            y = self._emit(item)
             if type(y) is list:
                 L.extend(y)
             else:
@@ -862,7 +862,7 @@ class unique(Stream):
         y = self.key(x)
         if y not in self.seen:
             self.seen[y] = 1
-            return self.emit(x)
+            return self._emit(x)
 
 
 @Stream.register_api()
@@ -882,7 +882,7 @@ class union(Stream):
         super(union, self).__init__(upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
-        return self.emit(x)
+        return self._emit(x)
 
 
 @Stream.register_api()
@@ -918,9 +918,9 @@ class pluck(Stream):
 
     def update(self, x, who=None):
         if isinstance(self.pick, list):
-            return self.emit(tuple([x[ind] for ind in self.pick]))
+            return self._emit(tuple([x[ind] for ind in self.pick]))
         else:
-            return self.emit(x[self.pick])
+            return self._emit(x[self.pick])
 
 
 @Stream.register_api()
@@ -953,7 +953,7 @@ class collect(Stream):
 
     def flush(self, _=None):
         out = tuple(self.cache)
-        self.emit(out)
+        self._emit(out)
         self.cache.clear()
 
 
@@ -994,7 +994,7 @@ class zip_latest(Stream):
             L = []
             while self.lossless_buffer:
                 self.last[0] = self.lossless_buffer.popleft()
-                L.append(self.emit(tuple(self.last)))
+                L.append(self._emit(tuple(self.last)))
             return L
 
 
@@ -1032,7 +1032,7 @@ class latest(Stream):
         while True:
             yield self.condition.wait()
             [x] = self.next
-            yield self.emit(x, asynchronous=True)
+            yield self._emit(x)
 
 
 def sync(loop, func, *args, **kwargs):
