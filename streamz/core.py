@@ -363,31 +363,6 @@ class Stream(object):
         from .batch import StreamingBatch
         return StreamingBatch(stream=self, **kwargs)
 
-    @staticmethod
-    def from_textfile(f, poll_interval=None):
-        """ Read data from file into stream
-
-        Parameters
-        ----------
-        f: file or string
-            File object or filename to read
-        poll_interval: number
-            Number of seconds between which to poll the file
-            If None then don't poll, and instead return without waiting
-
-        Examples
-        --------
-        >>> source = Stream()
-        >>> source.map(json.loads).pluck('value').sum()
-        >>> source.from_textfile('myfile.json')
-
-        Returns
-        -------
-        Nothing.  This has the side effect of emitting data into the stream.
-        """
-        from .sources import TextFile
-        return TextFile(f, poll_interval=poll_interval)
-
 
 @Stream.register_api()
 class sink(Stream):
