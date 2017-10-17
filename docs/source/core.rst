@@ -104,7 +104,7 @@ number of distinct elements that we have seen so far.
        return state, len(state)
 
     source = Stream()
-    source.accumulate(num_distinct, returns_state=True, start=set())
+    source.accumulate(num_distinct, returns_state=True, start=set()).sink(print)
 
     >>> source.emit('cat')
     1
