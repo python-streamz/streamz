@@ -1,6 +1,9 @@
 API
 ===
 
+Stream
+------
+
 .. currentmodule:: streamz
 
 .. autosummary::
@@ -29,6 +32,16 @@ API
    zip
    zip_latest
 
+Sources
+-------
+
+.. autosummary::
+   filenames
+   from_kafka
+   from_textfile
+
+Definitions
+-----------
 
 .. autofunction:: accumulate
 .. autofunction:: buffer
@@ -52,3 +65,7 @@ API
 .. autofunction:: pluck
 .. autofunction:: zip
 .. autofunction:: zip_latest
+
+.. autofunction:: filenames
+.. autofunction:: from_kafka
+.. autofunction:: from_textfile
