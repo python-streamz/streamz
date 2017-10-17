@@ -30,6 +30,11 @@ class Streaming(object):
     def __init__(self, stream=None, example=None):
         assert example is not None
         self.example = example
+        if not isinstance(self.example, self._subtype):
+            msg = ("For streaming type %s we expect an example of type %s. "
+                   "Got %s") % (type(self).__name__, self._subtype.__name__,
+                                str(self.example))
+            raise TypeError(msg)
         assert isinstance(self.example, self._subtype)
         self.stream = stream or Stream()
 
