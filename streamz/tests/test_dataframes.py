@@ -555,3 +555,12 @@ def test_random_source(loop):
         L = source.x.stream.gather().sink_to_list()
         sleep(0.20)
         assert len(client.cluster.scheduler.tasks) < 10
+
+
+def test_example_type_error_message():
+    try:
+        sdf = StreamingDataFrame(example=[123])
+    except Exception as e:
+        assert 'StreamingDataFrame' in str(e)
+        assert 'DataFrame' in str(e)
+        assert '[123]' in str(e)
