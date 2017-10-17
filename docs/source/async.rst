@@ -107,7 +107,7 @@ threads or processes.
 Using Dask
 ----------
 
-Dask_ is a parellel computing library that ses Tornado for concurrency and
+Dask_ is a parellel computing library that uses Tornado for concurrency and
 threads for computation.  The ``DaskStream`` object is a drop-in replacement
 for ``Stream`` (mostly).  We need to create a Dask client.  This will start a
 thread and IOLoop for us.
