@@ -404,7 +404,28 @@ class sink(Stream):
 
 @Stream.register_api()
 class map(Stream):
-    """ Apply a function to every element in the stream """
+    """ Apply a function to every element in the stream
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.map(lambda x: 2*x).sink(print)
+    >>> for i in range(5):
+    ...     source.emit(i)
+    0
+    2
+    4
+    6
+    8
+    """
     def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # this is one of a few stream specific kwargs
@@ -426,7 +447,24 @@ def _truthy(x):
 
 @Stream.register_api()
 class filter(Stream):
-    """ Only pass through elements that satisfy the predicate """
+    """ Only pass through elements that satisfy the predicate
+
+    Parameters
+    ----------
+    predicate : function
+        The predicate. Should return True or False, where
+        True means that the predicate is satisfied.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.filter(lambda x: x % 2 == 0).sink(print)
+    >>> for i in range(5):
+    ...     source.emit(i)
+    0
+    2
+    4
+    """
     def __init__(self, upstream, predicate, **kwargs):
         if predicate is None:
             predicate = _truthy
@@ -443,7 +481,7 @@ class filter(Stream):
 class accumulate(Stream):
     """ Accumulate results with previous state
 
-    This preforms running or cumulative reductions, applying the function
+    This performs running or cumulative reductions, applying the function
     to the previous total and the new element.  The function should take
     two arguments, the previous accumulated state and the next element and
     it should return a new accumulated state.
@@ -463,7 +501,6 @@ class accumulate(Stream):
     --------
     >>> source = Stream()
     >>> source.accumulate(lambda acc, x: acc + x).sink(print)
-    ...
     >>> for i in range(5):
     ...     source.emit(i)
     1
