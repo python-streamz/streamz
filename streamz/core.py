@@ -391,7 +391,7 @@ class sink(Stream):
     def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # take the stream specific kwargs out
-        stream_name = kwargs.pop("stream_name")
+        stream_name = kwargs.pop("stream_name", None)
         self.kwargs = kwargs
         self.args = args
 
