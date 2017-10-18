@@ -388,14 +388,18 @@ class sink(Stream):
     """
     _graphviz_shape = 'trapezium'
 
-    def __init__(self, upstream, func, **kwargs):
+    def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
+        # take the stream specific kwargs out
+        stream_name = kwargs.pop("stream_name")
+        self.kwargs = kwargs
+        self.args = args
 
-        Stream.__init__(self, upstream, **kwargs)
+        Stream.__init__(self, upstream, stream_name=stream_name)
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        result = self.func(x)
+        result = self.func(x, *self.args, **self.kwargs)
         if gen.isawaitable(result):
             return result
         else:
