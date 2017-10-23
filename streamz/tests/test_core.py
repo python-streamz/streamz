@@ -931,3 +931,23 @@ def test_separate_thread_with_time(loop, thread):
 
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
+
+
+def test_clear():
+    s = Stream()
+    # increment
+    def acc1(x1, x2):
+        return x1 + x2
+    from streamz.core import ClearMSG
+
+    cc = ClearMSG()
+
+    sout = s.accumulate(acc1)
+
+    Lout = sout.sink_to_list()
+
+    s.emit(1)
+    s.emit(2)
+    s.emit(cc)
+    s.emit(3)
+    assert Lout == [1, 3, 3]

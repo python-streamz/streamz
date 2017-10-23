@@ -28,6 +28,18 @@ thread_state = threading.local()
 logger = logging.getLogger(__name__)
 
 
+class ClearMSG:
+    pass
+
+
+class IgnoreMSG:
+    pass
+
+
+class StopMSG:
+    pass
+
+
 def identity(x):
     return x
 
@@ -277,7 +289,7 @@ class Stream(object):
         return scatter(self, **kwargs)
 
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False """
+        """ Only pass through elements for which the predicate returns False"""
         return self.filter(lambda x: not predicate(x))
 
     @property
@@ -399,11 +411,13 @@ class sink(Stream):
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        result = self.func(x, *self.args, **self.kwargs)
-        if gen.isawaitable(result):
-            return result
-        else:
-            return []
+        # only if not a clear msg, which is ignored
+        if not isinstance(x, ClearMSG):
+            result = self.func(x, *self.args, **self.kwargs)
+            if gen.isawaitable(result):
+                return result
+            else:
+                return []
 
 
 @Stream.register_api()
@@ -516,6 +530,7 @@ class accumulate(Stream):
 
     def __init__(self, upstream, func, start=no_default, returns_state=False,
                  **kwargs):
+        self.start = start
         self.func = func
         self.kwargs = kwargs
         self.state = start
@@ -525,6 +540,12 @@ class accumulate(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
+        # if this is a request to clear, reset state
+        if isinstance(x, ClearMSG):
+            self.state = self.start
+            # and pass it through
+            return self.emit(x)
+
         if self.state is no_default:
             self.state = x
             return self._emit(x)
