@@ -938,16 +938,21 @@ def test_clear():
     # increment
     def acc1(x1, x2):
         return x1 + x2
-    from streamz.core import ClearMSG
+    from streamz.core import ClearMSG, IgnoreMSG
 
-    cc = ClearMSG()
+    clear_msg = ClearMSG()
+    ignore_msg = IgnoreMSG()
 
     sout = s.accumulate(acc1)
-
     Lout = sout.sink_to_list()
+    sout2 = sout.map(lambda x : x + 1)
+    Lout2 = sout2.sink_to_list()
 
     s.emit(1)
     s.emit(2)
-    s.emit(cc)
+    s.emit(ignore_msg)
     s.emit(3)
-    assert Lout == [1, 3, 3]
+    s.emit(clear_msg)
+    s.emit(3)
+    assert Lout == [1, 3, 6, 3]
+    assert Lout2 == [2, 4, 7, 4]

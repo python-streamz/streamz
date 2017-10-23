@@ -36,9 +36,7 @@ class IgnoreMSG:
     pass
 
 
-class StopMSG:
-    pass
-
+# perhaps StopMSG?
 
 def identity(x):
     return x
@@ -412,7 +410,7 @@ class sink(Stream):
 
     def update(self, x, who=None):
         # only if not a clear msg, which is ignored
-        if not isinstance(x, ClearMSG):
+        if not isinstance(x, ClearMSG) and not isinstance(x, IgnoreMSG):
             result = self.func(x, *self.args, **self.kwargs)
             if gen.isawaitable(result):
                 return result
@@ -454,6 +452,9 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
+        if isinstance(x, IgnoreMSG) or isinstance(x, ClearMSG):
+            return self.emit(x)
+
         result = self.func(x, *self.args, **self.kwargs)
 
         return self._emit(result)
@@ -544,6 +545,9 @@ class accumulate(Stream):
         if isinstance(x, ClearMSG):
             self.state = self.start
             # and pass it through
+            return self.emit(x)
+
+        if isinstance(x, IgnoreMSG):
             return self.emit(x)
 
         if self.state is no_default:
