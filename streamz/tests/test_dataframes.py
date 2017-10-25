@@ -227,6 +227,19 @@ def test_pair_arithmetic(stream):
     assert_eq(pd.concat(L, axis=0), (df.x + df.y) * 2)
 
 
+def test_getitem(stream):
+    df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
+
+    a = StreamingDataFrame(example=df.iloc[:0], stream=stream)
+    L = a[a.x > 4].stream.gather().sink_to_list()
+
+    a.emit(df.iloc[:5])
+    a.emit(df.iloc[5:])
+
+    assert len(L) == 2
+    assert_eq(pd.concat(L, axis=0), df[df.x > 4])
+
+
 @pytest.mark.parametrize('agg', ['sum', 'mean'])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',

@@ -48,15 +48,7 @@ class Streaming(object):
         --------
         Streaming.accumulate_partitions
         """
-        example = kwargs.pop('example', None)
-        if example is None:
-            example = func(self.example, *args, **kwargs)
-        stream = self.stream.map(func, *args, **kwargs)
-
-        for typ, stream_type in _subtypes:
-            if isinstance(example, typ):
-                return stream_type(stream, example)
-        return Streaming(stream, example)
+        return map_partitions(func, self, *args, **kwargs)
 
     def accumulate_partitions(self, func, *args, **kwargs):
         """ Accumulate a function with state across batch elements
