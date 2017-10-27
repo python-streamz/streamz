@@ -18,6 +18,8 @@ from tornado.queues import Queue
 from collections import Iterable
 
 from .compatibility import builtins, get_thread_identity
+import time
+
 
 no_default = '--no-default--'
 
@@ -28,12 +30,27 @@ thread_state = threading.local()
 logger = logging.getLogger(__name__)
 
 
-class ClearMSG:
+class MSG:
+    def __call__(self, *args, **kwargs):
+        return self
+
+
+class ClearMSG(MSG):
     pass
 
 
-class IgnoreMSG:
+class IgnoreMSG(MSG):
     pass
+
+
+class TimeMSG(MSG):
+    def __init__(self):
+        self.node_list = []
+
+    def __call__(self, *args, **kwargs):
+        node = args[0]
+        self.node_list.append((node, time.time()))
+        return self
 
 
 # perhaps StopMSG?
@@ -410,6 +427,8 @@ class sink(Stream):
 
     def update(self, x, who=None):
         # only if not a clear msg, which is ignored
+        if isinstance(x, MSG):
+            return x(self)
         if not isinstance(x, ClearMSG) and not isinstance(x, IgnoreMSG):
             result = self.func(x, *self.args, **self.kwargs)
             if gen.isawaitable(result):
