@@ -935,9 +935,11 @@ if sys.version_info >= (3, 5):
 
 def test_clear():
     s = Stream()
+
     # increment
     def acc1(x1, x2):
         return x1 + x2
+
     from streamz.core import ClearMSG, IgnoreMSG
 
     clear_msg = ClearMSG()
