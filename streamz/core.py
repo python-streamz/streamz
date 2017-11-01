@@ -18,6 +18,8 @@ from tornado.queues import Queue
 from collections import Iterable
 
 from .compatibility import builtins, get_thread_identity
+import time
+
 
 no_default = '--no-default--'
 
@@ -27,6 +29,34 @@ thread_state = threading.local()
 
 logger = logging.getLogger(__name__)
 
+
+class MSG:
+    def __call__(self, *args, **kwargs):
+        return self
+
+
+class ClearMSG(MSG):
+    def __call__(self, *args, **kwargs):
+        node = args[0]
+        node.clear()
+        return self
+
+
+class IgnoreMSG(MSG):
+    pass
+
+
+class TimeMSG(MSG):
+    def __init__(self):
+        self.node_list = []
+
+    def __call__(self, *args, **kwargs):
+        node = args[0]
+        self.node_list.append((node, time.time()))
+        return self
+
+
+# perhaps StopMSG?
 
 def identity(x):
     return x
@@ -277,7 +307,7 @@ class Stream(object):
         return scatter(self, **kwargs)
 
     def remove(self, predicate):
-        """ Only pass through elements for which the predicate returns False """
+        """ Only pass through elements for which the predicate returns False"""
         return self.filter(lambda x: not predicate(x))
 
     @property
@@ -363,6 +393,9 @@ class Stream(object):
         from .batch import StreamingBatch
         return StreamingBatch(stream=self, **kwargs)
 
+    def clear(self):
+        pass
+
 
 @Stream.register_api()
 class sink(Stream):
@@ -399,11 +432,14 @@ class sink(Stream):
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        result = self.func(x, *self.args, **self.kwargs)
-        if gen.isawaitable(result):
-            return result
+        if isinstance(x, MSG):
+            return x(self)
         else:
-            return []
+            result = self.func(x, *self.args, **self.kwargs)
+            if gen.isawaitable(result):
+                return result
+            else:
+                return []
 
 
 @Stream.register_api()
@@ -440,6 +476,9 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x)
+
         result = self.func(x, *self.args, **self.kwargs)
 
         return self._emit(result)
@@ -477,6 +516,8 @@ class filter(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         if self.predicate(x):
             return self._emit(x)
 
@@ -516,6 +557,7 @@ class accumulate(Stream):
 
     def __init__(self, upstream, func, start=no_default, returns_state=False,
                  **kwargs):
+        self.start = start
         self.func = func
         self.kwargs = kwargs
         self.state = start
@@ -525,6 +567,8 @@ class accumulate(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         if self.state is no_default:
             self.state = x
             return self._emit(x)
@@ -536,6 +580,9 @@ class accumulate(Stream):
                 state = result
             self.state = state
             return self._emit(result)
+
+    def clear(self):
+        self.state = self.start
 
 
 @Stream.register_api()
@@ -560,12 +607,17 @@ class partition(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             result, self.buffer = self.buffer, []
             return self._emit(tuple(result))
         else:
             return []
+
+    def clear(self):
+        self.buffer = []
 
 
 @Stream.register_api()
@@ -593,11 +645,16 @@ class sliding_window(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             return self._emit(tuple(self.buffer))
         else:
             return []
+
+    def clear(self):
+        self.buffer = deque(maxlen=self.n)
 
 
 @Stream.register_api()
@@ -621,6 +678,7 @@ class timed_window(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None):
+        # XXX: what to do about messages here!!!
         self.buffer.append(x)
         return self.last
 
@@ -658,6 +716,7 @@ class delay(Stream):
                 yield gen.sleep(duration)
 
     def update(self, x, who=None):
+        # XXX: what to do about messages here!!!
         return self.queue.put(x)
 
 
@@ -680,6 +739,7 @@ class rate_limit(Stream):
         self.next = 0
 
         Stream.__init__(self, upstream, **kwargs)
+        # XXX: what to do about messages here!!!
 
     @gen.coroutine
     def update(self, x, who=None):
@@ -703,6 +763,7 @@ class buffer(Stream):
 
     def __init__(self, upstream, n, loop=None, **kwargs):
         loop = loop or upstream.loop or IOLoop.current()
+        self.n = n
         self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, upstream, loop=loop, **kwargs)
@@ -710,7 +771,12 @@ class buffer(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         return self.queue.put(x)
+
+    def clear(self):
+        self.queue = Queue(self.n)
 
     @gen.coroutine
     def cb(self):
@@ -750,11 +816,13 @@ class zip(Stream):
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
     def pack_literals(self):
-        """ Fill buffers for literals whenver we empty them """
+        """ Fill buffers for literals whenever we empty them """
         for i, val in self.literals:
             self.buffers[i].append(val)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         L = self.buffers_by_stream[who]  # get buffer for stream
         L.append(x)
         if len(L) == 1 and all(self.buffers):
@@ -765,6 +833,18 @@ class zip(Stream):
             return self._emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
+
+    def clear(self):
+        self.buffers = [deque() for _ in self.upstreams]
+        self.condition = Condition()
+        self.literals = [(i, val) for i, val in enumerate(self.upstreams)
+                         if not isinstance(val, Stream)]
+        self.pack_literals()
+
+        self.buffers_by_stream = {upstream: buffer
+                                  for upstream, buffer in
+                                  builtins.zip(self.upstreams, self.buffers)
+                                  if isinstance(upstream, Stream)}
 
 
 @Stream.register_api()
@@ -803,6 +883,8 @@ class combine_latest(Stream):
         Stream.__init__(self, upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            self._emit(x(self))
         if self.missing and who in self.missing:
             self.missing.remove(who)
 
@@ -810,6 +892,10 @@ class combine_latest(Stream):
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
             return self.emit(tup)
+
+    def clear(self):
+        self.last = [None for _ in self.upstreams]
+        self.missing = set(self.upstreams)
 
 
 @Stream.register_api()
@@ -835,6 +921,8 @@ class flatten(Stream):
     partition
     """
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         L = []
         for item in x:
             y = self._emit(item)
@@ -871,14 +959,23 @@ class unique(Stream):
         if history:
             from zict import LRU
             self.seen = LRU(history, self.seen)
+        self.history = history
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         y = self.key(x)
         if y not in self.seen:
             self.seen[y] = 1
             return self._emit(x)
+
+    def clear(self):
+        self.seen = dict()
+        if self.history:
+            from zict import LRU
+            self.seen = LRU(self.history, self.seen)
 
 
 @Stream.register_api()
@@ -898,6 +995,8 @@ class union(Stream):
         super(union, self).__init__(upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         return self._emit(x)
 
 
@@ -933,6 +1032,8 @@ class pluck(Stream):
         super(pluck, self).__init__(upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x)
         if isinstance(self.pick, list):
             return self._emit(tuple([x[ind] for ind in self.pick]))
         else:
@@ -965,6 +1066,9 @@ class collect(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        # XXX: need clear method
+        if isinstance(x, MSG):
+            return self._emit(x)
         self.cache.append(x)
 
     def flush(self, _=None):
@@ -998,6 +1102,8 @@ class zip_latest(Stream):
         Stream.__init__(self, upstreams=upstreams, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x)
         idx = self.upstreams.index(who)
         if who is self.lossless:
             self.lossless_buffer.append(x)
@@ -1012,6 +1118,11 @@ class zip_latest(Stream):
                 self.last[0] = self.lossless_buffer.popleft()
                 L.append(self._emit(tuple(self.last)))
             return L
+
+    def clear(self):
+        self.last = [None for _ in self.upstreams]
+        self.missing = set(self.upstreams)
+        self.lossless_buffer = deque()
 
 
 @Stream.register_api()
