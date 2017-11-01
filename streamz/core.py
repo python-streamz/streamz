@@ -36,7 +36,10 @@ class MSG:
 
 
 class ClearMSG(MSG):
-    pass
+    def __call__(self, *args, **kwargs):
+        node = args[0]
+        node.clear()
+        return self
 
 
 class IgnoreMSG(MSG):
@@ -426,10 +429,9 @@ class sink(Stream):
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        # only if not a clear msg, which is ignored
         if isinstance(x, MSG):
             return x(self)
-        if not isinstance(x, ClearMSG) and not isinstance(x, IgnoreMSG):
+        else:
             result = self.func(x, *self.args, **self.kwargs)
             if gen.isawaitable(result):
                 return result
@@ -471,7 +473,7 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        if isinstance(x, IgnoreMSG) or isinstance(x, ClearMSG):
+        if isinstance(x, MSG):
             return self.emit(x)
 
         result = self.func(x, *self.args, **self.kwargs)
@@ -511,6 +513,8 @@ class filter(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         if self.predicate(x):
             return self._emit(x)
 
@@ -560,15 +564,8 @@ class accumulate(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        # if this is a request to clear, reset state
-        if isinstance(x, ClearMSG):
-            self.state = self.start
-            # and pass it through
-            return self.emit(x)
-
-        if isinstance(x, IgnoreMSG):
-            return self.emit(x)
-
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         if self.state is no_default:
             self.state = x
             return self._emit(x)
@@ -580,6 +577,9 @@ class accumulate(Stream):
                 state = result
             self.state = state
             return self._emit(result)
+
+    def clear(self):
+        self.state = self.start
 
 
 @Stream.register_api()
@@ -604,12 +604,17 @@ class partition(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             result, self.buffer = self.buffer, []
             return self._emit(tuple(result))
         else:
             return []
+
+    def clear(self):
+        self.buffer = []
 
 
 @Stream.register_api()
@@ -637,11 +642,16 @@ class sliding_window(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self._emit(x(self))
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             return self._emit(tuple(self.buffer))
         else:
             return []
+
+    def clear(self):
+        self.buffer = deque(maxlen=self.n)
 
 
 @Stream.register_api()
@@ -665,6 +675,7 @@ class timed_window(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None):
+        # XXX: what to do about messages here!!!
         self.buffer.append(x)
         return self.last
 
@@ -702,6 +713,7 @@ class delay(Stream):
                 yield gen.sleep(duration)
 
     def update(self, x, who=None):
+        # XXX: what to do about messages here!!!
         return self.queue.put(x)
 
 
@@ -724,6 +736,7 @@ class rate_limit(Stream):
         self.next = 0
 
         Stream.__init__(self, upstream, **kwargs)
+        # XXX: what to do about messages here!!!
 
     @gen.coroutine
     def update(self, x, who=None):
@@ -747,6 +760,7 @@ class buffer(Stream):
 
     def __init__(self, upstream, n, loop=None, **kwargs):
         loop = loop or upstream.loop or IOLoop.current()
+        self.n = n
         self.queue = Queue(maxsize=n)
 
         Stream.__init__(self, upstream, loop=loop, **kwargs)
@@ -754,7 +768,12 @@ class buffer(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None):
+        if isinstance(x, MSG):
+            return self.emit(x(self))
         return self.queue.put(x)
+
+    def clear(self):
+        self.queue = Queue(self.n)
 
     @gen.coroutine
     def cb(self):
@@ -794,7 +813,7 @@ class zip(Stream):
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
     def pack_literals(self):
-        """ Fill buffers for literals whenver we empty them """
+        """ Fill buffers for literals whenever we empty them """
         for i, val in self.literals:
             self.buffers[i].append(val)
 
