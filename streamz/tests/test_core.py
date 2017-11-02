@@ -342,6 +342,16 @@ def test_zip_literals():
                  (4, 123, 5)]
 
 
+def test_zip_same():
+    a = Stream()
+    b = a.zip(a)
+    L = b.sink_to_list()
+
+    a.emit(1)
+    a.emit(2)
+    assert L == [(1, 1), (2, 2)]
+
+
 def test_combine_latest():
     a = Stream()
     b = Stream()
