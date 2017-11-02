@@ -223,7 +223,7 @@ def test_getitem(stream):
     assert_eq(pd.concat(L, axis=0), df[df.x > 4])
 
 
-@pytest.mark.parametrize('agg', ['sum', 'mean'])
+@pytest.mark.parametrize('agg', ['sum', 'mean', 'count'])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',
                                      lambda a: a.index % 2,
@@ -244,6 +244,19 @@ def test_groupby_aggregate(agg, grouper, indexer, stream):
     a.emit(df.iloc[7:])
 
     assert assert_eq(L[-1], getattr(indexer(df.groupby(grouper(df))), agg)())
+
+
+def test_value_counts(stream):
+    s = pd.Series(['a', 'b', 'a'])
+
+    a = StreamingSeries(example=s, stream=stream)
+
+    result = a.value_counts().stream.gather().sink_to_list()
+
+    a.emit(s)
+    a.emit(s)
+
+    assert_eq(result[-1], pd.concat([s, s], axis=0).value_counts())
 
 
 def test_repr(stream):
