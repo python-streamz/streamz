@@ -172,6 +172,24 @@ def test_unary_operators(op, getter):
     assert_eq(b[0], expected)
 
 
+def test_set_index():
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+
+    a = StreamingDataFrame(example=df)
+
+    b = a.set_index('x').stream.sink_to_list()
+    a.emit(df)
+    assert_eq(b[0], df.set_index('x'))
+
+    b = a.set_index('x', drop=True).stream.sink_to_list()
+    a.emit(df)
+    assert_eq(b[0], df.set_index('x', drop=True))
+
+    b = a.set_index(a.y + 1, drop=True).stream.sink_to_list()
+    a.emit(df)
+    assert_eq(b[0], df.set_index(df.y + 1, drop=True))
+
+
 def test_binary_stream_operators(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
 
