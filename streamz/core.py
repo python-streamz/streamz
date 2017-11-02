@@ -735,33 +735,42 @@ class zip(Stream):
 
     def __init__(self, *upstreams, **kwargs):
         self.maxsize = kwargs.pop('maxsize', 10)
-        self.buffers = [deque() for _ in upstreams]
         self.condition = Condition()
         self.literals = [(i, val) for i, val in enumerate(upstreams)
                          if not isinstance(val, Stream)]
-        self.pack_literals()
 
-        self.buffers_by_stream = {upstream: buffer
-                    for upstream, buffer in builtins.zip(upstreams, self.buffers)
-                    if isinstance(upstream, Stream)}
+        self.buffers = {upstream: deque()
+                        for upstream in upstreams
+                        if isinstance(upstream, Stream)}
 
         upstreams2 = [upstream for upstream in upstreams if isinstance(upstream, Stream)]
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
-    def pack_literals(self):
+    def pack_literals(self, tup):
         """ Fill buffers for literals whenver we empty them """
+        inp = list(tup)[::-1]
+        out = []
         for i, val in self.literals:
-            self.buffers[i].append(val)
+            while len(out) < i:
+                out.append(inp.pop())
+            out.append(val)
+
+        while inp:
+            out.append(inp.pop())
+
+        return tuple(out)
 
     def update(self, x, who=None):
-        L = self.buffers_by_stream[who]  # get buffer for stream
+        L = self.buffers[who]  # get buffer for stream
         L.append(x)
-        if len(L) == 1 and all(self.buffers):
-            tup = tuple(buf.popleft() for buf in self.buffers)
+        if len(L) == 1 and all(self.buffers.values()):
+            tup = tuple(self.buffers[up][0] for up in self.upstreams)
+            for buf in self.buffers.values():
+                buf.popleft()
             self.condition.notify_all()
             if self.literals:
-                self.pack_literals()
+                tup = self.pack_literals(tup)
             return self._emit(tup)
         elif len(L) > self.maxsize:
             return self.condition.wait()
