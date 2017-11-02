@@ -86,44 +86,26 @@ def test_exceptions(stream):
         sdf.emit(pd.DataFrame())
 
 
-def test_sum(stream):
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.size
+])
+def test_reductions(stream, func):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = StreamingDataFrame(example=df, stream=stream)
-    df_out = sdf.sum().stream.gather().sink_to_list()
+
+    df_out = func(sdf).stream.gather().sink_to_list()
 
     x = sdf.x
-    x_out = (x.sum() + 1).stream.gather().sink_to_list()
+    x_out = func(x).stream.gather().sink_to_list()
 
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf.emit(df)
     sdf.emit(df)
 
-    assert assert_eq(df_out[0], df.sum())
-    assert assert_eq(df_out[1], df.sum() + df.sum())
-
-    assert x_out[0] == df.x.sum() + 1
-    assert x_out[1] == df.x.sum() + df.x.sum() + 1
-
-
-def test_mean(stream):
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = StreamingDataFrame(example=df, stream=stream)
-    mean = sdf.mean()
-    assert isinstance(mean, StreamingSeries)
-    df_out = mean.stream.gather().sink_to_list()
-
-    x = sdf.x
-    x_out = x.mean().stream.gather().sink_to_list()
-
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf.emit(df)
-    sdf.emit(df)
-
-    assert assert_eq(df_out[0], df.mean())
-    assert assert_eq(df_out[1], df.mean())
-
-    assert x_out[0] == df.x.mean()
-    assert x_out[1] == df.x.mean()
+    assert_eq(df_out[-1], func(pd.concat([df, df])))
+    assert_eq(x_out[-1], func(pd.concat([df, df]).x))
 
 
 @pytest.mark.parametrize('op', [
