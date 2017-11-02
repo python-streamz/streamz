@@ -35,9 +35,13 @@ class StreamingFrame(Streaming):
         """ Round elements in frame """
         return self.map_partitions(M.round, decimals=decimals)
 
-    def reset_index(self, decimals=0):
+    def reset_index(self):
         """ Reset Index """
         return self.map_partitions(M.reset_index)
+
+    def set_index(self, index, **kwargs):
+        """ Set Index """
+        return self.map_partitions(M.set_index, index, **kwargs)
 
     def tail(self, n=5):
         """ Round elements in frame """
