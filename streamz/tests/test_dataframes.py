@@ -171,6 +171,7 @@ def test_binary_operators(op, getter, stream):
     operator.invert,
     operator.neg,
     operator.not_,
+    lambda x: x.map(lambda x: x + 1),
 ])
 @pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
 def test_unary_operators(op, getter):

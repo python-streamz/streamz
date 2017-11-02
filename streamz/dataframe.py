@@ -126,6 +126,8 @@ class StreamingFrame(Streaming):
         """ Cumulative maximum """
         return self._cumulative_aggregation(op='cummax')
 
+    def map(self, func, na_action=None):
+        return self.map_partitions(self._subtype.map, func, na_action=na_action)
 
 def _cumulative_accumulator(state, new, op=None):
     if not len(new):
