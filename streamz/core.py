@@ -17,7 +17,7 @@ from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 from collections import Iterable
 
-from .compatibility import builtins, get_thread_identity
+from .compatibility import get_thread_identity
 
 no_default = '--no-default--'
 

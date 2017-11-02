@@ -7,7 +7,7 @@ from tornado import gen
 from distributed.client import default_client
 
 from .core import Stream
-from . import core
+from . import core, sources
 
 
 class DaskStream(Stream):
@@ -131,4 +131,14 @@ class union(DaskStream, core.union):
 
 @DaskStream.register_api()
 class zip(DaskStream, core.zip):
+    pass
+
+
+@DaskStream.register_api(staticmethod)
+class filenames(DaskStream, sources.filenames):
+    pass
+
+
+@DaskStream.register_api(staticmethod)
+class from_textfile(DaskStream, sources.from_textfile):
     pass

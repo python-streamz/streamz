@@ -57,13 +57,13 @@ class from_textfile(Source):
     -------
     Stream
     """
-    def __init__(self, f, poll_interval=0.100):
+    def __init__(self, f, poll_interval=0.100, **kwargs):
         if isinstance(f, str):
             f = open(f)
         self.file = f
 
         self.poll_interval = poll_interval
-        super(from_textfile, self).__init__()
+        super(from_textfile, self).__init__(**kwargs)
 
     @gen.coroutine
     def start(self):
@@ -95,7 +95,7 @@ class filenames(Source):
     >>> source = Stream.filenames('path/to/dir')  # doctest: +SKIP
     >>> source = Stream.filenames('path/to/*.csv', poll_interval=0.500)  # doctest: +SKIP
     """
-    def __init__(self, path, poll_interval=0.100):
+    def __init__(self, path, poll_interval=0.100, **kwargs):
         if '*' not in path:
             if os.path.isdir(path):
                 if not path.endswith(os.path.sep):
