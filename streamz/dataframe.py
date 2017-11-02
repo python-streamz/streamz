@@ -17,6 +17,15 @@ class StreamingFrame(Streaming):
         """ Sum frame """
         return self.accumulate_partitions(_accumulate_sum, start=0)
 
+    @property
+    def size(self):
+        """ Size of frame """
+        return self.accumulate_partitions(lambda acc, x: acc + x.size, start=0)
+
+    def count(self):
+        """ Count of frame """
+        return self.accumulate_partitions(lambda acc, x: acc + x.count(), start=0)
+
     def round(self, decimals=0):
         """ Round elements in frame """
         return self.map_partitions(M.round, decimals=decimals)
@@ -128,6 +137,7 @@ class StreamingFrame(Streaming):
 
     def map(self, func, na_action=None):
         return self.map_partitions(self._subtype.map, func, na_action=na_action)
+
 
 def _cumulative_accumulator(state, new, op=None):
     if not len(new):
