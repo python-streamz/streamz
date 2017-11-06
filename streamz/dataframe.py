@@ -261,7 +261,73 @@ def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
     return new_acc, result
 
 
-class StreamingDataFrame(StreamingFrame):
+class _DataFrameMixin(object):
+
+    @property
+    def columns(self):
+        return self.example.columns
+
+    @property
+    def dtypes(self):
+        return self.example.dtypes
+
+    def __getitem__(self, index):
+        return self.map_partitions(operator.getitem, index)
+
+    def __getattr__(self, key):
+        if key in self.columns or not len(self.columns):
+            return self.map_partitions(getattr, key)
+        else:
+            raise AttributeError("StreamingDataFrame has no attribute %r" % key)
+
+    def __dir__(self):
+        o = set(dir(type(self)))
+        o.update(self.__dict__)
+        o.update(c for c in self.columns if
+                 (isinstance(c, pd.compat.string_types) and
+                 pd.compat.isidentifier(c)))
+        return list(o)
+
+    def assign(self, **kwargs):
+        """ Assign new columns to this dataframe
+
+        Alternatively use setitem syntax
+
+        Examples
+        --------
+        >>> sdf = sdf.assign(z=sdf.x + sdf.y)  # doctest: +SKIP
+        >>> sdf['z'] = sdf.x + sdf.y  # doctest: +SKIP
+        """
+        def concat(tup, columns=None):
+            result = pd.concat(tup, axis=1)
+            result.columns = columns
+            return result
+        columns, values = zip(*kwargs.items())
+        stream = self.stream.zip(*[v.stream for v in values])
+        stream = stream.map(concat, columns=list(self.columns) + list(columns))
+        example = self.example.assign(**{c: v.example for c, v in kwargs.items()})
+        return type(self)(stream, example)
+
+    def to_frame(self):
+        """ Convert to a streaming dataframe """
+        return self
+
+    def __setitem__(self, key, value):
+        if isinstance(value, StreamingSeries):
+            result = self.assign(**{key: value})
+        elif isinstance(value, StreamingDataFrame):
+            result = self.assign(**{k: value[c] for k, c in zip(key, value.columns)})
+        else:
+            example = self.example.copy()
+            example[key] = value
+            result = self.map_partitions(pd.DataFrame.assign, **{key: value})
+
+        self.stream = result.stream
+        self.example = result.example
+        return self
+
+
+class StreamingDataFrame(StreamingFrame, _DataFrameMixin):
     """ A Streaming dataframe
 
     This is a logical collection over a stream of Pandas dataframes.
@@ -292,30 +358,12 @@ class StreamingDataFrame(StreamingFrame):
         else:
             return super(StreamingDataFrame, self).__init__(*args, **kwargs)
 
-    @property
-    def columns(self):
-        return self.example.columns
-
-    @property
-    def dtypes(self):
-        return self.example.dtypes
-
-    def __getitem__(self, index):
-        return self.map_partitions(operator.getitem, index)
-
-    def __getattr__(self, key):
-        if key in self.columns or not len(self.columns):
-            return self.map_partitions(getattr, key)
-        else:
-            raise AttributeError("StreamingDataFrame has no attribute %r" % key)
-
-    def __dir__(self):
-        o = set(dir(type(self)))
-        o.update(self.__dict__)
-        o.update(c for c in self.columns if
-                 (isinstance(c, pd.compat.string_types) and
-                 pd.compat.isidentifier(c)))
-        return list(o)
+    def mean(self):
+        """ Average """
+        start = pd.DataFrame({'sums': 0, 'counts': 0},
+                             index=self.example.columns)
+        return self.accumulate_partitions(_accumulate_mean, start=start,
+                                          returns_state=True)
 
     def verify(self, x):
         """ Verify consistency of elements that pass through this stream """
@@ -324,53 +372,18 @@ class StreamingDataFrame(StreamingFrame):
             raise IndexError("Input expected to have columns %s, got %s" %
                              (self.example.columns, x.columns))
 
-    def mean(self):
-        """ Average """
-        start = pd.DataFrame({'sums': 0, 'counts': 0},
-                             index=self.example.columns)
-        return self.accumulate_partitions(_accumulate_mean, start=start,
-                                          returns_state=True)
 
-    def assign(self, **kwargs):
-        """ Assign new columns to this dataframe
-
-        Alternatively use setitem syntax
-
-        Examples
-        --------
-        >>> sdf = sdf.assign(z=sdf.x + sdf.y)  # doctest: +SKIP
-        >>> sdf['z'] = sdf.x + sdf.y  # doctest: +SKIP
-        """
-        def concat(tup, columns=None):
-            result = pd.concat(tup, axis=1)
-            result.columns = columns
-            return result
-        columns, values = zip(*kwargs.items())
-        stream = self.stream.zip(*[v.stream for v in values])
-        stream = stream.map(concat, columns=list(self.columns) + list(columns))
-        example = self.example.assign(**{c: v.example for c, v in kwargs.items()})
-        return StreamingDataFrame(stream, example)
+class _SeriesMixin(object):
+    @property
+    def dtype(self):
+        return self.example.dtype
 
     def to_frame(self):
         """ Convert to a streaming dataframe """
-        return self
-
-    def __setitem__(self, key, value):
-        if isinstance(value, StreamingSeries):
-            result = self.assign(**{key: value})
-        elif isinstance(value, StreamingDataFrame):
-            result = self.assign(**{k: value[c] for k, c in zip(key, value.columns)})
-        else:
-            example = self.example.copy()
-            example[key] = value
-            result = self.map_partitions(pd.DataFrame.assign, **{key: value})
-
-        self.stream = result.stream
-        self.example = result.example
-        return self
+        return self.map_partitions(M.to_frame)
 
 
-class StreamingSeries(StreamingFrame):
+class StreamingSeries(StreamingFrame, _SeriesMixin):
     """ A Streaming series
 
     This is a logical collection over a stream of Pandas series objects.
@@ -384,19 +397,11 @@ class StreamingSeries(StreamingFrame):
     """
     _subtype = pd.Series
 
-    @property
-    def dtype(self):
-        return self.example.dtype
-
     def mean(self):
         """ Average """
         start = pd.Series({'sums': 0, 'counts': 0})
         return self.accumulate_partitions(_accumulate_mean, start=start,
                                           returns_state=True)
-
-    def to_frame(self):
-        """ Convert to a streaming dataframe """
-        return self.map_partitions(M.to_frame)
 
     def value_counts(self):
         return self.groupby(self).count()
