@@ -12,11 +12,11 @@ from .sources import Source
 from .utils import M
 
 
-class StreamingFrame(Streaming):
+class Frame(Streaming):
 
     def groupby(self, other):
         """ Groupby aggreagtions """
-        return StreamingSeriesGroupby(self, other)
+        return SeriesGroupby(self, other)
 
     def sum(self):
         """ Sum frame """
@@ -195,7 +195,7 @@ class Rolling(object):
         if key in self.sdf.columns or not len(self.sdf.columns):
             return self[key]
         else:
-            raise AttributeError("StreamingSeriesGroupby has no attribute %r" % key)
+            raise AttributeError("SeriesGroupby has no attribute %r" % key)
 
     def _known_aggregation(self, op, *args, **kwargs):
         return self.sdf.accumulate_partitions(rolling_accumulator,
@@ -278,7 +278,7 @@ class _DataFrameMixin(object):
         if key in self.columns or not len(self.columns):
             return self.map_partitions(getattr, key)
         else:
-            raise AttributeError("StreamingDataFrame has no attribute %r" % key)
+            raise AttributeError("DataFrame has no attribute %r" % key)
 
     def __dir__(self):
         o = set(dir(type(self)))
@@ -313,9 +313,9 @@ class _DataFrameMixin(object):
         return self
 
     def __setitem__(self, key, value):
-        if isinstance(value, StreamingSeries):
+        if isinstance(value, Series):
             result = self.assign(**{key: value})
-        elif isinstance(value, StreamingDataFrame):
+        elif isinstance(value, DataFrame):
             result = self.assign(**{k: value[c] for k, c in zip(key, value.columns)})
         else:
             example = self.example.copy()
@@ -327,7 +327,7 @@ class _DataFrameMixin(object):
         return self
 
 
-class StreamingDataFrame(StreamingFrame, _DataFrameMixin):
+class DataFrame(Frame, _DataFrameMixin):
     """ A Streaming dataframe
 
     This is a logical collection over a stream of Pandas dataframes.
@@ -336,8 +336,8 @@ class StreamingDataFrame(StreamingFrame, _DataFrameMixin):
 
     See Also
     --------
-    streams.dataframe.StreamingSeries
-    streams.sequence.StreamingSequence
+    streams.dataframe.Series
+    streams.sequence.Sequence
     """
     _subtype = pd.DataFrame
 
@@ -354,9 +354,9 @@ class StreamingDataFrame(StreamingFrame, _DataFrameMixin):
             stream = stream.map(concat, columns=list(columns))
             example = pd.DataFrame({k: getattr(v, 'example', v)
                                     for k, v in args[0].items()})
-            StreamingDataFrame.__init__(self, stream, example)
+            DataFrame.__init__(self, stream, example)
         else:
-            return super(StreamingDataFrame, self).__init__(*args, **kwargs)
+            return super(DataFrame, self).__init__(*args, **kwargs)
 
     def mean(self):
         """ Average """
@@ -367,7 +367,7 @@ class StreamingDataFrame(StreamingFrame, _DataFrameMixin):
 
     def verify(self, x):
         """ Verify consistency of elements that pass through this stream """
-        super(StreamingDataFrame, self).verify(x)
+        super(DataFrame, self).verify(x)
         if list(x.columns) != list(self.example.columns):
             raise IndexError("Input expected to have columns %s, got %s" %
                              (self.example.columns, x.columns))
@@ -383,7 +383,7 @@ class _SeriesMixin(object):
         return self.map_partitions(M.to_frame)
 
 
-class StreamingSeries(StreamingFrame, _SeriesMixin):
+class Series(Frame, _SeriesMixin):
     """ A Streaming series
 
     This is a logical collection over a stream of Pandas series objects.
@@ -392,8 +392,8 @@ class StreamingSeries(StreamingFrame, _SeriesMixin):
 
     See Also
     --------
-    streams.dataframe.StreamingDataFrame
-    streams.sequence.StreamingSequence
+    streams.dataframe.DataFrame
+    streams.sequence.Sequence
     """
     _subtype = pd.Series
 
@@ -407,7 +407,7 @@ class StreamingSeries(StreamingFrame, _SeriesMixin):
         return self.groupby(self).count()
 
 
-class StreamingIndex(StreamingSeries):
+class Index(Series):
     _subtype = pd.Index
 
 
@@ -427,20 +427,20 @@ def _accumulate_size(accumulator, new):
     return accumulator + new.size()
 
 
-class StreamingSeriesGroupby(object):
+class SeriesGroupby(object):
     def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
         self.index = index
 
     def __getitem__(self, index):
-        return StreamingSeriesGroupby(self.root, self.grouper, index)
+        return SeriesGroupby(self.root, self.grouper, index)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
-            raise AttributeError("StreamingSeriesGroupby has no attribute %r" % key)
+            raise AttributeError("SeriesGroupby has no attribute %r" % key)
 
     def count(self):
         return self._aggregation(_accumulate_groupby_count, 0, lambda x: x.count(), False)
@@ -529,7 +529,7 @@ def _random_df(tup):
     return df
 
 
-class Random(StreamingDataFrame):
+class Random(DataFrame):
     """ A streaming dataframe of random data
 
     The x column is uniformly distributed.
@@ -588,6 +588,6 @@ class Random(StreamingDataFrame):
             last = now
 
 
-_subtypes.append((pd.DataFrame, StreamingDataFrame))
-_subtypes.append((pd.Index, StreamingIndex))
-_subtypes.append((pd.Series, StreamingSeries))
+_subtypes.append((pd.DataFrame, DataFrame))
+_subtypes.append((pd.Index, Index))
+_subtypes.append((pd.Series, Series))

@@ -26,8 +26,8 @@ Conversion
    Stream.to_batch
    Stream.to_dataframe
 
-You can convert from core Stream objects to StreamingBatch, and
-StreamingDataFrame objects using the ``.to_batch`` and ``.to_dataframe``
+You can convert from core Stream objects to Batch, and
+DataFrame objects using the ``.to_batch`` and ``.to_dataframe``
 methods.  In each case we assume that the stream is a stream of batches (lists
 or tuples) or a list of Pandas dataframes.
 
@@ -37,7 +37,7 @@ or tuples) or a list of Pandas dataframes.
    >>> sdf = stream.to_dataframe()
 
 
-To convert back from a StreamingBatch or a StreamingDataFrame to a
+To convert back from a Batch or a DataFrame to a
 ``core.Stream`` you can access the ``.stream`` property.
 
 .. code-block:: python
@@ -61,7 +61,7 @@ Our file produces line-delimited JSON serialized data on which we want to call
 ``json.loads`` to parse into dictionaries.
 
 To reduce overhead we first batch our records up into 100-line batches and turn
-this into a StreamingBatch object.  We provide our StreamingBatch object an
+this into a Batch object.  We provide our Batch object an
 example element that it will use to help it determine metadata.
 
 .. code-block:: python
@@ -83,7 +83,7 @@ basic filtering and groupby-aggregations.
    sdf = sdf[sdf.name == "Alice"]
    sdf = sdf.groupby(sdf.x).y.mean()
 
-The StreamingDataFrames satisfy a subset of the Pandas API, but now rather than
+The DataFrames satisfy a subset of the Pandas API, but now rather than
 operate on the data directly, they set up a pipeline to compute the data in an
 online fashion.
 

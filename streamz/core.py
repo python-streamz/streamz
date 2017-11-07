@@ -329,7 +329,7 @@ class Stream(object):
         return visualize(self, filename, **kwargs)
 
     def to_dataframe(self, example):
-        """ Convert a stream of Pandas dataframes to a StreamingDataFrame
+        """ Convert a stream of Pandas dataframes to a DataFrame
 
         Examples
         --------
@@ -340,11 +340,11 @@ class Stream(object):
         >>> source.emit(pd.DataFrame(...))  # doctest: +SKIP
         >>> source.emit(pd.DataFrame(...))  # doctest: +SKIP
         """
-        from .dataframe import StreamingDataFrame
-        return StreamingDataFrame(stream=self, example=example)
+        from .dataframe import DataFrame
+        return DataFrame(stream=self, example=example)
 
     def to_batch(self, **kwargs):
-        """ Convert a stream of lists to a StreamingBatch
+        """ Convert a stream of lists to a Batch
 
         All elements of the stream are assumed to be lists or tuples
 
@@ -360,8 +360,8 @@ class Stream(object):
         ...              {'name': 'Bob', 'value': 5},
         ...              {'name': 'Charlie', 'value': 6}])
         """
-        from .batch import StreamingBatch
-        return StreamingBatch(stream=self, **kwargs)
+        from .batch import Batch
+        return Batch(stream=self, **kwargs)
 
 
 @Stream.register_api()
