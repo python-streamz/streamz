@@ -3,7 +3,7 @@ import toolz
 import toolz.curried
 
 
-class StreamingBatch(Streaming):
+class Batch(Streaming):
     """ A Stream of tuples or lists
 
     This streaming collection manages batches of Python objects such as lists
@@ -21,7 +21,7 @@ class StreamingBatch(Streaming):
     def __init__(self, stream=None, example=None):
         if example is None:
             example = []
-        super(StreamingBatch, self).__init__(stream=stream, example=example)
+        super(Batch, self).__init__(stream=stream, example=example)
 
     def sum(self):
         """ Sum elements """
@@ -82,4 +82,4 @@ def _accumulate_sum(accumulator, new):
 
 map_type = type(map(lambda x: x, []))
 
-_subtypes.append(((list, tuple, set), StreamingBatch))
+_subtypes.append(((list, tuple, set), Batch))

@@ -18,12 +18,12 @@ Batch
 .. currentmodule:: streamz.batch
 
 .. autosummary::
-   StreamingBatch
-   StreamingBatch.filter
-   StreamingBatch.map
-   StreamingBatch.pluck
-   StreamingBatch.to_dataframe
-   StreamingBatch.to_stream
+   Batch
+   Batch.filter
+   Batch.map
+   Batch.pluck
+   Batch.to_dataframe
+   Batch.to_stream
 
 Dataframes
 ----------
@@ -31,17 +31,17 @@ Dataframes
 .. currentmodule:: streamz.dataframe
 
 .. autosummary::
-   StreamingDataFrame
-   StreamingDataFrame.groupby
-   StreamingDataFrame.rolling
-   StreamingDataFrame.assign
-   StreamingDataFrame.sum
-   StreamingDataFrame.mean
-   StreamingDataFrame.cumsum
-   StreamingDataFrame.cumprod
-   StreamingDataFrame.cummin
-   StreamingDataFrame.cummax
-   StreamingDataFrame.plot
+   DataFrame
+   DataFrame.groupby
+   DataFrame.rolling
+   DataFrame.assign
+   DataFrame.sum
+   DataFrame.mean
+   DataFrame.cumsum
+   DataFrame.cumprod
+   DataFrame.cummin
+   DataFrame.cummax
+   DataFrame.plot
 
 .. autosummary::
    Rolling
@@ -69,13 +69,13 @@ Details
 
 .. currentmodule:: streamz.batch
 
-.. autoclass:: StreamingBatch
+.. autoclass:: Batch
    :members:
    :inherited-members:
 
 .. currentmodule:: streamz.dataframe
 
-.. autoclass:: StreamingDataFrame
+.. autoclass:: DataFrame
    :members:
    :inherited-members:
 
