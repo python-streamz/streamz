@@ -1,3 +1,5 @@
+from __future__ import division, print_function
+
 import json
 import operator
 from time import sleep
@@ -171,6 +173,20 @@ def test_unary_operators(op, getter):
 
     assert_eq(b[0], expected)
 
+
+@pytest.mark.parametrize('func', [
+    lambda df: df.query('x > 1 and x < 4', engine='python')
+])
+def test_dataframe_simple(func):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    expected = func(df)
+
+    a = DataFrame(example=df)
+    L = func(a).stream.sink_to_list()
+
+    a.emit(df)
+
+    assert_eq(L[0], expected)
 
 def test_set_index():
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
