@@ -8,8 +8,7 @@ import six
 import sys
 import threading
 from time import time
-import weakreflist
-from weakref import WeakSet
+from . import weakreflist
 
 import toolz
 from tornado import gen
