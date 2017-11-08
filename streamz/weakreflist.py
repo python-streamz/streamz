@@ -1,6 +1,6 @@
 # -*- coding: utf8 -*-
 # This is a copy from weakreflist
-# https://stackoverflow.com/questions/677978/weakref-list-in-python
+# https://pypi.python.org/pypi/weakreflist
 from weakref import ref, ReferenceType
 import sys
 
