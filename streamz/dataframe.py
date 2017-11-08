@@ -249,7 +249,6 @@ class _DataFrameMixin(object):
         return self.map_partitions(pd.DataFrame.query, expr, **kwargs)
 
 
-
 class DataFrame(Frame, _DataFrameMixin):
     """ A Streaming dataframe
 

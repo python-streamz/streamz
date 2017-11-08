@@ -593,12 +593,12 @@ def test_tail(stream):
     assert_eq(L[1], df.tail(2))
 
 
-def test_random_source(loop):
-    with Client(processes=False, diagnostics_port=False, loop=loop) as client:
-        source = sd.Random(freq='1ms', interval='10ms', dask=True)
-        L = source.x.stream.gather().sink_to_list()
-        sleep(0.20)
-        assert len(client.cluster.scheduler.tasks) < 10
+def test_random_source(client):
+    n = len(client.cluster.scheduler.tasks)
+    source = sd.Random(freq='1ms', interval='10ms', dask=True)
+    L = source.x.stream.gather().sink_to_list()
+    sleep(0.20)
+    assert len(client.cluster.scheduler.tasks) < n + 10
 
 
 def test_example_type_error_message():
