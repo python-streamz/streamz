@@ -1,5 +1,5 @@
 # -*- coding: utf8 -*-
-# This is a copy from weakreflist
+# This is a copy from stackoverflow
 # https://stackoverflow.com/questions/7828444/indexable-weak-ordered-set-in-python
 import collections
 import weakref
