@@ -939,5 +939,20 @@ def test_separate_thread_with_time(loop, thread):
     assert L == [2]
 
 
+def test_execution_order():
+    L = []
+    for i in range(5):
+        s = Stream()
+        b = s.pluck(1)
+        a = s.pluck(0)
+        l = a.combine_latest(b, emit_on=a).sink_to_list()
+        z = [(1, 'red'), (2, 'blue'), (3, 'green')]
+        for zz in z:
+            s.emit(zz)
+        L.append((l, ))
+    for ll in L:
+        assert ll == L[0]
+
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
