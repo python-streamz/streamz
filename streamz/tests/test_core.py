@@ -730,9 +730,10 @@ def test_from_file():
             f.write('{"x": 5, "y": 2}\n')
             f.flush()
 
-            yield gen.sleep(0.050)
-
-            assert L == [1, 2, 3, 4, 5]
+            start = time()
+            while L != [1, 2, 3, 4, 5]:
+                yield gen.sleep(0.01)
+                assert time() < start + 2  # reads within 2s
 
 
 @gen_test()

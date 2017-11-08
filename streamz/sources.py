@@ -70,11 +70,10 @@ class from_textfile(Source):
         while True:
             line = self.file.readline()
             if line:
-                last = self._emit(line)  # TODO: we should yield on emit
+                yield self._emit(line)
             else:
                 if self.poll_interval:
                     yield gen.sleep(self.poll_interval)
-                    yield last
                 else:
                     return
 

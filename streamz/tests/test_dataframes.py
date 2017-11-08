@@ -10,7 +10,7 @@ from tornado import gen
 
 from streamz import Stream
 from streamz.utils_test import gen_test
-from streamz.dataframe import DataFrame, Series
+from streamz.dataframe import DataFrame, Series, DataFrames, Seriess
 import streamz.dataframe as sd
 from streamz.dask import DaskStream
 
@@ -20,7 +20,7 @@ from distributed.utils_test import loop  # flake8: noqa
 
 @pytest.fixture(scope="module")
 def client():
-    client = Client(processes=False)
+    client = Client(processes=False, asynchronous=False)
     try:
         yield client
     finally:
@@ -397,7 +397,7 @@ def test_integration_from_stream(stream):
     for i in range(12):
         source.emit(json.dumps({'x': i % 3, 'y': i}))
 
-    assert L == [2, 17 / 3, 100 / 9]
+    assert L == [2, 28 / 3, 22.0]
 
 
 @gen_test()
@@ -591,3 +591,23 @@ def test_example_type_error_message():
     except Exception as e:
         assert 'DataFrame' in str(e)
         assert '[123]' in str(e)
+
+
+def test_dataframes(stream):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrames(example=df, stream=stream)
+    L = (sdf + 1).x.sum().stream.gather().sink_to_list()
+
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert L == [9, 9]
+
+
+def test_groupby_aggregate_updating(stream):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrame(example=df, stream=stream)
+
+    assert sdf.groupby('x').y.mean()._stream_type == 'updating'
+    assert sdf.x.sum()._stream_type == 'updating'
+    assert (sdf.x.sum() + 1)._stream_type == 'updating'
