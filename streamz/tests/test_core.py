@@ -964,7 +964,6 @@ def test_execution_order():
             s.emit(zz)
         L2.append((l,))
     for ll, ll2 in zip(L, L2):
-        print(ll, ll2)
         assert ll2 == L2[0]
         assert ll != ll2
 
