@@ -245,6 +245,10 @@ class _DataFrameMixin(object):
         self.example = result.example
         return self
 
+    def query(self, expr, **kwargs):
+        return self.map_partitions(pd.DataFrame.query, expr, **kwargs)
+
+
 
 class DataFrame(Frame, _DataFrameMixin):
     """ A Streaming dataframe
