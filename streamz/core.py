@@ -8,7 +8,7 @@ import six
 import sys
 import threading
 from time import time
-from . import weakreflist
+from .weakreflist import WeakList
 
 import toolz
 from tornado import gen
@@ -74,7 +74,7 @@ class Stream(object):
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
                  loop=None, asynchronous=False):
         self.asynchronous = asynchronous
-        self.downstreams = weakreflist.WeakList()
+        self.downstreams = WeakList()
         if upstreams is not None:
             self.upstreams = upstreams
         else:
