@@ -3,7 +3,7 @@ import weakref
 
 from streamz import Stream, core
 
-_subtypes = []
+_stream_types = {'streaming': [], 'updating': []}
 
 _html_update_streams = set()
 
@@ -26,8 +26,9 @@ class Streaming(object):
     streamz.dataframe.StreamingBatch
     """
     _subtype = object
+    _stream_type = 'streaming'
 
-    def __init__(self, stream=None, example=None):
+    def __init__(self, stream=None, example=None, stream_type=None):
         assert example is not None
         self.example = example
         if not isinstance(self.example, self._subtype):
@@ -37,6 +38,10 @@ class Streaming(object):
             raise TypeError(msg)
         assert isinstance(self.example, self._subtype)
         self.stream = stream or Stream()
+        if stream_type:
+            if stream_type not in ['streaming', 'updating']:
+                raise Exception()
+            self._stream_type = stream_type
 
     def map_partitions(self, func, *args, **kwargs):
         """ Map a function across all batch elements of this stream
@@ -60,6 +65,7 @@ class Streaming(object):
         start = kwargs.pop('start', core.no_default)
         returns_state = kwargs.pop('returns_state', False)
         example = kwargs.pop('example', None)
+        stream_type = kwargs.pop('stream_type', self._stream_type)
         if example is None:
             example = func(start, self.example, *args, **kwargs)
         if returns_state:
@@ -67,10 +73,10 @@ class Streaming(object):
         stream = self.stream.accumulate(func, *args, start=start,
                 returns_state=returns_state, **kwargs)
 
-        for typ, stream_type in _subtypes:
+        for typ, s_type in _stream_types[stream_type]:
             if isinstance(example, typ):
-                return stream_type(stream, example)
-        return Streaming(stream, example)
+                return s_type(stream, example)
+        return Streaming(stream, example, stream_type=stream_type)
 
     def __repr__(self):
         example = self.example
@@ -239,8 +245,8 @@ class Streaming(object):
                             (self._subtype, type(x)))
 
 
-def stream_type(example):
-    for typ, s_type in _subtypes:
+def stream_type(example, stream_type='streaming'):
+    for typ, s_type in _stream_types[stream_type]:
         if isinstance(example, typ):
             return s_type
     raise TypeError("No streaming equivalent found for type %s" %
@@ -262,6 +268,12 @@ def map_partitions(func, *args, **kwargs):
         example = func(*[getattr(arg, 'example', arg) for arg in args], **kwargs)
 
     streams = [arg for arg in args if isinstance(arg, Streaming)]
+    if 'stream_type' in kwargs:
+        stream_type = kwargs['stream_type']
+    else:
+        stream_type = ('streaming'
+                       if any(s._stream_type == 'streaming' for s in streams)
+                       else 'updating')
 
     if len(streams) > 1:
         stream = type(streams[0].stream).zip(*[getattr(arg, 'stream', arg) for arg in args])
@@ -278,10 +290,10 @@ def map_partitions(func, *args, **kwargs):
             stream = s.stream.map(partial_by_order, function=func, other=other,
                                   **kwargs)
 
-    for typ, stream_type in _subtypes:
+    for typ, s_type in _stream_types[stream_type]:
         if isinstance(example, typ):
-            return stream_type(stream, example)
-    return Streaming(stream, example)
+            return s_type(stream, example)
+    return Streaming(stream, example, stream_type=stream_type)
 
 
 def partial_by_order(*args, **kwargs):

@@ -1,4 +1,4 @@
-from .collection import Streaming, _subtypes
+from .collection import Streaming, _stream_types
 import toolz
 import toolz.curried
 
@@ -82,4 +82,4 @@ def _accumulate_sum(accumulator, new):
 
 map_type = type(map(lambda x: x, []))
 
-_subtypes.append(((list, tuple, set), Batch))
+_stream_types['streaming'].append(((list, tuple, set), Batch))
