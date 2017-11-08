@@ -8,7 +8,7 @@ import six
 import sys
 import threading
 from time import time
-from .weakreflist import WeakList
+from .orderedweakset import OrderedWeakrefSet
 
 import toolz
 from tornado import gen
@@ -74,7 +74,7 @@ class Stream(object):
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
                  loop=None, asynchronous=False):
         self.asynchronous = asynchronous
-        self.downstreams = WeakList()
+        self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = upstreams
         else:
@@ -87,7 +87,7 @@ class Stream(object):
         self.loop = loop
         for upstream in self.upstreams:
             if upstream:
-                upstream.downstreams.append(self)
+                upstream.downstreams.add(self)
         self.name = stream_name
         if loop:
             for upstream in self.upstreams:
@@ -236,7 +236,7 @@ class Stream(object):
         downstream: Stream
             The downstream stream to connect to
         '''
-        self.downstreams.append(downstream)
+        self.downstreams.add(downstream)
 
         if downstream.upstreams == [None]:
             downstream.upstreams = [self]
@@ -748,7 +748,7 @@ class zip(Stream):
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
     def pack_literals(self, tup):
-        """ Fill buffers for literals whenver we empty them """
+        """ Fill buffers for literals whenever we empty them """
         inp = list(tup)[::-1]
         out = []
         for i, val in self.literals:

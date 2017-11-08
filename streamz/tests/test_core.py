@@ -953,6 +953,21 @@ def test_execution_order():
     for ll in L:
         assert ll == L[0]
 
+    L2 = []
+    for i in range(5):
+        s = Stream()
+        a = s.pluck(0)
+        b = s.pluck(1)
+        l = a.combine_latest(b, emit_on=a).sink_to_list()
+        z = [(1, 'red'), (2, 'blue'), (3, 'green')]
+        for zz in z:
+            s.emit(zz)
+        L2.append((l,))
+    for ll, ll2 in zip(L, L2):
+        print(ll, ll2)
+        assert ll2 == L2[0]
+        assert ll != ll2
+
 
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
