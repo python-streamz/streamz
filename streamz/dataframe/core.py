@@ -7,10 +7,10 @@ import pandas as pd
 from tornado.ioloop import IOLoop
 from tornado import gen
 
-from .collection import (Streaming, _stream_types, stream_type)
-from .sources import Source
-from .utils import M
-from . import dataframe_aggregations as aggregations
+from ..collection import (Streaming, _stream_types, stream_type)
+from ..sources import Source
+from ..utils import M
+from . import aggregations
 
 
 class BaseFrame(Streaming):
