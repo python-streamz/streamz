@@ -10,6 +10,7 @@ from tornado import gen
 from .collection import (Streaming, _stream_types, stream_type)
 from .sources import Source
 from .utils import M
+from . import dataframe_aggregations as aggregations
 
 
 class BaseFrame(Streaming):
@@ -47,8 +48,10 @@ class Frame(BaseFrame):
 
     def sum(self):
         """ Sum frame """
-        return self.accumulate_partitions(_accumulate_sum, start=0,
-                                          stream_type='updating')
+        return self.accumulate_partitions(aggregations.accumulator,
+                                          agg=aggregations.Sum(),
+                                          start=None, stream_type='updating',
+                                          returns_state=True)
 
     @property
     def size(self):
@@ -58,8 +61,17 @@ class Frame(BaseFrame):
 
     def count(self):
         """ Count of frame """
-        return self.accumulate_partitions(lambda acc, x: acc + x.count(),
-                start=0, stream_type='updating')
+        return self.accumulate_partitions(aggregations.accumulator,
+                                          agg=aggregations.Count(),
+                                          start=None, stream_type='updating',
+                                          returns_state=True)
+
+    def mean(self):
+        """ Average """
+        return self.accumulate_partitions(aggregations.accumulator,
+                                          agg=aggregations.Mean(),
+                                          start=None, stream_type='updating',
+                                          returns_state=True)
 
     def rolling(self, window, min_periods=1):
         """ Compute rolling aggregations
@@ -86,6 +98,9 @@ class Frame(BaseFrame):
         Rolling object
         """
         return Rolling(self, window, min_periods)
+
+    def window(self, n=None, value=None):
+        return Window(self, n=n, value=value)
 
     def plot(self, backlog=1000, width=800, height=300, **kwargs):
         """ Plot streaming dataframe as Bokeh plot
@@ -280,14 +295,6 @@ class DataFrame(Frame, _DataFrameMixin):
         else:
             return super(DataFrame, self).__init__(*args, **kwargs)
 
-    def mean(self):
-        """ Average """
-        start = pd.DataFrame({'sums': 0, 'counts': 0},
-                             index=self.example.columns)
-        return self.accumulate_partitions(_accumulate_mean, start=start,
-                                          returns_state=True,
-                                          stream_type='updating')
-
     def verify(self, x):
         """ Verify consistency of elements that pass through this stream """
         super(DataFrame, self).verify(x)
@@ -319,13 +326,6 @@ class Series(Frame, _SeriesMixin):
     streams.sequence.Sequence
     """
     _subtype = pd.Series
-
-    def mean(self):
-        """ Average """
-        start = pd.Series({'sums': 0, 'counts': 0})
-        return self.accumulate_partitions(_accumulate_mean, start=start,
-                                          returns_state=True,
-                                          stream_type='updating')
 
     def value_counts(self):
         def _value_counts(acc, new):
@@ -441,6 +441,49 @@ class Rolling(object):
     def quantile(self, *args, **kwargs):
         """ Rolling quantile """
         return self._known_aggregation('quantile', *args, **kwargs)
+
+
+class Window(object):
+    def __init__(self, sdf, n=None, value=None):
+        self.n = n
+        self.value = value
+        self.sdf = sdf
+
+    def __getitem__(self, key):
+        sdf = self.sdf[key]
+        return Window(sdf, n=self.n, value=self.value)
+
+    def __getattr__(self, key):
+        if key in self.sdf.columns or not len(self.sdf.columns):
+            return self[key]
+        else:
+            raise AttributeError("SeriesGroupby has no attribute %r" % key)
+
+    def _known_aggregation(self, agg):
+        if self.n is not None:
+            diff = aggregations.diff_iloc
+            window = self.n
+        elif self.value is not None:
+            diff = aggregations.diff_loc
+            window = self.value
+        return self.sdf.accumulate_partitions(aggregations.window_accumulator,
+                                              diff=diff,
+                                              window=window,
+                                              agg=agg,
+                                              start=None,
+                                              returns_state=True)
+
+    def sum(self):
+        return self._known_aggregation(aggregations.Sum())
+
+    def count(self):
+        return self._known_aggregation(aggregations.Count())
+
+    def mean(self):
+        return self._known_aggregation(aggregations.Mean())
+
+    def var(self, ddof=1):
+        return self._known_aggregation(aggregations.Var(ddof=ddof))
 
 
 def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):

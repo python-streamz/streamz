@@ -627,3 +627,98 @@ def test_groupby_aggregate_updating(stream):
     assert sdf.groupby('x').y.mean()._stream_type == 'updating'
     assert sdf.x.sum()._stream_type == 'updating'
     assert (sdf.x.sum() + 1)._stream_type == 'updating'
+
+
+def test_window_sum(stream):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrame(example=df, stream=stream)
+    L = sdf.window(n=4).x.sum().stream.gather().sink_to_list()
+
+    sdf.emit(df)
+    assert L == [6]
+    sdf.emit(df)
+    assert L == [6, 9]
+    sdf.emit(df)
+    assert L == [6, 9, 9]
+
+
+def test_window_sum_dataframe(stream):
+    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrame(example=df, stream=stream)
+    L = sdf.window(n=4).sum().stream.gather().sink_to_list()
+
+    sdf.emit(df)
+    assert_eq(L[0], pd.Series([6, 15], index=['x', 'y']))
+    sdf.emit(df)
+    assert_eq(L[0], pd.Series([6, 15], index=['x', 'y']))
+    assert_eq(L[1], pd.Series([9, 21], index=['x', 'y']))
+    sdf.emit(df)
+    assert_eq(L[0], pd.Series([6, 15], index=['x', 'y']))
+    assert_eq(L[1], pd.Series([9, 21], index=['x', 'y']))
+    assert_eq(L[2], pd.Series([9, 21], index=['x', 'y']))
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+    lambda x: x.var(ddof=0),
+])
+@pytest.mark.parametrize('n', [1, 4])
+@pytest.mark.parametrize('getter', [
+    lambda df: df,
+    lambda df: df.x,
+])
+def test_windowing_n(func, n, getter):
+    df = pd.DataFrame({'x': list(range(10)), 'y': [1, 2] * 5})
+
+    sdf = DataFrame(example=df)
+    L = func(getter(sdf).window(n=n)).stream.gather().sink_to_list()
+
+    for i in range(0, 10, 3):
+        sdf.emit(df.iloc[i: i + 3])
+    sdf.emit(df.iloc[:0])
+
+    assert len(L) == 5
+
+    assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3]))
+    assert_eq(L[-1], func(getter(df).iloc[len(df) - n:]))
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+    lambda x: x.var(ddof=0),
+])
+@pytest.mark.parametrize('value', ['10h', '1d'])
+@pytest.mark.parametrize('getter', [
+    lambda df: df,
+    lambda df: df.x,
+])
+def test_windowing_value(func, value, getter):
+    value = pd.Timedelta(value)
+    index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
+    df = pd.DataFrame({'x': np.arange(len(index))}, index=index)
+
+    sdf = DataFrame(example=df)
+    L = func(getter(sdf).window(value=value)).stream.gather().sink_to_list()
+
+    diff = 13
+    for i in range(0, len(index), diff):
+        sdf.emit(df.iloc[i: i + diff])
+    sdf.emit(df.iloc[:0])
+
+    assert len(L) == 5
+
+    first = df.iloc[:diff]
+    lost = first[first.index.min() + value:]
+    first = first.iloc[len(lost):]
+
+    assert_eq(L[0], func(getter(first)))
+
+    last = df.loc[index.max() - value + pd.Timedelta('1s'):]
+
+    assert_eq(L[-1], func(getter(last)))
