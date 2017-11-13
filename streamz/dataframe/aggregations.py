@@ -1,6 +1,7 @@
 from collections import deque
 from numbers import Number
 
+import numpy as np
 import pandas as pd
 
 
@@ -15,7 +16,7 @@ class Aggregation(object):
 
     def stateless(self, new):
         acc = self.initial(new)
-        acc, result = self.on_new(acc, df)
+        acc, result = self.on_new(acc, new)
         return result
 
 
@@ -185,3 +186,141 @@ def accumulator(acc, new, agg=None):
     if acc is None:
         acc = agg.initial(new)
     return agg.on_new(acc, new)
+
+
+class GroupbyAggregation(Aggregation):
+    def __init__(self, columns, grouper=None, **kwargs):
+        self.grouper = grouper
+        self.columns = columns
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    def grouped(self, df, grouper=None):
+        if grouper is None:
+            grouper = self.grouper
+
+        g = df.groupby(grouper)
+
+        if self.columns is not None:
+            g = g[self.columns]
+
+        return g
+
+
+class GroupbySum(GroupbyAggregation):
+    def on_new(self, acc, new, grouper=None):
+        g = self.grouped(new, grouper=grouper)
+        result = acc.add(g.sum(), fill_value=0)
+        return result, result
+
+    def on_old(self, acc, old, grouper=None):
+        g = self.grouped(old)
+        result = acc.sub(g.sum(), fill_value=0)
+        return result, result
+
+    def initial(self, new, grouper=None):
+        if hasattr(grouper, 'iloc'):
+            grouper = grouper.iloc[:0]
+        if isinstance(grouper, (pd.Index, np.ndarray)):
+            grouper = grouper[:0]
+        return self.grouped(new.iloc[:0], grouper=grouper).sum()
+
+
+class GroupbyCount(GroupbyAggregation):
+    def on_new(self, acc, new, grouper=None):
+        g = self.grouped(new, grouper=grouper)
+        result = acc.add(g.count(), fill_value=0)
+        result = result.astype(int)
+        return result, result
+
+    def on_old(self, acc, old, grouper=None):
+        g = self.grouped(old)
+        result = acc.sub(g.count(), fill_value=0)
+        result = result.astype(int)
+        return result, result
+
+    def initial(self, new, grouper=None):
+        if hasattr(grouper, 'iloc'):
+            grouper = grouper.iloc[:0]
+        if isinstance(grouper, (pd.Index, np.ndarray)):
+            grouper = grouper[:0]
+        return self.grouped(new.iloc[:0], grouper=grouper).count()
+
+
+class GroupbyMean(GroupbyAggregation):
+    def on_new(self, acc, new, grouper=None):
+        totals, counts = acc
+        g = self.grouped(new, grouper=grouper)
+        totals = totals.add(g.sum(), fill_value=0)
+        counts = counts.add(g.count(), fill_value=0)
+
+        return (totals, counts), totals / counts
+
+    def on_old(self, acc, old, grouper=None):
+        totals, counts = acc
+        g = self.grouped(old, grouper=grouper)
+        totals = totals.sub(g.sum(), fill_value=0)
+        counts = counts.sub(g.count(), fill_value=0)
+
+        return (totals, counts), totals / counts
+
+    def initial(self, new, grouper=None):
+        if hasattr(grouper, 'iloc'):
+            grouper = grouper.iloc[:0]
+        if isinstance(grouper, (pd.Index, np.ndarray)):
+            grouper = grouper[:0]
+        g = self.grouped(new.iloc[:0], grouper=grouper)
+        return (g.sum(), g.count())
+
+
+class GroupbyVar(GroupbyAggregation):
+    def _compute_result(self, x, x2, n):
+        result = (x2 / n) - (x / n) ** 2
+        if self.ddof != 0:
+            result = result * n / (n - self.ddof)
+        return result
+
+    def on_new(self, acc, new, grouper=None):
+        x, x2, n = acc
+        g = self.grouped(new, grouper=grouper)
+        if len(new):
+            x = x.add(g.sum(), fill_value=0)
+            x2 = x2.add(g.agg(lambda x: (x**2).sum()), fill_value=0)
+            n = n.add(g.count(), fill_value=0)
+
+        return (x, x2, n), self._compute_result(x, x2, n)
+
+    def on_old(self, acc, old, grouper=None):
+        x, x2, n = acc
+        g = self.grouped(old, grouper=grouper)
+        if len(old):
+            x = x.sub(g.sum(), fill_value=0)
+            x2 = x2.sub(g.agg(lambda x: (x**2).sum()), fill_value=0)
+            n = n.sub(g.count(), fill_value=0)
+
+        return (x, x2, n), self._compute_result(x, x2, n)
+
+    def initial(self, new, grouper=None):
+        if hasattr(grouper, 'iloc'):
+            grouper = grouper.iloc[:0]
+        if isinstance(grouper, (pd.Index, np.ndarray)):
+            grouper = grouper[:0]
+
+        new = new.iloc[:0]
+        g = self.grouped(new, grouper=grouper)
+        x = g.sum()
+        x2 = g.agg(lambda x: (x**2).sum())
+        n = g.count()
+
+        return (x, x2, n)
+
+
+def groupby_accumulator(acc, new, agg=None):
+    if agg.grouper is None and isinstance(new, tuple):
+        new, grouper = new
+    else:
+        grouper = None
+    if acc is None:
+        acc = agg.initial(new, grouper=grouper)
+    result = agg.on_new(acc, new, grouper=grouper)
+    return result

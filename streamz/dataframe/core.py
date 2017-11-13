@@ -1,4 +1,3 @@
-from functools import partial
 import operator
 from time import time
 
@@ -7,7 +6,7 @@ import pandas as pd
 from tornado.ioloop import IOLoop
 from tornado import gen
 
-from ..collection import (Streaming, _stream_types, stream_type)
+from ..collection import (Streaming, _stream_types)
 from ..sources import Source
 from ..utils import M
 from . import aggregations
@@ -531,78 +530,41 @@ class SeriesGroupby(object):
         else:
             raise AttributeError("SeriesGroupby has no attribute %r" % key)
 
+    def _accumulate(self, Agg, **kwargs):
+        stream_type = 'updating'
+
+        if isinstance(self.grouper, Streaming):
+            stream = self.root.stream.zip(self.grouper.stream)
+            grouper_example = self.grouper.example
+            agg = Agg(self.index, grouper=None, **kwargs)
+        else:
+            stream = self.root.stream
+            grouper_example = self.grouper
+            agg = Agg(self.index, grouper=self.grouper, **kwargs)
+
+        example = agg.initial(self.root.example, grouper=grouper_example)
+
+        outstream = stream.accumulate(aggregations.groupby_accumulator,
+                                      agg=agg,
+                                      start=None,
+                                      returns_state=True)
+
+        for typ, s_type in _stream_types[stream_type]:
+            if isinstance(example, typ):
+                return s_type(outstream, example)
+        return Streaming(outstream, example, stream_type=stream_type)
+
     def count(self):
-        return self._aggregation(_accumulate_groupby_count, 0, lambda x: x.count(), False)
+        return self._accumulate(aggregations.GroupbyCount)
 
     def sum(self):
-        return self._aggregation(_accumulate_groupby_sum, 0, lambda x: x.sum(), False)
+        return self._accumulate(aggregations.GroupbySum)
 
     def mean(self):
-        return self._aggregation(_accumulate_groupby_mean, (0, 0), lambda x: x.mean())
+        return self._accumulate(aggregations.GroupbyMean)
 
-    def _aggregation(self, func, start, example_func, returns_state=True):
-        if isinstance(self.grouper, Streaming):
-            func = partial(func, index=self.index)
-            example = self.root.example.groupby(self.grouper.example)
-            if self.index is not None:
-                example = example[self.index]
-            example = example_func(example)
-            stream = self.root.stream.zip(self.grouper.stream)
-            stream = stream.accumulate(func, start=start,
-                                       returns_state=returns_state)
-        else:
-            func = partial(func, grouper=self.grouper, index=self.index)
-            example = self.root.example.groupby(self.grouper)
-            if self.index is not None:
-                example = example[self.index]
-            example = example_func(example)
-            stream = self.root.stream.accumulate(func, start=start,
-                                                 returns_state=returns_state)
-        return stream_type(example, stream_type='updating')(stream, example)
-
-
-def _accumulate_groupby_count(accumulator, new, grouper=None, index=None):
-    if isinstance(new, tuple):  # zipped
-        assert grouper is None
-        new, grouper = new
-    g = new.groupby(grouper)
-    if index is not None:
-        g = g[index]
-    if isinstance(accumulator, int):
-        return g.count()
-    else:
-        return accumulator.add(g.count(), fill_value=0).astype(int)
-
-
-def _accumulate_groupby_sum(accumulator, new, grouper=None, index=None):
-    if isinstance(new, tuple):  # zipped
-        assert grouper is None
-        new, grouper = new
-    g = new.groupby(grouper)
-    if index is not None:
-        g = g[index]
-    if isinstance(accumulator, int):
-        return g.sum()
-    else:
-        return accumulator.add(g.sum(), fill_value=0)
-
-
-def _accumulate_groupby_mean(accumulator, new, grouper=None, index=None):
-    if isinstance(new, tuple):  # zipped
-        assert grouper is None
-        new, grouper = new
-    g = new.groupby(grouper)
-    if index is not None:
-        g = g[index]
-
-    (sums, counts) = accumulator
-    if isinstance(sums, int):  # first time
-        sums = g.sum()
-        counts = g.count()
-    else:
-        sums = sums.add(g.sum(), fill_value=0)
-        counts = counts.add(g.count(), fill_value=0)
-    return (sums, counts), sums / counts
+    def var(self, ddof=1):
+        return self._accumulate(aggregations.GroupbyVar, ddof=ddof)
 
 
 def _random_df(tup):

@@ -258,7 +258,13 @@ def test_getitem(stream):
     assert_eq(pd.concat(L, axis=0), df[df.x > 4])
 
 
-@pytest.mark.parametrize('agg', ['sum', 'mean', 'count'])
+@pytest.mark.parametrize('agg', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
+])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',
                                      lambda a: a.index % 2,
@@ -268,17 +274,22 @@ def test_getitem(stream):
                                      lambda g: g[['y']],
                                      lambda g: g[['x', 'y']]])
 def test_groupby_aggregate(agg, grouper, indexer, stream):
-    df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0] * 10})
+    df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
 
     a = DataFrame(example=df.iloc[:0], stream=stream)
 
-    L = getattr(indexer(a.groupby(grouper(a))), agg)().stream.gather().sink_to_list()
+    def f(x):
+        return agg(indexer(x.groupby(grouper(x))))
+
+    L = f(a).stream.gather().sink_to_list()
 
     a.emit(df.iloc[:3])
     a.emit(df.iloc[3:7])
     a.emit(df.iloc[7:])
 
-    assert assert_eq(L[-1], getattr(indexer(df.groupby(grouper(df))), agg)())
+    first = df.iloc[:3]
+    assert assert_eq(L[0], f(first))
+    assert assert_eq(L[-1], f(df))
 
 
 def test_value_counts(stream):
