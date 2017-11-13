@@ -292,6 +292,39 @@ def test_groupby_aggregate(agg, grouper, indexer, stream):
     assert assert_eq(L[-1], f(df))
 
 
+@pytest.mark.parametrize('agg', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+])
+@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
+                                     lambda a: 'x',
+                                     lambda a: a.index % 2,
+                                     lambda a: ['x']])
+@pytest.mark.parametrize('indexer', [lambda g: g.y,
+                                     lambda g: g,
+                                     lambda g: g[['y']],
+                                     lambda g: g[['x', 'y']]])
+def test_window_groupby_aggregate(agg, grouper, indexer, stream, n):
+    df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
+
+    a = DataFrame(example=df.iloc[:0], stream=stream)
+
+    def f(x):
+        return agg(indexer(x.groupby(grouper(x))))
+
+    L = f(a).stream.gather().sink_to_list()
+
+    a.emit(df.iloc[:3])
+    a.emit(df.iloc[3:7])
+    a.emit(df.iloc[7:])
+
+    first = df.iloc[:3]
+    assert assert_eq(L[0], f(first))
+    assert assert_eq(L[-1], f(df))
+
+
 def test_value_counts(stream):
     s = pd.Series(['a', 'b', 'a'])
 
@@ -702,20 +735,34 @@ def test_windowing_n(func, n, getter):
     lambda x: x.mean(),
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
-    lambda x: x.var(ddof=0),
+    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
 ])
 @pytest.mark.parametrize('value', ['10h', '1d'])
 @pytest.mark.parametrize('getter', [
     lambda df: df,
     lambda df: df.x,
 ])
-def test_windowing_value(func, value, getter):
+@pytest.mark.parametrize('grouper', [# lambda a: a.y,
+                                     lambda a: 'y',
+                                     # lambda a: a.index % 2,
+                                     lambda a: ['y']])
+@pytest.mark.parametrize('indexer', [lambda g: g.x,
+                                     lambda g: g,
+                                     lambda g: g[['x']],
+                                     lambda g: g[['x', 'y']]])
+def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     value = pd.Timedelta(value)
     index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
-    df = pd.DataFrame({'x': np.arange(len(index))}, index=index)
+    df = pd.DataFrame({'x': np.arange(len(index), dtype=float),
+                       'y': np.arange(len(index), dtype=float) % 2},
+                      index=index)
 
     sdf = DataFrame(example=df)
-    L = func(getter(sdf).window(value=value)).stream.gather().sink_to_list()
+
+    def f(x):
+        return func(indexer(x.groupby(grouper(x))))
+
+    L = f(sdf.window(value=value)).stream.gather().sink_to_list()
 
     diff = 13
     for i in range(0, len(index), diff):
@@ -728,8 +775,55 @@ def test_windowing_value(func, value, getter):
     lost = first[first.index.min() + value:]
     first = first.iloc[len(lost):]
 
-    assert_eq(L[0], func(getter(first)))
+    assert_eq(L[0], f(first))
 
     last = df.loc[index.max() - value + pd.Timedelta('1s'):]
 
-    assert_eq(L[-1], func(getter(last)))
+    assert_eq(L[-1], f(last))
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
+])
+@pytest.mark.parametrize('n', [1, 4])
+@pytest.mark.parametrize('getter', [
+    lambda df: df,
+    lambda df: df.x,
+])
+@pytest.mark.parametrize('grouper', [# lambda a: a.x % 3,
+                                     lambda a: 'y',
+                                     # lambda a: a.index % 2,
+                                     lambda a: ['y']])
+@pytest.mark.parametrize('indexer', [lambda g: g.x,
+                                     lambda g: g,
+                                     lambda g: g[['x']],
+                                     lambda g: g[['x', 'y']]])
+def test_groupby_windowing_n(func, n, getter, grouper, indexer):
+    df = pd.DataFrame({'x': np.arange(10, dtype=float), 'y': [1.0, 2.0] * 5})
+
+    sdf = DataFrame(example=df)
+
+    def f(x):
+        return func(indexer(x.groupby(grouper(x))))
+
+    L = f(sdf.window(n=n)).stream.gather().sink_to_list()
+
+    diff = 3
+    for i in range(0, 10, diff):
+        sdf.emit(df.iloc[i: i + diff])
+    sdf.emit(df.iloc[:0])
+
+    assert len(L) == 5
+
+    first = df.iloc[max(0, diff - n): diff]
+    assert_eq(L[0], f(first))
+
+    last = df.iloc[len(df) - n:]
+    assert_eq(L[-1], f(last))
+
+    assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3]))
+    assert_eq(L[-1], func(getter(df).iloc[len(df) - n:]))

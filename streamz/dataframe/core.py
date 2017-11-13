@@ -484,6 +484,9 @@ class Window(object):
     def var(self, ddof=1):
         return self._known_aggregation(aggregations.Var(ddof=ddof))
 
+    def groupby(self, other):
+        return WindowedGroupBy(self.sdf, other, None, self.n, self.value)
+
 
 def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
     if len(acc):
@@ -565,6 +568,55 @@ class GroupBy(object):
 
     def var(self, ddof=1):
         return self._accumulate(aggregations.GroupbyVar, ddof=ddof)
+
+
+class WindowedGroupBy(GroupBy):
+    def __init__(self, root, grouper, index=None, n=None, value=None):
+        self.root = root
+        self.grouper = grouper
+        self.index = index
+        self.n = n
+        self.value = value
+
+    def __getitem__(self, index):
+        return WindowedGroupBy(self.root, self.grouper, index, self.n, self.value)
+
+    def _accumulate(self, Agg, **kwargs):
+        stream_type = 'updating'
+
+        if isinstance(self.grouper, Streaming):
+            stream = self.root.stream.zip(self.grouper.stream)
+            grouper_example = self.grouper.example
+            agg = Agg(self.index, grouper=None, **kwargs)
+        elif isinstance(self.grouper, Window):
+            stream = self.root.stream.zip(self.grouper.sdf.stream)
+            grouper_example = self.grouper.sdf.example
+            agg = Agg(self.index, grouper=None, **kwargs)
+        else:
+            stream = self.root.stream
+            grouper_example = self.grouper
+            agg = Agg(self.index, grouper=self.grouper, **kwargs)
+
+        example = agg.initial(self.root.example, grouper=grouper_example)
+
+        if self.n is not None:
+            diff = aggregations.diff_iloc
+            window = self.n
+        elif self.value is not None:
+            diff = aggregations.diff_loc
+            window = self.value
+
+        outstream = stream.accumulate(aggregations.windowed_groupby_accumulator,
+                                      agg=agg,
+                                      start=None,
+                                      returns_state=True,
+                                      diff=diff,
+                                      window=window)
+
+        for typ, s_type in _stream_types[stream_type]:
+            if isinstance(example, typ):
+                return s_type(outstream, example)
+        return Streaming(outstream, example, stream_type=stream_type)
 
 
 def _random_df(tup):
