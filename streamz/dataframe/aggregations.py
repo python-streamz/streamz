@@ -182,6 +182,30 @@ def window_accumulator(acc, new, diff=None, window=None, agg=None):
     return acc2, result
 
 
+def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None):
+    if agg.grouper is None and isinstance(new, tuple):
+        new, grouper = new
+    else:
+        grouper = None
+
+    if acc is None:
+        acc = {'dfs': [], 'state': agg.initial(new, grouper=grouper)}
+
+    dfs = acc['dfs']
+    state = acc['state']
+
+    dfs, old = diff(dfs, new, window=window)
+
+    if new is not None:
+        state, result = agg.on_new(state, new, grouper=grouper)
+    for o in old:
+        if len(o):
+            state, result = agg.on_old(state, o, grouper=grouper)
+
+    acc2 = {'dfs': dfs, 'state': state}
+    return acc2, result
+
+
 def accumulator(acc, new, agg=None):
     if acc is None:
         acc = agg.initial(new)
@@ -214,7 +238,7 @@ class GroupbySum(GroupbyAggregation):
         return result, result
 
     def on_old(self, acc, old, grouper=None):
-        g = self.grouped(old)
+        g = self.grouped(old, grouper=grouper)
         result = acc.sub(g.sum(), fill_value=0)
         return result, result
 
@@ -234,7 +258,7 @@ class GroupbyCount(GroupbyAggregation):
         return result, result
 
     def on_old(self, acc, old, grouper=None):
-        g = self.grouped(old)
+        g = self.grouped(old, grouper=grouper)
         result = acc.sub(g.count(), fill_value=0)
         result = result.astype(int)
         return result, result
