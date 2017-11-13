@@ -43,7 +43,7 @@ class Frame(BaseFrame):
 
     def groupby(self, other):
         """ Groupby aggreagtions """
-        return SeriesGroupby(self, other)
+        return GroupBy(self, other)
 
     def sum(self):
         """ Sum frame """
@@ -390,7 +390,7 @@ class Rolling(object):
         if key in self.sdf.columns or not len(self.sdf.columns):
             return self[key]
         else:
-            raise AttributeError("SeriesGroupby has no attribute %r" % key)
+            raise AttributeError("GroupBy has no attribute %r" % key)
 
     def _known_aggregation(self, op, *args, **kwargs):
         return self.sdf.accumulate_partitions(rolling_accumulator,
@@ -456,7 +456,7 @@ class Window(object):
         if key in self.sdf.columns or not len(self.sdf.columns):
             return self[key]
         else:
-            raise AttributeError("SeriesGroupby has no attribute %r" % key)
+            raise AttributeError("GroupBy has no attribute %r" % key)
 
     def _known_aggregation(self, agg):
         if self.n is not None:
@@ -515,20 +515,20 @@ def _accumulate_size(accumulator, new):
     return accumulator + new.size()
 
 
-class SeriesGroupby(object):
+class GroupBy(object):
     def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
         self.index = index
 
     def __getitem__(self, index):
-        return SeriesGroupby(self.root, self.grouper, index)
+        return GroupBy(self.root, self.grouper, index)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
-            raise AttributeError("SeriesGroupby has no attribute %r" % key)
+            raise AttributeError("GroupBy has no attribute %r" % key)
 
     def _accumulate(self, Agg, **kwargs):
         stream_type = 'updating'
