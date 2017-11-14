@@ -1,3 +1,5 @@
+from __future__ import division, print_function
+
 import operator
 from time import time
 
@@ -6,7 +8,7 @@ import pandas as pd
 from tornado.ioloop import IOLoop
 from tornado import gen
 
-from ..collection import (Streaming, _stream_types)
+from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
@@ -16,26 +18,26 @@ class BaseFrame(Streaming):
 
     def round(self, decimals=0):
         """ Round elements in frame """
-        return self.map_partitions(M.round, decimals=decimals)
+        return self.map_partitions(M.round, self, decimals=decimals)
 
     def reset_index(self):
         """ Reset Index """
-        return self.map_partitions(M.reset_index)
+        return self.map_partitions(M.reset_index, self)
 
     def set_index(self, index, **kwargs):
         """ Set Index """
-        return self.map_partitions(M.set_index, index, **kwargs)
+        return self.map_partitions(M.set_index, self, index, **kwargs)
 
     def tail(self, n=5):
         """ Round elements in frame """
-        return self.map_partitions(M.tail, n=n)
+        return self.map_partitions(M.tail, self, n=n)
 
     @property
     def index(self):
-        return self.map_partitions(lambda x: x.index)
+        return self.map_partitions(lambda x: x.index, self)
 
     def map(self, func, na_action=None):
-        return self.map_partitions(self._subtype.map, func, na_action=na_action)
+        return self.map_partitions(self._subtype.map, self, func, na_action=na_action)
 
 
 class Frame(BaseFrame):
@@ -179,22 +181,22 @@ class Frames(BaseFrame):
     _stream_type = 'updating'
 
     def sum(self, **kwargs):
-        return self.map_partitions(M.sum, **kwargs)
+        return self.map_partitions(M.sum, self, **kwargs)
 
     def mean(self, **kwargs):
-        return self.map_partitions(M.mean, **kwargs)
+        return self.map_partitions(M.mean, self, **kwargs)
 
     def std(self, **kwargs):
-        return self.map_partitions(M.std, **kwargs)
+        return self.map_partitions(M.std, self, **kwargs)
 
     def var(self, **kwargs):
-        return self.map_partitions(M.var, **kwargs)
+        return self.map_partitions(M.var, self, **kwargs)
 
     def size(self, **kwargs):
-        return self.map_partitions(M.size, **kwargs)
+        return self.map_partitions(M.size, self, **kwargs)
 
     def count(self, **kwargs):
-        return self.map_partitions(M.count, **kwargs)
+        return self.map_partitions(M.count, self, **kwargs)
 
 
 class _DataFrameMixin(object):
@@ -207,11 +209,11 @@ class _DataFrameMixin(object):
         return self.example.dtypes
 
     def __getitem__(self, index):
-        return self.map_partitions(operator.getitem, index)
+        return self.map_partitions(operator.getitem, self, index)
 
     def __getattr__(self, key):
         if key in self.columns or not len(self.columns):
-            return self.map_partitions(getattr, key)
+            return self.map_partitions(getattr, self, key)
         else:
             raise AttributeError("DataFrame has no attribute %r" % key)
 
@@ -255,14 +257,14 @@ class _DataFrameMixin(object):
         else:
             example = self.example.copy()
             example[key] = value
-            result = self.map_partitions(pd.DataFrame.assign, **{key: value})
+            result = self.map_partitions(pd.DataFrame.assign, self, **{key: value})
 
         self.stream = result.stream
         self.example = result.example
         return self
 
     def query(self, expr, **kwargs):
-        return self.map_partitions(pd.DataFrame.query, expr, **kwargs)
+        return self.map_partitions(pd.DataFrame.query, self, expr, **kwargs)
 
 
 class DataFrame(Frame, _DataFrameMixin):
@@ -311,7 +313,7 @@ class _SeriesMixin(object):
 
     def to_frame(self):
         """ Convert to a streaming dataframe """
-        return self.map_partitions(M.to_frame)
+        return self.map_partitions(M.to_frame, self)
 
 
 class Series(Frame, _SeriesMixin):
@@ -375,7 +377,7 @@ class Rolling(object):
     >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
     """
     def __init__(self, sdf, window, min_periods):
-        self.sdf = sdf
+        self.root = sdf
         if not isinstance(window, int):
             window = pd.Timedelta(window)
             min_periods = 1
@@ -383,17 +385,17 @@ class Rolling(object):
         self.min_periods = min_periods
 
     def __getitem__(self, key):
-        sdf = self.sdf[key]
+        sdf = self.root[key]
         return Rolling(sdf, self.window, self.min_periods)
 
     def __getattr__(self, key):
-        if key in self.sdf.columns or not len(self.sdf.columns):
+        if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
             raise AttributeError("GroupBy has no attribute %r" % key)
 
     def _known_aggregation(self, op, *args, **kwargs):
-        return self.sdf.accumulate_partitions(rolling_accumulator,
+        return self.root.accumulate_partitions(rolling_accumulator,
                                               window=self.window,
                                               op=op,
                                               args=args,
@@ -442,23 +444,47 @@ class Rolling(object):
         return self._known_aggregation('quantile', *args, **kwargs)
 
 
-class Window(object):
+class Window(OperatorMixin):
     def __init__(self, sdf, n=None, value=None):
         self.n = n
-        self.sdf = sdf
-        if isinstance(value, str) and isinstance(self.sdf.example.index, pd.DatetimeIndex):
+        self.root = sdf
+        if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
             value = pd.Timedelta(value)
         self.value = value
 
     def __getitem__(self, key):
-        sdf = self.sdf[key]
+        sdf = self.root[key]
         return Window(sdf, n=self.n, value=self.value)
 
     def __getattr__(self, key):
-        if key in self.sdf.columns or not len(self.sdf.columns):
+        if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
             raise AttributeError("GroupBy has no attribute %r" % key)
+
+    def map_partitions(self, func, *args, **kwargs):
+        args2 = [a.root if isinstance(a, Window) else a for a in args]
+        root = self.root.map_partitions(func, *args2, **kwargs)
+        return Window(root, n=self.n, value=self.value)
+
+    @property
+    def index(self):
+        return self.map_partitions(lambda x: x.index, self)
+
+    @property
+    def columns(self):
+        return self.root.columns
+
+    @property
+    def dtypes(self):
+        return self.root.dtypes
+
+    @property
+    def example(self):
+        return self.root.example
+
+    def reset_index(self):
+        return Window(self.root.reset_index(), n=self.n, value=self.value)
 
     def _known_aggregation(self, agg):
         if self.n is not None:
@@ -467,7 +493,7 @@ class Window(object):
         elif self.value is not None:
             diff = aggregations.diff_loc
             window = self.value
-        return self.sdf.accumulate_partitions(aggregations.window_accumulator,
+        return self.root.accumulate_partitions(aggregations.window_accumulator,
                                               diff=diff,
                                               window=window,
                                               agg=agg,
@@ -486,6 +512,9 @@ class Window(object):
     def var(self, ddof=1):
         return self._known_aggregation(aggregations.Var(ddof=ddof))
 
+    def std(self, ddof=1):
+        return self.var(ddof=ddof) ** 0.5
+
     def size(self):
         return self._known_aggregation(aggregations.Size())
 
@@ -493,7 +522,7 @@ class Window(object):
         return self._known_aggregation(aggregations.ValueCounts())
 
     def groupby(self, other):
-        return WindowedGroupBy(self.sdf, other, None, self.n, self.value)
+        return WindowedGroupBy(self.root, other, None, self.n, self.value)
 
 
 def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
@@ -553,7 +582,15 @@ class GroupBy(object):
             grouper_example = self.grouper
             agg = Agg(self.index, grouper=self.grouper, **kwargs)
 
-        example = agg.initial(self.root.example, grouper=grouper_example)
+        # Compute example
+        state = agg.initial(self.root.example, grouper=grouper_example)
+        if hasattr(grouper_example, 'iloc'):
+            grouper_example = grouper_example.iloc[:0]
+        elif isinstance(grouper_example, (np.ndarray, pd.Index)):
+            grouper_example = grouper_example[:0]
+        _, example = agg.on_new(state,
+                                self.root.example.iloc[:0],
+                                grouper=grouper_example)
 
         outstream = stream.accumulate(aggregations.groupby_accumulator,
                                       agg=agg,
@@ -580,6 +617,9 @@ class GroupBy(object):
     def var(self, ddof=1):
         return self._accumulate(aggregations.GroupbyVar, ddof=ddof)
 
+    def std(self, ddof=1):
+        return self.var(ddof=ddof) ** 0.5
+
 
 class WindowedGroupBy(GroupBy):
     def __init__(self, root, grouper, index=None, n=None, value=None):
@@ -602,15 +642,23 @@ class WindowedGroupBy(GroupBy):
             grouper_example = self.grouper.example
             agg = Agg(self.index, grouper=None, **kwargs)
         elif isinstance(self.grouper, Window):
-            stream = self.root.stream.zip(self.grouper.sdf.stream)
-            grouper_example = self.grouper.sdf.example
+            stream = self.root.stream.zip(self.grouper.root.stream)
+            grouper_example = self.grouper.root.example
             agg = Agg(self.index, grouper=None, **kwargs)
         else:
             stream = self.root.stream
             grouper_example = self.grouper
             agg = Agg(self.index, grouper=self.grouper, **kwargs)
 
-        example = agg.initial(self.root.example, grouper=grouper_example)
+        # Compute example
+        state = agg.initial(self.root.example, grouper=grouper_example)
+        if hasattr(grouper_example, 'iloc'):
+            grouper_example = grouper_example.iloc[:0]
+        elif isinstance(grouper_example, (np.ndarray, pd.Index)):
+            grouper_example = grouper_example[:0]
+        _, example = agg.on_new(state,
+                                self.root.example.iloc[:0],
+                                grouper=grouper_example)
 
         if self.n is not None:
             diff = aggregations.diff_iloc
