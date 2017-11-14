@@ -52,16 +52,18 @@ class Frame(BaseFrame):
                                           start=None, stream_type='updating',
                                           returns_state=True)
 
-    @property
-    def size(self):
-        """ Size of frame """
-        return self.accumulate_partitions(lambda acc, x: acc + x.size, start=0,
-                stream_type='updating')
-
     def count(self):
         """ Count of frame """
         return self.accumulate_partitions(aggregations.accumulator,
                                           agg=aggregations.Count(),
+                                          start=None, stream_type='updating',
+                                          returns_state=True)
+
+    @property
+    def size(self):
+        """ size of frame """
+        return self.accumulate_partitions(aggregations.accumulator,
+                                          agg=aggregations.Size(),
                                           start=None, stream_type='updating',
                                           returns_state=True)
 
@@ -484,6 +486,9 @@ class Window(object):
     def var(self, ddof=1):
         return self._known_aggregation(aggregations.Var(ddof=ddof))
 
+    def size(self):
+        return self._known_aggregation(aggregations.Size())
+
     def groupby(self, other):
         return WindowedGroupBy(self.sdf, other, None, self.n, self.value)
 
@@ -559,6 +564,9 @@ class GroupBy(object):
 
     def count(self):
         return self._accumulate(aggregations.GroupbyCount)
+
+    def size(self):
+        return self._accumulate(aggregations.GroupbySize)
 
     def sum(self):
         return self._accumulate(aggregations.GroupbySum)
