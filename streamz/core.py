@@ -318,8 +318,6 @@ class Stream(object):
 
         Parameters
         ----------
-        node: Stream instance
-            A node in the task graph
         filename : str, optional
             The name of the file to write to disk.
         source_node: bool, optional
