@@ -329,12 +329,10 @@ class Series(Frame, _SeriesMixin):
     _subtype = pd.Series
 
     def value_counts(self):
-        def _value_counts(acc, new):
-            if acc is None:
-                return new.value_counts()
-            else:
-                return acc.add(new.value_counts(), fill_value=0).astype(int)
-        return self.accumulate_partitions(_value_counts, start=None)
+        return self.accumulate_partitions(aggregations.accumulator,
+                                          agg=aggregations.ValueCounts(),
+                                          start=None, stream_type='updating',
+                                          returns_state=True)
 
 
 class Index(Series):
@@ -490,6 +488,9 @@ class Window(object):
 
     def size(self):
         return self._known_aggregation(aggregations.Size())
+
+    def value_counts(self):
+        return self._known_aggregation(aggregations.ValueCounts())
 
     def groupby(self, other):
         return WindowedGroupBy(self.sdf, other, None, self.n, self.value)
