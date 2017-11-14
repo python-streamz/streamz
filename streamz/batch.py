@@ -29,7 +29,7 @@ class Batch(Streaming):
 
     def filter(self, predicate):
         """ Filter elements by a predicate """
-        return self.map_partitions(_filter, predicate)
+        return self.map_partitions(_filter, self, predicate)
 
     def pluck(self, ind):
         """ Pick a field out of all elements
@@ -40,11 +40,11 @@ class Batch(Streaming):
         >>> s.emit({'name': 'Alice', 'x': 123})  # doctest: +SKIP
         'Alice'
         """
-        return self.map_partitions(_pluck, ind)
+        return self.map_partitions(_pluck, self, ind)
 
     def map(self, func, **kwargs):
         """ Map a function across all elements """
-        return self.map_partitions(_map_map, func, **kwargs)
+        return self.map_partitions(_map_map, self, func, **kwargs)
 
     def to_dataframe(self):
         """
@@ -54,7 +54,7 @@ class Batch(Streaming):
         """
         import pandas as pd
         import streamz.dataframe  # flake8: noqa
-        return self.map_partitions(pd.DataFrame)
+        return self.map_partitions(pd.DataFrame, self)
 
     def to_stream(self):
         """ Concatenate batches and return base Stream

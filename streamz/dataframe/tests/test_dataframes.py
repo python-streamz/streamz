@@ -259,11 +259,12 @@ def test_getitem(stream):
 
 
 @pytest.mark.parametrize('agg', [
-    lambda x: x.sum(),
-    lambda x: x.mean(),
-    lambda x: x.count(),
+    # lambda x: x.sum(),
+    # lambda x: x.mean(),
+    # lambda x: x.count(),
     lambda x: x.var(ddof=1),
-    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
+    lambda x: x.std(),
+    # pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
 ])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',
@@ -274,40 +275,6 @@ def test_getitem(stream):
                                      lambda g: g[['y']],
                                      lambda g: g[['x', 'y']]])
 def test_groupby_aggregate(agg, grouper, indexer, stream):
-    df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
-
-    a = DataFrame(example=df.iloc[:0], stream=stream)
-
-    def f(x):
-        return agg(indexer(x.groupby(grouper(x))))
-
-    L = f(a).stream.gather().sink_to_list()
-
-    a.emit(df.iloc[:3])
-    a.emit(df.iloc[3:7])
-    a.emit(df.iloc[7:])
-
-    first = df.iloc[:3]
-    assert assert_eq(L[0], f(first))
-    assert assert_eq(L[-1], f(df))
-
-
-@pytest.mark.parametrize('agg', [
-    lambda x: x.sum(),
-    lambda x: x.mean(),
-    lambda x: x.count(),
-    lambda x: x.var(ddof=1),
-])
-@pytest.mark.parametrize('n', [1, 4])
-@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
-                                     lambda a: 'x',
-                                     lambda a: a.index % 2,
-                                     lambda a: ['x']])
-@pytest.mark.parametrize('indexer', [lambda g: g.y,
-                                     lambda g: g,
-                                     lambda g: g[['y']],
-                                     lambda g: g[['x', 'y']]])
-def test_window_groupby_aggregate(agg, grouper, indexer, stream, n):
     df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
 
     a = DataFrame(example=df.iloc[:0], stream=stream)
@@ -708,6 +675,7 @@ def test_window_sum_dataframe(stream):
     lambda x: x.mean(),
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
+    lambda x: x.std(ddof=1),
     lambda x: x.var(ddof=0),
 ])
 @pytest.mark.parametrize('n', [1, 4])
@@ -719,7 +687,7 @@ def test_windowing_n(func, n, getter):
     df = pd.DataFrame({'x': list(range(10)), 'y': [1, 2] * 5})
 
     sdf = DataFrame(example=df)
-    L = func(getter(sdf).window(n=n)).stream.gather().sink_to_list()
+    L = func(getter(sdf).window(n=n) + 10).stream.gather().sink_to_list()
 
     for i in range(0, 10, 3):
         sdf.emit(df.iloc[i: i + 3])
@@ -727,8 +695,8 @@ def test_windowing_n(func, n, getter):
 
     assert len(L) == 5
 
-    assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3]))
-    assert_eq(L[-1], func(getter(df).iloc[len(df) - n:]))
+    assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3] + 10))
+    assert_eq(L[-1], func(getter(df).iloc[len(df) - n:] + 10))
 
 
 @pytest.mark.parametrize('func', [
@@ -736,6 +704,7 @@ def test_windowing_n(func, n, getter):
     lambda x: x.mean(),
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
+    lambda x: x.std(),
     pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
 ])
 @pytest.mark.parametrize('value', ['10h', '1d'])
@@ -743,9 +712,9 @@ def test_windowing_n(func, n, getter):
     lambda df: df,
     lambda df: df.x,
 ])
-@pytest.mark.parametrize('grouper', [lambda a: a.y,
+@pytest.mark.parametrize('grouper', [lambda a: a.x % 4,
                                      lambda a: 'y',
-                                     # lambda a: a.index % 2,
+                                     lambda a: a.index,
                                      lambda a: ['y']])
 @pytest.mark.parametrize('indexer', [lambda g: g.x,
                                      lambda g: g,
@@ -790,6 +759,7 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     lambda x: x.count(),
     lambda x: x.size(),
     lambda x: x.var(ddof=1),
+    lambda x: x.std(ddof=1),
     pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
 ])
 @pytest.mark.parametrize('n', [1, 4])
@@ -797,9 +767,9 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     lambda df: df,
     lambda df: df.x,
 ])
-@pytest.mark.parametrize('grouper', [# lambda a: a.x % 3,
+@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'y',
-                                     # lambda a: a.index % 2,
+                                     lambda a: a.index % 2,
                                      lambda a: ['y']])
 @pytest.mark.parametrize('indexer', [lambda g: g.x,
                                      lambda g: g,

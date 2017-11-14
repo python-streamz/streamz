@@ -1,3 +1,5 @@
+from __future__ import division, print_function
+
 from collections import deque
 from numbers import Number
 
@@ -231,7 +233,6 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     state = acc['state']
     size_state = acc['size-state']
 
-    original_dfs = dfs
     dfs, old = diff(dfs, new, window=window)
 
     if 'groupers' in acc:
@@ -247,7 +248,8 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     for o, og in zip(old, old_groupers):
         if 'groupers' in acc:
             assert len(o) == len(og)
-            assert (o.index == og.index).all()
+            if hasattr(og, 'index'):
+                assert (o.index == og.index).all()
         if len(o):
             state, result = agg.on_old(state, o, grouper=og)
             size_state, _ = size.on_old(size_state, o, grouper=og)

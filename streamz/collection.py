@@ -8,7 +8,154 @@ _stream_types = {'streaming': [], 'updating': []}
 _html_update_streams = set()
 
 
-class Streaming(object):
+def map_partitions(func, *args, **kwargs):
+    """ Map a function across all batch elements of this stream
+
+    The output stream type will be determined by the action of that
+    function on the example
+
+    See Also
+    --------
+    Streaming.accumulate_partitions
+    """
+    example = kwargs.pop('example', None)
+    if example is None:
+        example = func(*[getattr(arg, 'example', arg) for arg in args], **kwargs)
+
+    streams = [arg for arg in args if isinstance(arg, Streaming)]
+    if 'stream_type' in kwargs:
+        stream_type = kwargs['stream_type']
+    else:
+        stream_type = ('streaming'
+                       if any(s._stream_type == 'streaming' for s in streams)
+                       else 'updating')
+
+    if len(streams) > 1:
+        stream = type(streams[0].stream).zip(*[getattr(arg, 'stream', arg) for arg in args])
+        stream = stream.map(apply_args, func, kwargs)
+
+    else:
+        s = streams[0]
+
+        if isinstance(args[0], Streaming):
+            stream = s.stream.map(func, *args[1:], **kwargs)
+        else:
+            other = [(i, arg) for i, arg in enumerate(args)
+                     if not isinstance(arg, Streaming)]
+            stream = s.stream.map(partial_by_order, function=func, other=other,
+                                  **kwargs)
+
+    for typ, s_type in _stream_types[stream_type]:
+        if isinstance(example, typ):
+            return s_type(stream, example)
+    return Streaming(stream, example, stream_type=stream_type)
+
+
+class OperatorMixin(object):
+    def __abs__(self):
+        return self.map_partitions(operator.abs, self)
+
+    def __add__(self, other):
+        return self.map_partitions(operator.add, self, other)
+
+    def __radd__(self, other):
+        return self.map_partitions(operator.add, other, self)
+
+    def __and__(self, other):
+        return self.map_partitions(operator.and_, self, other)
+
+    def __rand__(self, other):
+        return self.map_partitions(operator.and_, other, self)
+
+    def __eq__(self, other):
+        return self.map_partitions(operator.eq, self, other)
+
+    def __floordiv__(self, other):
+        return self.map_partitions(operator.floordiv, self, other)
+
+    def __rfloordiv__(self, other):
+        return self.map_partitions(operator.floordiv, other, self)
+
+    def __ge__(self, other):
+        return self.map_partitions(operator.ge, self, other)
+
+    def __gt__(self, other):
+        return self.map_partitions(operator.gt, self, other)
+
+    def __inv__(self):
+        return self.map_partitions(operator.inv, self)
+
+    def __invert__(self):
+        return self.map_partitions(operator.invert, self)
+
+    def __le__(self, other):
+        return self.map_partitions(operator.le, self, other)
+
+    def __lshift__(self, other):
+        return self.map_partitions(operator.lshift, self, other)
+
+    def __rlshift__(self, other):
+        return self.map_partitions(operator.lshift, other, self)
+
+    def __lt__(self, other):
+        return self.map_partitions(operator.lt, self, other)
+
+    def __mod__(self, other):
+        return self.map_partitions(operator.mod, self, other)
+
+    def __rmod__(self, other):
+        return self.map_partitions(operator.mod, other, self)
+
+    def __mul__(self, other):
+        return self.map_partitions(operator.mul, self, other)
+
+    def __rmul__(self, other):
+        return self.map_partitions(operator.mul, other, self)
+
+    def __ne__(self, other):
+        return self.map_partitions(operator.ne, self, other)
+
+    def __neg__(self):
+        return self.map_partitions(operator.neg, self)
+
+    def __or__(self, other):
+        return self.map_partitions(operator.or_, self, other)
+
+    def __ror__(self, other):
+        return self.map_partitions(operator.or_, other, self)
+
+    def __pow__(self, other):
+        return self.map_partitions(operator.pow, self, other)
+
+    def __rpow__(self, other):
+        return self.map_partitions(operator.pow, other, self)
+
+    def __rshift__(self, other):
+        return self.map_partitions(operator.rshift, self, other)
+
+    def __rrshift__(self, other):
+        return self.map_partitions(operator.rshift, other, self)
+
+    def __sub__(self, other):
+        return self.map_partitions(operator.sub, self, other)
+
+    def __rsub__(self, other):
+        return self.map_partitions(operator.sub, other, self)
+
+    def __truediv__(self, other):
+        return self.map_partitions(operator.truediv, self, other)
+
+    def __rtruediv__(self, other):
+        return self.map_partitions(operator.truediv, other, self)
+
+    def __xor__(self, other):
+        return self.map_partitions(operator.xor, self, other)
+
+    def __rxor__(self, other):
+        return self.map_partitions(operator.xor, other, self)
+
+
+class Streaming(OperatorMixin):
     """
     Superclass for streaming collections
 
@@ -27,6 +174,7 @@ class Streaming(object):
     """
     _subtype = object
     _stream_type = 'streaming'
+    map_partitions = staticmethod(map_partitions)
 
     def __init__(self, stream=None, example=None, stream_type=None):
         assert example is not None
@@ -42,18 +190,6 @@ class Streaming(object):
             if stream_type not in ['streaming', 'updating']:
                 raise Exception()
             self._stream_type = stream_type
-
-    def map_partitions(self, func, *args, **kwargs):
-        """ Map a function across all batch elements of this stream
-
-        The output stream type will be determined by the action of that
-        function on the example
-
-        See Also
-        --------
-        Streaming.accumulate_partitions
-        """
-        return map_partitions(func, self, *args, **kwargs)
 
     def accumulate_partitions(self, func, *args, **kwargs):
         """ Accumulate a function with state across batch elements
@@ -132,108 +268,6 @@ class Streaming(object):
 
         return output._ipython_display_(**kwargs)
 
-    def __abs__(self):
-        return map_partitions(operator.abs, self)
-
-    def __add__(self, other):
-        return map_partitions(operator.add, self, other)
-
-    def __radd__(self, other):
-        return map_partitions(operator.add, other, self)
-
-    def __and__(self, other):
-        return map_partitions(operator.and_, self, other)
-
-    def __rand__(self, other):
-        return map_partitions(operator.and_, other, self)
-
-    def __eq__(self, other):
-        return map_partitions(operator.eq, self, other)
-
-    def __floordiv__(self, other):
-        return map_partitions(operator.floordiv, self, other)
-
-    def __rfloordiv__(self, other):
-        return map_partitions(operator.floordiv, other, self)
-
-    def __ge__(self, other):
-        return map_partitions(operator.ge, self, other)
-
-    def __gt__(self, other):
-        return map_partitions(operator.gt, self, other)
-
-    def __inv__(self):
-        return map_partitions(operator.inv, self)
-
-    def __invert__(self):
-        return map_partitions(operator.invert, self)
-
-    def __le__(self, other):
-        return map_partitions(operator.le, self, other)
-
-    def __lshift__(self, other):
-        return map_partitions(operator.lshift, self, other)
-
-    def __rlshift__(self, other):
-        return map_partitions(operator.lshift, other, self)
-
-    def __lt__(self, other):
-        return map_partitions(operator.lt, self, other)
-
-    def __mod__(self, other):
-        return map_partitions(operator.mod, self, other)
-
-    def __rmod__(self, other):
-        return map_partitions(operator.mod, other, self)
-
-    def __mul__(self, other):
-        return map_partitions(operator.mul, self, other)
-
-    def __rmul__(self, other):
-        return map_partitions(operator.mul, other, self)
-
-    def __ne__(self, other):
-        return map_partitions(operator.ne, self, other)
-
-    def __neg__(self):
-        return map_partitions(operator.neg, self)
-
-    def __or__(self, other):
-        return map_partitions(operator.or_, self, other)
-
-    def __ror__(self, other):
-        return map_partitions(operator.or_, other, self)
-
-    def __pow__(self, other):
-        return map_partitions(operator.pow, self, other)
-
-    def __rpow__(self, other):
-        return map_partitions(operator.pow, other, self)
-
-    def __rshift__(self, other):
-        return map_partitions(operator.rshift, self, other)
-
-    def __rrshift__(self, other):
-        return map_partitions(operator.rshift, other, self)
-
-    def __sub__(self, other):
-        return map_partitions(operator.sub, self, other)
-
-    def __rsub__(self, other):
-        return map_partitions(operator.sub, other, self)
-
-    def __truediv__(self, other):
-        return map_partitions(operator.truediv, self, other)
-
-    def __rtruediv__(self, other):
-        return map_partitions(operator.truediv, other, self)
-
-    def __xor__(self, other):
-        return map_partitions(operator.xor, self, other)
-
-    def __rxor__(self, other):
-        return map_partitions(operator.xor, other, self)
-
     def emit(self, x):
         self.verify(x)
         self.stream.emit(x)
@@ -251,49 +285,6 @@ def stream_type(example, stream_type='streaming'):
             return s_type
     raise TypeError("No streaming equivalent found for type %s" %
                     type(example).__name__)
-
-
-def map_partitions(func, *args, **kwargs):
-    """ Map a function across all batch elements of this stream
-
-    The output stream type will be determined by the action of that
-    function on the example
-
-    See Also
-    --------
-    Streaming.accumulate_partitions
-    """
-    example = kwargs.pop('example', None)
-    if example is None:
-        example = func(*[getattr(arg, 'example', arg) for arg in args], **kwargs)
-
-    streams = [arg for arg in args if isinstance(arg, Streaming)]
-    if 'stream_type' in kwargs:
-        stream_type = kwargs['stream_type']
-    else:
-        stream_type = ('streaming'
-                       if any(s._stream_type == 'streaming' for s in streams)
-                       else 'updating')
-
-    if len(streams) > 1:
-        stream = type(streams[0].stream).zip(*[getattr(arg, 'stream', arg) for arg in args])
-        stream = stream.map(apply_args, func, kwargs)
-
-    else:
-        s = streams[0]
-
-        if isinstance(args[0], Streaming):
-            stream = s.stream.map(func, *args[1:], **kwargs)
-        else:
-            other = [(i, arg) for i, arg in enumerate(args)
-                     if not isinstance(arg, Streaming)]
-            stream = s.stream.map(partial_by_order, function=func, other=other,
-                                  **kwargs)
-
-    for typ, s_type in _stream_types[stream_type]:
-        if isinstance(example, typ):
-            return s_type(stream, example)
-    return Streaming(stream, example, stream_type=stream_type)
 
 
 def partial_by_order(*args, **kwargs):
