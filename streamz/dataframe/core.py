@@ -447,8 +447,10 @@ class Rolling(object):
 class Window(object):
     def __init__(self, sdf, n=None, value=None):
         self.n = n
-        self.value = value
         self.sdf = sdf
+        if isinstance(value, str) and isinstance(self.sdf.example.index, pd.DatetimeIndex):
+            value = pd.Timedelta(value)
+        self.value = value
 
     def __getitem__(self, key):
         sdf = self.sdf[key]
@@ -584,6 +586,8 @@ class WindowedGroupBy(GroupBy):
         self.grouper = grouper
         self.index = index
         self.n = n
+        if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
+            value = pd.Timedelta(value)
         self.value = value
 
     def __getitem__(self, index):
