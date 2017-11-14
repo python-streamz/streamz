@@ -752,7 +752,6 @@ def test_windowing_n(func, n, getter):
                                      lambda g: g[['x']],
                                      lambda g: g[['x', 'y']]])
 def test_groupby_windowing_value(func, value, getter, grouper, indexer):
-    value = pd.Timedelta(value)
     index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
     df = pd.DataFrame({'x': np.arange(len(index), dtype=float),
                        'y': np.arange(len(index), dtype=float) % 2},
@@ -764,6 +763,8 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
         return func(indexer(x.groupby(grouper(x))))
 
     L = f(sdf.window(value=value)).stream.gather().sink_to_list()
+
+    value = pd.Timedelta(value)
 
     diff = 13
     for i in range(0, len(index), diff):
