@@ -353,6 +353,19 @@ class GroupbySize(GroupbyAggregation):
         return self.grouped(new.iloc[:0], grouper=grouper).size()
 
 
+class ValueCounts(Aggregation):
+    def on_new(self, acc, new, grouper=None):
+        result = acc.add(new.value_counts(), fill_value=0).astype(int)
+        return result, result
+
+    def on_old(self, acc, new, grouper=None):
+        result = acc.sub(new.value_counts(), fill_value=0).astype(int)
+        return result, result
+
+    def initial(self, new, grouper=None):
+        return new.iloc[:0].value_counts()
+
+
 class GroupbyMean(GroupbyAggregation):
     def on_new(self, acc, new, grouper=None):
         totals, counts = acc
