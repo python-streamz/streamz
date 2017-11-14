@@ -167,6 +167,23 @@ def diff_loc(dfs, new, window=None):
     return dfs, old
 
 
+def diff_align(dfs, groupers):
+    old = []
+    while len(dfs) < len(groupers):
+        old.append(groupers.popleft())
+
+    if dfs:
+        n = len(groupers[0]) - len(dfs[0])
+        if n:
+            old.append(groupers[0][:n])
+            groupers[0] = groupers[0][n:]
+
+    assert len(dfs) == len(groupers)
+    for df, g in zip(dfs, groupers):
+        assert len(df) == len(g)
+    return old, groupers
+
+
 def window_accumulator(acc, new, diff=None, window=None, agg=None):
     if acc is None:
         acc = {'dfs': [], 'state': agg.initial(new)}
@@ -190,19 +207,34 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
 
     if acc is None:
         acc = {'dfs': [], 'state': agg.initial(new, grouper=grouper)}
+        if isinstance(grouper, (pd.Series, pd.Index, np.ndarray)):
+            acc['groupers'] = deque([])
 
     dfs = acc['dfs']
     state = acc['state']
 
+    original_dfs = dfs
     dfs, old = diff(dfs, new, window=window)
+
+    if 'groupers' in acc:
+        groupers = deque(acc['groupers'])
+        groupers.append(grouper)
+        old_groupers, groupers = diff_align(dfs, groupers)
+    else:
+        old_groupers = [grouper] * len(old)
 
     if new is not None:
         state, result = agg.on_new(state, new, grouper=grouper)
-    for o in old:
+    for o, og in zip(old, old_groupers):
+        if 'groupers' in acc:
+            assert len(o) == len(og)
+            assert (o.index == og.index).all()
         if len(o):
-            state, result = agg.on_old(state, o, grouper=grouper)
+            state, result = agg.on_old(state, o, grouper=og)
 
     acc2 = {'dfs': dfs, 'state': state}
+    if 'groupers' in acc:
+        acc2['groupers'] = groupers
     return acc2, result
 
 

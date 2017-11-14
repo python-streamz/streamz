@@ -298,6 +298,7 @@ def test_groupby_aggregate(agg, grouper, indexer, stream):
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
 ])
+@pytest.mark.parametrize('n', [1, 4])
 @pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
                                      lambda a: 'x',
                                      lambda a: a.index % 2,
@@ -742,7 +743,7 @@ def test_windowing_n(func, n, getter):
     lambda df: df,
     lambda df: df.x,
 ])
-@pytest.mark.parametrize('grouper', [# lambda a: a.y,
+@pytest.mark.parametrize('grouper', [lambda a: a.y,
                                      lambda a: 'y',
                                      # lambda a: a.index % 2,
                                      lambda a: ['y']])
