@@ -787,6 +787,7 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     lambda x: x.sum(),
     lambda x: x.mean(),
     lambda x: x.count(),
+    lambda x: x.size(),
     lambda x: x.var(ddof=1),
     pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
 ])
@@ -825,6 +826,3 @@ def test_groupby_windowing_n(func, n, getter, grouper, indexer):
 
     last = df.iloc[len(df) - n:]
     assert_eq(L[-1], f(last))
-
-    assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3]))
-    assert_eq(L[-1], func(getter(df).iloc[len(df) - n:]))

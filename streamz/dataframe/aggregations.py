@@ -80,6 +80,19 @@ class Count(Aggregation):
         return new.iloc[:0].count()
 
 
+class Size(Aggregation):
+    def on_new(self, acc, new):
+        result = acc + new.size
+        return result, result
+
+    def on_old(self, acc, old):
+        result = acc - old.size
+        return result, result
+
+    def initial(self, new):
+        return 0
+
+
 class Var(Aggregation):
     def __init__(self, ddof=1):
         self.ddof = ddof
@@ -205,13 +218,18 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     else:
         grouper = None
 
+    size = GroupbySize(agg.columns, agg.grouper)
+
     if acc is None:
-        acc = {'dfs': [], 'state': agg.initial(new, grouper=grouper)}
+        acc = {'dfs': [],
+               'state': agg.initial(new, grouper=grouper),
+               'size-state': size.initial(new, grouper=grouper)}
         if isinstance(grouper, (pd.Series, pd.Index, np.ndarray)):
             acc['groupers'] = deque([])
 
     dfs = acc['dfs']
     state = acc['state']
+    size_state = acc['size-state']
 
     original_dfs = dfs
     dfs, old = diff(dfs, new, window=window)
@@ -225,14 +243,25 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
 
     if new is not None:
         state, result = agg.on_new(state, new, grouper=grouper)
+        size_state, _ = size.on_new(size_state, new, grouper=grouper)
     for o, og in zip(old, old_groupers):
         if 'groupers' in acc:
             assert len(o) == len(og)
             assert (o.index == og.index).all()
         if len(o):
             state, result = agg.on_old(state, o, grouper=og)
+            size_state, _ = size.on_old(size_state, o, grouper=og)
 
-    acc2 = {'dfs': dfs, 'state': state}
+    nonzero = size_state != 0
+    if not nonzero.all():
+        size_state = size_state[nonzero]
+        result = result[nonzero]
+        if isinstance(state, tuple):
+            state = tuple(s[nonzero] for s in state)
+        else:
+            state = state[nonzero]
+
+    acc2 = {'dfs': dfs, 'state': state, 'size-state': size_state}
     if 'groupers' in acc:
         acc2['groupers'] = groupers
     return acc2, result
@@ -301,6 +330,27 @@ class GroupbyCount(GroupbyAggregation):
         if isinstance(grouper, (pd.Index, np.ndarray)):
             grouper = grouper[:0]
         return self.grouped(new.iloc[:0], grouper=grouper).count()
+
+
+class GroupbySize(GroupbyAggregation):
+    def on_new(self, acc, new, grouper=None):
+        g = self.grouped(new, grouper=grouper)
+        result = acc.add(g.size(), fill_value=0)
+        result = result.astype(int)
+        return result, result
+
+    def on_old(self, acc, old, grouper=None):
+        g = self.grouped(old, grouper=grouper)
+        result = acc.sub(g.size(), fill_value=0)
+        result = result.astype(int)
+        return result, result
+
+    def initial(self, new, grouper=None):
+        if hasattr(grouper, 'iloc'):
+            grouper = grouper.iloc[:0]
+        if isinstance(grouper, (pd.Index, np.ndarray)):
+            grouper = grouper[:0]
+        return self.grouped(new.iloc[:0], grouper=grouper).size()
 
 
 class GroupbyMean(GroupbyAggregation):
