@@ -1,6 +1,8 @@
 # -*- coding: utf8 -*-
-# This is a copy from stackoverflow
+# This is a copy from Stack Overflow
 # https://stackoverflow.com/questions/7828444/indexable-weak-ordered-set-in-python
+# Asked by Neil G https://stackoverflow.com/users/99989/neil-g
+# Answered/edited by https://stackoverflow.com/users/1001643/raymond-hettinger
 import collections
 import weakref
 
