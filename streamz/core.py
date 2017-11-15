@@ -8,7 +8,7 @@ import six
 import sys
 import threading
 from time import time
-import weakref
+from .orderedweakset import OrderedWeakrefSet
 
 import toolz
 from tornado import gen
@@ -74,7 +74,7 @@ class Stream(object):
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
                  loop=None, asynchronous=False):
         self.asynchronous = asynchronous
-        self.downstreams = weakref.WeakSet()
+        self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = upstreams
         else:
@@ -311,22 +311,23 @@ class Stream(object):
 
         return self.scan(update_frequencies, start={}, **kwargs)
 
-    def visualize(self, filename='mystream.png', **kwargs):
+    def visualize(self, filename='mystream.png', source_node=False, **kwargs):
         """Render the computation of this object's task graph using graphviz.
 
         Requires ``graphviz`` to be installed.
 
         Parameters
         ----------
-        node: Stream instance
-            A node in the task graph
         filename : str, optional
             The name of the file to write to disk.
+        source_node: bool, optional
+            If True then the node is the source node and we can label the
+            edges in their execution order. Defaults to False
         kwargs:
             Graph attributes to pass to graphviz like ``rankdir="LR"``
         """
         from .graph import visualize
-        return visualize(self, filename, **kwargs)
+        return visualize(self, filename, source_node=source_node, **kwargs)
 
     def to_dataframe(self, example):
         """ Convert a stream of Pandas dataframes to a DataFrame
@@ -748,7 +749,7 @@ class zip(Stream):
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
     def pack_literals(self, tup):
-        """ Fill buffers for literals whenver we empty them """
+        """ Fill buffers for literals whenever we empty them """
         inp = list(tup)[::-1]
         out = []
         for i, val in self.literals:
