@@ -125,6 +125,11 @@ class Var(Aggregation):
 
 
 class Full(Aggregation):
+    """ Return the full window of data every time
+
+    This is somewhat expensive, builtin aggregations should be preferred when
+    possible
+    """
     def on_new(self, acc, new):
         result = pd.concat([acc, new])
         return result, result
@@ -138,6 +143,23 @@ class Full(Aggregation):
 
 
 def diff_iloc(dfs, new, window=None):
+    """ Emit new list of dfs and decayed data
+
+    Parameters
+    ----------
+    dfs: list
+        List of historical dataframes
+    new: DataFrame, Series
+        New data
+    window: int
+
+    Returns
+    -------
+    dfs: list
+        New list of historical data
+    old: list
+        List of dataframes to decay
+    """
     dfs = deque(dfs)
     dfs.append(new)
     old = []
@@ -156,6 +178,23 @@ def diff_iloc(dfs, new, window=None):
 
 
 def diff_loc(dfs, new, window=None):
+    """ Emit new list of dfs and decayed data
+
+    Parameters
+    ----------
+    dfs: list
+        List of historical dataframes
+    new: DataFrame, Series
+        New data
+    window: value
+
+    Returns
+    -------
+    dfs: list
+        New list of historical data
+    old: list
+        List of dataframes to decay
+    """
     dfs = deque(dfs)
     dfs.append(new)
     mx = max(df.index.max() for df in dfs)
@@ -172,6 +211,14 @@ def diff_loc(dfs, new, window=None):
 
 
 def diff_align(dfs, groupers):
+    """ Align groupers to newly-diffed dataframes
+
+    For groupby aggregations we keep historical values of the grouper along
+    with historical values of the dataframes.  The dataframes are kept in
+    historical sync with the ``diff_loc`` and ``diff_iloc`` functions above.
+    This function copies that functionality over to the secondary list of
+    groupers.
+    """
     old = []
     while len(dfs) < len(groupers):
         old.append(groupers.popleft())
@@ -189,6 +236,34 @@ def diff_align(dfs, groupers):
 
 
 def window_accumulator(acc, new, diff=None, window=None, agg=None):
+    """ An accumulation binary operator for windowed aggregations
+
+    This is the function that is actually given to the ``Stream.accumulate``
+    function.  It performs all of the work given old state, new data, a diff
+    function, window value, and aggregation object.
+
+    Parameters
+    ----------
+    acc: state
+    new: DataFrame, Series
+        The new data to add to the window.
+    diff: callable
+        One of ``diff_iloc`` or ``diff_loc``
+    window: int, value
+        Either an integer for ``n=...`` for a value like ``value='2h'``
+    agg: Aggregation
+        The aggregation object to apply, like ``Sum()``
+
+    Returns
+    -------
+    acc: state
+    result: newly emitted result
+
+    See Also
+    --------
+    accumulator
+    windowed_groupby_accumulator
+    """
     if acc is None:
         acc = {'dfs': [], 'state': agg.initial(new)}
     dfs = acc['dfs']
@@ -204,6 +279,36 @@ def window_accumulator(acc, new, diff=None, window=None, agg=None):
 
 
 def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None):
+    """ An accumulation binary operator for windowed groupb-aggregations
+
+    This is the function that is actually given to the ``Stream.accumulate``
+    function.
+
+    Parameters
+    ----------
+    acc: state
+    new: DataFrame, Series
+        The new data to add to the window.
+    diff: callable
+        One of ``diff_iloc`` or ``diff_loc``
+    window: int, value
+        Either an integer for ``n=...`` for a value like ``value='2h'``
+    agg: Aggregation
+        The aggregation object to apply, like ``Sum()``
+    grouper: key or Frame
+        Either a column like ``'x'`` or a Pandas Series if the groupby was
+        given a streaming frame.
+
+    Returns
+    -------
+    acc: state
+    result: newly emitted result
+
+    See Also
+    --------
+    accumulator
+    windowed_accumulator
+    """
     if agg.grouper is None and isinstance(new, tuple):
         new, grouper = new
     else:
@@ -259,6 +364,16 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
 
 
 def accumulator(acc, new, agg=None):
+    """ An accumulation binary operator
+
+    This is the function that is actually given to the ``Stream.accumulate``
+    function.
+
+    See Also
+    --------
+    windowed_accumulator
+    windowed_groupby_accumulator
+    """
     if acc is None:
         acc = agg.initial(new)
     return agg.on_new(acc, new)
