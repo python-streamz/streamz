@@ -99,10 +99,41 @@ class Frame(BaseFrame):
         Returns
         -------
         Rolling object
+
+        See Also
+        --------
+        DataFrame.window: more generic window operations
         """
         return Rolling(self, window, min_periods)
 
     def window(self, n=None, value=None):
+        """ Sliding window operations
+
+        Windowed operations are defined over a sliding window of data, either
+        with a fixed number of elements::
+
+            >>> df.window(n=10).sum()  # sum of the last ten elements
+
+        or over an index value range (index must be monotonic)::
+
+            >>> df.window(value='2h').mean()  # average over the last two hours
+
+        Windowed dataframes support all normal arithmetic, aggregations, and
+        groupby-aggregations.
+
+        Examples
+        --------
+        >>> df.window(n=10).std()
+        >>> df.window(value='2h').count()
+
+        >>> w = df.window(n=100)
+        >>> w.groupby(w.name).amount.sum()
+        >>> w.groupby(w.x % 10).y.var()
+
+        See Also
+        --------
+        DataFrame.rolling: mimic's Pandas rolling aggregations
+        """
         return Window(self, n=n, value=value)
 
     def plot(self, backlog=1000, width=800, height=300, **kwargs):
@@ -277,8 +308,7 @@ class DataFrame(Frame, _DataFrameMixin):
 
     See Also
     --------
-    streams.dataframe.Series
-    streams.sequence.Sequence
+    Series
     """
     _subtype = pd.DataFrame
 
@@ -326,8 +356,7 @@ class Series(Frame, _SeriesMixin):
 
     See Also
     --------
-    streams.dataframe.DataFrame
-    streams.sequence.Sequence
+    DataFrame
     """
     _subtype = pd.Series
 
@@ -446,6 +475,15 @@ class Rolling(object):
 
 
 class Window(OperatorMixin):
+    """ Windowed aggregations
+
+    This provides a set of aggregations that can be applied over a sliding
+    window of data.
+
+    See Also
+    --------
+    DataFrame.window: contains full docstring
+    """
     def __init__(self, sdf, n=None, value=None):
         self.n = n
         self.root = sdf
@@ -502,32 +540,41 @@ class Window(OperatorMixin):
                                               returns_state=True)
 
     def apply(self, func):
+        """ Apply an arbitrary function over each window of data """
         result = self._known_aggregation(aggregations.Full())
         return result.map_partitions(func, result)
 
     def sum(self):
+        """ Sum elements within window """
         return self._known_aggregation(aggregations.Sum())
 
     def count(self):
+        """ Count elements within window """
         return self._known_aggregation(aggregations.Count())
 
     def mean(self):
+        """ Average elements within window """
         return self._known_aggregation(aggregations.Mean())
 
     def var(self, ddof=1):
+        """ Compute variance of elements within window """
         return self._known_aggregation(aggregations.Var(ddof=ddof))
 
     def std(self, ddof=1):
+        """ Compute standard deviation of elements within window """
         return self.var(ddof=ddof) ** 0.5
 
     @property
     def size(self):
+        """ Number of elements within window """
         return self._known_aggregation(aggregations.Size())
 
     def value_counts(self):
+        """ Count groups of elements within window """
         return self._known_aggregation(aggregations.ValueCounts())
 
     def groupby(self, other):
+        """ Groupby-aggregations within window """
         return WindowedGroupBy(self.root, other, None, self.n, self.value)
 
 
@@ -562,6 +609,7 @@ def _accumulate_size(accumulator, new):
 
 
 class GroupBy(object):
+    """ Groupby aggregations on streaming dataframes """
     def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
@@ -609,25 +657,32 @@ class GroupBy(object):
         return Streaming(outstream, example, stream_type=stream_type)
 
     def count(self):
+        """ Groupby-count """
         return self._accumulate(aggregations.GroupbyCount)
 
-    def size(self):
-        return self._accumulate(aggregations.GroupbySize)
-
-    def sum(self):
-        return self._accumulate(aggregations.GroupbySum)
-
     def mean(self):
+        """ Groupby-mean """
         return self._accumulate(aggregations.GroupbyMean)
 
-    def var(self, ddof=1):
-        return self._accumulate(aggregations.GroupbyVar, ddof=ddof)
+    def size(self):
+        """ Groupby-size """
+        return self._accumulate(aggregations.GroupbySize)
 
     def std(self, ddof=1):
+        """ Groupby-std """
         return self.var(ddof=ddof) ** 0.5
+
+    def sum(self):
+        """ Groupby-sum """
+        return self._accumulate(aggregations.GroupbySum)
+
+    def var(self, ddof=1):
+        """ Groupby-variance """
+        return self._accumulate(aggregations.GroupbyVar, ddof=ddof)
 
 
 class WindowedGroupBy(GroupBy):
+    """ Groupby aggregations over a window of data """
     def __init__(self, root, grouper, index=None, n=None, value=None):
         self.root = root
         self.grouper = grouper

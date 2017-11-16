@@ -44,7 +44,38 @@ Dataframes
    DataFrame.plot
 
 .. autosummary::
+   GroupBy
+   GroupBy.count
+   GroupBy.mean
+   GroupBy.size
+   GroupBy.std
+   GroupBy.sum
+   GroupBy.var
+
+.. autosummary::
    Rolling
+   Rolling.aggregate
+   Rolling.count
+   Rolling.max
+   Rolling.mean
+   Rolling.median
+   Rolling.min
+   Rolling.quantile
+   Rolling.std
+   Rolling.sum
+   Rolling.var
+
+.. autosummary::
+   DataFrame.window
+   Window.apply
+   Window.count
+   Window.groupby
+   Window.sum
+   Window.size
+   Window.std
+   Window.var
+
+.. autosummary::
    Rolling.aggregate
    Rolling.count
    Rolling.max
@@ -80,6 +111,12 @@ Details
    :inherited-members:
 
 .. autoclass:: Rolling
+   :members:
+
+.. autoclass:: Window
+   :members:
+
+.. autoclass:: GroupBy
    :members:
 
 .. autoclass:: Random
