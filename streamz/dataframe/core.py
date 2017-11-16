@@ -192,6 +192,7 @@ class Frames(BaseFrame):
     def var(self, **kwargs):
         return self.map_partitions(M.var, self, **kwargs)
 
+    @property
     def size(self, **kwargs):
         return self.map_partitions(M.size, self, **kwargs)
 
@@ -500,6 +501,10 @@ class Window(OperatorMixin):
                                               start=None,
                                               returns_state=True)
 
+    def apply(self, func):
+        result = self._known_aggregation(aggregations.Full())
+        return result.map_partitions(func, result)
+
     def sum(self):
         return self._known_aggregation(aggregations.Sum())
 
@@ -515,6 +520,7 @@ class Window(OperatorMixin):
     def std(self, ddof=1):
         return self.var(ddof=ddof) ** 0.5
 
+    @property
     def size(self):
         return self._known_aggregation(aggregations.Size())
 

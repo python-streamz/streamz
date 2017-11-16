@@ -674,6 +674,7 @@ def test_window_sum_dataframe(stream):
     lambda x: x.sum(),
     lambda x: x.mean(),
     lambda x: x.count(),
+    lambda x: x.size,
     lambda x: x.var(ddof=1),
     lambda x: x.std(ddof=1),
     lambda x: x.var(ddof=0),
@@ -797,3 +798,19 @@ def test_groupby_windowing_n(func, n, getter, grouper, indexer):
 
     last = df.iloc[len(df) - n:]
     assert_eq(L[-1], f(last))
+
+
+def test_window_full():
+    df = pd.DataFrame({'x': np.arange(10, dtype=float), 'y': [1.0, 2.0] * 5})
+
+    sdf = DataFrame(example=df)
+
+    L = sdf.window(n=4).apply(lambda x: x).stream.sink_to_list()
+
+    sdf.emit(df.iloc[:3])
+    sdf.emit(df.iloc[3:8])
+    sdf.emit(df.iloc[8:])
+
+    assert_eq(L[0], df.iloc[:3])
+    assert_eq(L[1], df.iloc[4:8])
+    assert_eq(L[2], df.iloc[-4:])

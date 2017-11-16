@@ -8,18 +8,7 @@ import pandas as pd
 
 
 class Aggregation(object):
-    def update(self, acc, new_old):
-        new, old = new_old
-        if old is not None:
-            acc, result = self.on_old(acc, old)
-        if new is not None:
-            acc, result = self.on_new(acc, new)
-        return acc, result
-
-    def stateless(self, new):
-        acc = self.initial(new)
-        acc, result = self.on_new(acc, new)
-        return result
+    pass
 
 
 class Sum(Aggregation):
@@ -144,8 +133,8 @@ class Full(Aggregation):
         result = acc.iloc[len(old):]
         return result, result
 
-    def stateless(self, new):
-        return new
+    def initial(self, new):
+        return new.iloc[:0]
 
 
 def diff_iloc(dfs, new, window=None):
