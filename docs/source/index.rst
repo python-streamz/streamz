@@ -85,6 +85,7 @@ data streaming systems like `Apache Flink <https://flink.apache.org/>`_,
 
    core.rst
    collections.rst
+   dataframes.rst
    api.rst
    collections-api.rst
    dataframe-aggregations.rst
