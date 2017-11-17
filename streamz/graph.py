@@ -54,7 +54,45 @@ def create_graph(node, graph, prior_node=None, pc=None):
                 create_graph(node2, graph, node, pc=pc)
 
 
-def readable_graph(node):
+def create_edge_label_graph(node, graph, prior_node=None, pc=None, i=None):
+    """Create graph from a single node, searching up and down the chain
+
+    Parameters
+    ----------
+    node: Stream instance
+    graph: networkx.DiGraph instance
+    """
+    if node is None:
+        return
+    t = hash(node)
+    graph.add_node(t,
+                   label=_clean_text(str(node)),
+                   shape=node._graphviz_shape,
+                   orientation=str(node._graphviz_orientation),
+                   style=node._graphviz_style,
+                   fillcolor=node._graphviz_fillcolor)
+    if prior_node:
+        tt = hash(prior_node)
+        if graph.has_edge(t, tt):
+            return
+        if i is None:
+            i = ''
+        if pc == 'downstream':
+            graph.add_edge(tt, t, label=str(i))
+        else:
+            graph.add_edge(t, tt)
+
+    for nodes, pc in zip([list(node.downstreams), list(node.upstreams)],
+                         ['downstream', 'upstreams']):
+        for i, node2 in enumerate(nodes):
+            if node2 is not None:
+                if len(nodes) > 1:
+                    create_edge_label_graph(node2, graph, node, pc=pc, i=i)
+                else:
+                    create_edge_label_graph(node2, graph, node, pc=pc)
+
+
+def readable_graph(node, source_node=False):
     """Create human readable version of this object's task graph.
 
     Parameters
@@ -64,7 +102,10 @@ def readable_graph(node):
     """
     import networkx as nx
     g = nx.DiGraph()
-    create_graph(node, g)
+    if source_node:
+        create_edge_label_graph(node, g)
+    else:
+        create_graph(node, g)
     mapping = {k: '{}'.format(g.node[k]['label']) for k in g}
     idx_mapping = {}
     for k, v in mapping.items():
@@ -84,11 +125,12 @@ def to_graphviz(graph, **graph_attr):
     gvz = graphviz.Digraph(graph_attr=graph_attr)
     for node, attrs in graph.node.items():
         gvz.node(node, **attrs)
-    gvz.edges(graph.edges())
+    for edge, attrs in graph.edges().items():
+        gvz.edge(edge[0], edge[1], **attrs)
     return gvz
 
 
-def visualize(node, filename='mystream.png', **kwargs):
+def visualize(node, filename='mystream.png', source_node=False, **kwargs):
     """
     Render a task graph using dot.
 
@@ -123,7 +165,7 @@ def visualize(node, filename='mystream.png', **kwargs):
     --------
     streams.graph.readable_graph
     """
-    rg = readable_graph(node)
+    rg = readable_graph(node, source_node=source_node)
     g = to_graphviz(rg, **kwargs)
 
     fmts = ['.png', '.pdf', '.dot', '.svg', '.jpeg', '.jpg']
