@@ -11,6 +11,31 @@ from . import core, sources
 
 
 class DaskStream(Stream):
+    """ A Parallel stream using Dask
+
+    This object is fully compliant with the ``streamz.core.Stream`` object but
+    uses a Dask client for execution.  Operations like ``map`` and
+    ``accumulate`` submit functions to run on the Dask instance using
+    ``dask.distributed.Client.submit`` and pass around Dask futures.
+    Time-based operations like ``timed_window``, buffer, and so on operate as
+    normal.
+
+    Typically one transfers between normal Stream and DaskStream objects using
+    the ``Stream.scatter()`` and ``DaskStream.gather()`` methods.
+
+    Examples
+    --------
+    >>> from dask.distributed import Client
+    >>> client = Client()
+
+    >>> from streamz import Stream
+    >>> source = Stream()
+    >>> source.scatter().map(func).accumulate(binop).gather().sink(...)
+
+    See Also
+    --------
+    dask.distributed.Client
+    """
     def __init__(self, *args, **kwargs):
         if 'loop' not in kwargs:
             kwargs['loop'] = default_client().loop
@@ -75,7 +100,22 @@ class scatter(DaskStream):
 
 @DaskStream.register_api()
 class gather(core.Stream):
-    """ Convert Dask stream to local Stream """
+    """ Wait on and gather results from DaskStream to local Stream
+
+    This waits on every result in the stream and then gathers that result back
+    to the local stream.  Warning, this can restrict parallelism.  It is common
+    to combine a ``gather()`` node with a ``buffer()`` to allow unfinished
+    futures to pile up.
+
+    Examples
+    --------
+    >>> local_stream = dask_stream.buffer(20).gather()
+
+    See Also
+    --------
+    buffer
+    scatter
+    """
     @gen.coroutine
     def update(self, x, who=None):
         client = default_client()
