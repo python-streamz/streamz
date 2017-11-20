@@ -5,3 +5,5 @@ tornado
 toolz
 zict
 pandas
+dask
+distributed
