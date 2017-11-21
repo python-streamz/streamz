@@ -732,7 +732,7 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     def f(x):
         return func(indexer(x.groupby(grouper(x))))
 
-    L = f(sdf.window(value=value)).stream.gather().sink_to_list()
+    L = f(sdf.window(value)).stream.gather().sink_to_list()
 
     value = pd.Timedelta(value)
 

@@ -485,6 +485,9 @@ class Window(OperatorMixin):
     DataFrame.window: contains full docstring
     """
     def __init__(self, sdf, n=None, value=None):
+        if value is None and isinstance(n, (str, pd.Timedelta)):
+            value = n
+            n = None
         self.n = n
         self.root = sdf
         if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
