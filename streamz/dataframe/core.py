@@ -1,10 +1,12 @@
 from __future__ import division, print_function
 
+from collections import OrderedDict
 import operator
 from time import time
 
 import numpy as np
 import pandas as pd
+import toolz
 from tornado.ioloop import IOLoop
 from tornado import gen
 
@@ -270,15 +272,15 @@ class _DataFrameMixin(object):
         >>> sdf = sdf.assign(z=sdf.x + sdf.y)  # doctest: +SKIP
         >>> sdf['z'] = sdf.x + sdf.y  # doctest: +SKIP
         """
-        def concat(tup, columns=None):
-            result = pd.concat(tup, axis=1)
-            result.columns = columns
-            return result
-        columns, values = zip(*kwargs.items())
-        stream = self.stream.zip(*[v.stream for v in values])
-        stream = stream.map(concat, columns=list(self.columns) + list(columns))
-        example = self.example.assign(**{c: v.example for c, v in kwargs.items()})
-        return type(self)(stream, example)
+        kvs = list(toolz.concat(kwargs.items()))
+
+        def _assign(df, *kvs):
+            keys = kvs[::2]
+            values = kvs[1::2]
+            kwargs = OrderedDict(zip(keys, values))
+            return df.assign(**kwargs)
+
+        return self.map_partitions(_assign, self, *kvs)
 
     def to_frame(self):
         """ Convert to a streaming dataframe """
