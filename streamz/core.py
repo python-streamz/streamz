@@ -8,7 +8,7 @@ import six
 import sys
 import threading
 from time import time
-from .orderedweakset import OrderedWeakrefSet
+import weakref
 
 import toolz
 from tornado import gen
@@ -18,10 +18,13 @@ from tornado.queues import Queue
 from collections import Iterable
 
 from .compatibility import get_thread_identity
+from .orderedweakset import OrderedWeakrefSet
 
 no_default = '--no-default--'
 
 _global_sinks = set()
+
+_html_update_streams = set()
 
 thread_state = threading.local()
 
@@ -179,6 +182,43 @@ class Stream(object):
         return text
 
     __repr__ = __str__
+
+    def _ipython_display_(self, **kwargs):
+        try:
+            from ipywidgets import Output
+            import IPython
+        except ImportError:
+            return self._repr_html_()
+        output = Output(_view_count=0)
+        output_ref = weakref.ref(output)
+
+        def update_cell(val):
+            output = output_ref()
+            if output is None:
+                return
+            with output:
+                IPython.display.clear_output(wait=True)
+                IPython.display.display(val)
+
+        s = self.map(update_cell)
+        _html_update_streams.add(s)
+
+        self.output_ref = output_ref
+        s_ref = weakref.ref(s)
+
+        def remove_stream(change):
+            output = output_ref()
+            if output is None:
+                return
+
+            if output._view_count == 0:
+                ss = s_ref()
+                ss.destroy()
+                _html_update_streams.remove(ss)  # trigger gc
+
+        output.observe(remove_stream, '_view_count')
+
+        return output._ipython_display_(**kwargs)
 
     def _emit(self, x):
         result = []
