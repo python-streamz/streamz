@@ -32,6 +32,9 @@ class BaseFrame(Streaming):
         """ Round elements in frame """
         return self.map_partitions(M.tail, self, n=n)
 
+    def astype(self, dt):
+        return self.map_partitions(M.astype, self, dt)
+
     @property
     def index(self):
         return self.map_partitions(lambda x: x.index, self)
