@@ -357,6 +357,22 @@ def test_setitem(stream):
     assert_eq(L[-1], df.mean())
 
 
+def test_setitem_overwrites(stream):
+    df = pd.DataFrame({'x': list(range(10))})
+    sdf = DataFrame(example=df.iloc[:0], stream=stream)
+    stream = sdf.stream
+
+    sdf['x'] = sdf['x'] * 2
+
+    L = sdf.stream.gather().sink_to_list()
+
+    stream.emit(df.iloc[:3])
+    stream.emit(df.iloc[3:7])
+    stream.emit(df.iloc[7:])
+
+    assert_eq(L[-1], df.iloc[7:] * 2)
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize('kwargs,op', [
     ({}, 'sum'),
