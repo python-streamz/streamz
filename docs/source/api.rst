@@ -14,15 +14,16 @@ Stream
    buffer
    collect
    combine_latest
-   connect
+   Stream.connect
    delay
-   destroy
-   disconnect
+   Stream.destroy
+   Stream.disconnect
    filter
    flatten
    map
    partition
    rate_limit
+   scatter
    sink
    sliding_window
    timed_window
@@ -40,17 +41,26 @@ Sources
    from_kafka
    from_textfile
 
+DaskStream
+----------
+
+.. currentmodule:: streamz.dask
+
+.. autosummary::
+   DaskStream
+   gather
+
+
 Definitions
 -----------
+
+.. currentmodule:: streamz
 
 .. autofunction:: accumulate
 .. autofunction:: buffer
 .. autofunction:: collect
-.. autofunction:: connect
 .. autofunction:: combine_latest
 .. autofunction:: delay
-.. autofunction:: destroy
-.. autofunction:: disconnect
 .. autofunction:: filter
 .. autofunction:: flatten
 .. autofunction:: map
@@ -69,3 +79,8 @@ Definitions
 .. autofunction:: filenames
 .. autofunction:: from_kafka
 .. autofunction:: from_textfile
+
+.. currentmodule:: streamz.dask
+
+.. autofunction:: DaskStream
+.. autofunction:: gather
