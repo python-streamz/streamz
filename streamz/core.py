@@ -641,6 +641,13 @@ class sliding_window(Stream):
             return []
 
 
+def convert_interval(interval):
+    if isinstance(interval, str):
+        import pandas as pd
+        interval = pd.Timedelta(interval).total_seconds()
+    return interval
+
+
 @Stream.register_api()
 class timed_window(Stream):
     """ Emit a tuple of collected results every interval
@@ -653,7 +660,7 @@ class timed_window(Stream):
 
     def __init__(self, upstream, interval, loop=None, **kwargs):
         loop = loop or upstream.loop or IOLoop.current()
-        self.interval = interval
+        self.interval = convert_interval(interval)
         self.buffer = []
         self.last = gen.moment
 
@@ -681,7 +688,7 @@ class delay(Stream):
 
     def __init__(self, upstream, interval, loop=None, **kwargs):
         loop = loop or upstream.loop or IOLoop.current()
-        self.interval = interval
+        self.interval = convert_interval(interval)
         self.queue = Queue()
 
         Stream.__init__(self, upstream, loop=loop, **kwargs)
@@ -717,7 +724,7 @@ class rate_limit(Stream):
     _graphviz_shape = 'octagon'
 
     def __init__(self, upstream, interval, **kwargs):
-        self.interval = interval
+        self.interval = convert_interval(interval)
         self.next = 0
 
         Stream.__init__(self, upstream, **kwargs)
