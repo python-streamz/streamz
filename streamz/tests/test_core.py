@@ -182,6 +182,13 @@ def test_timed_window():
     assert not L[-1]
 
 
+def test_timed_window_timedelta():
+    pytest.importorskip('pandas')
+    source = Stream(asynchronous=True)
+    a = source.timed_window('10ms')
+    assert a.interval == 0.010
+
+
 @gen_test()
 def test_timed_window_backpressure():
     q = Queue(maxsize=1)
