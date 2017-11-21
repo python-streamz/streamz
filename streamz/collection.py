@@ -1,11 +1,8 @@
 import operator
-import weakref
 
 from streamz import Stream, core
 
 _stream_types = {'streaming': [], 'updating': []}
-
-_html_update_streams = set()
 
 
 def map_partitions(func, *args, **kwargs):
@@ -232,41 +229,7 @@ class Streaming(OperatorMixin):
         return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
 
     def _ipython_display_(self, **kwargs):
-        try:
-            from ipywidgets import Output
-            import IPython
-        except ImportError:
-            return self._repr_html_()
-        output = Output(_view_count=0)
-        output_ref = weakref.ref(output)
-
-        def update_cell(val):
-            output = output_ref()
-            if output is None:
-                return
-            with output:
-                IPython.display.clear_output(wait=True)
-                IPython.display.display(val)
-
-        s = self.stream.latest().rate_limit(0.5).gather().map(update_cell)
-        _html_update_streams.add(s)
-
-        self.output_ref = output_ref
-        s_ref = weakref.ref(s)
-
-        def remove_stream(change):
-            output = output_ref()
-            if output is None:
-                return
-
-            if output._view_count == 0:
-                ss = s_ref()
-                ss.destroy()
-                _html_update_streams.remove(ss)  # trigger gc
-
-        output.observe(remove_stream, '_view_count')
-
-        return output._ipython_display_(**kwargs)
+        return self.stream.latest().rate_limit(0.5).gather()._ipython_display_(**kwargs)
 
     def emit(self, x):
         self.verify(x)

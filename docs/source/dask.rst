@@ -106,7 +106,7 @@ did.
 
 -   ``scatter``: Converted our Stream into a DaskStream.  The elements that we
     emitted into our source were sent to the Dask client, and the subsequent
-   ``map`` call used that client's cores to perform the computations.
+    ``map`` call used that client's cores to perform the computations.
 -   ``gather``: Converted our DaskStream back into a Stream, pulling data on our
     Dask client back to our local stream
 -   ``buffer(5)``: Normally gather would exert back pressure so that the source
