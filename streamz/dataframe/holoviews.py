@@ -182,6 +182,8 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
 
         def chartfn(data):
+            if len(data.columns) == 1:
+                data = data.reset_index()
             return chart(data).opts(**opts)
 
         return DynamicMap(chartfn, streams=[self.stream])
@@ -194,6 +196,9 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
 
     def area(self):
         return self.chart(Area)
+
+    def bar(self):
+        return self.chart(Bars)
 
     def box(self):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
