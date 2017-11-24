@@ -235,6 +235,9 @@ class Frames(BaseFrame):
     def count(self, **kwargs):
         return self.map_partitions(M.count, self, **kwargs)
 
+    def nlargest(self, n, *args, **kwargs):
+        return self.map_partitions(M.nlargest, self, n, *args, **kwargs)
+
 
 class _DataFrameMixin(object):
     @property
@@ -545,7 +548,8 @@ class Window(OperatorMixin):
                                               window=window,
                                               agg=agg,
                                               start=None,
-                                              returns_state=True)
+                                              returns_state=True,
+                                              stream_type='updating')
 
     def apply(self, func):
         """ Apply an arbitrary function over each window of data """
