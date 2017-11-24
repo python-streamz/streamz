@@ -27,7 +27,7 @@ class HoloViewsConverter(object):
         else:
             self.stream = Buffer(data.example, length=backlog)
         data.stream.sink(self.stream.send)
-        self.by=by
+        self.by = by
 
         if 'cmap' in kwds and colormap:
             raise TypeError("Only specify one of `cmap` and `colormap`.")
@@ -64,13 +64,16 @@ class HoloViewsFrameConverter(HoloViewsConverter):
 
     def single_chart(self, chart, x, y):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
+
         def single_chart(data):
             return chart(self.reset_index(data), x, y).opts(**opts)
+
         return DynamicMap(single_chart, streams=[self.stream])
 
     def chart(self, chart, x, y):
         if x and y:
             return self.single_chart(chart, x, y)
+
         def multi_chart(data):
             x = self.data.example.index.name or 'index'
             curves = {}
@@ -78,6 +81,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
             for c in data.columns[1:]:
                 curves[c] = chart(data, x, c).opts(**opts)
             return NdOverlay(curves)
+
         return DynamicMap(multi_chart, streams=[self.stream])
 
     def line(self, x, y):
@@ -95,6 +99,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
     def bars(self, x, y):
         if x and y:
             return self.single_chart(Bars, x, y)
+
         def bars(data):
             index = self.data.example.index.name or 'index'
             data = self.reset_index(data)
@@ -102,6 +107,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
             opts = {'plot': dict(self._plot_opts, labelled=[]), 'norm': self._norm_opts}
             opts['plot']['stack_index'] = 1 if self.stacked else None
             return Bars(df, kdims=[index, 'Group'], vdims=['Value']).opts(**opts)
+
         return DynamicMap(bars, streams=[self.stream])
 
     def barh(self, x, y):
@@ -110,6 +116,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
     def box(self, x, y):
         if x and y:
             return self.single_chart(BoxWhisker, x, y)
+
         def box(data):
             index = self.data.example.index.name or 'index'
             data = self.reset_index(data)
@@ -124,9 +131,11 @@ class HoloViewsFrameConverter(HoloViewsConverter):
                     'norm': self._norm_opts}
             opts['plot']['invert_axes'] = not self.kwds.get('vert', True)
             return BoxWhisker(df, kdims, 'Value').opts(**opts)
+
         return DynamicMap(box, streams=[self.stream])
 
     def hist(self, x, y):
+
         def hist(data):
             hists = {}
             data = self.reset_index(data)
@@ -140,9 +149,11 @@ class HoloViewsFrameConverter(HoloViewsConverter):
             for col in data.columns[1:]:
                 hists[col] = hv.operation.histogram(ds, dimension=col, **hist_opts).opts(**opts)
             return NdOverlay(hists)
+
         return DynamicMap(hist, streams=[self.stream])
 
     def kde(self, x, y):
+
         def kde(data):
             data = self.reset_index(data)
             index = self.data.example.index.name or 'index'
@@ -158,7 +169,9 @@ class HoloViewsFrameConverter(HoloViewsConverter):
                 overlay = NdOverlay({0: Area([], 'Value', 'Value Density')}, ['Group'])
             return overlay.opts({'Distribution': opts, 'Area': opts,
                                  'NdOverlay': {'plot': dict(legend_limit=0)}})
+
         return DynamicMap(kde, streams=[self.stream])
+
 
 class HoloViewsSeriesConverter(HoloViewsConverter):
 
@@ -167,8 +180,10 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
 
     def chart(self, chart):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
+
         def chartfn(data):
             return chart(data).opts(**opts)
+
         return DynamicMap(chartfn, streams=[self.stream])
 
     def line(self):
@@ -182,13 +197,16 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
 
     def box(self):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
+
         def boxfn(data):
             return BoxWhisker(data, [], data.columns[-1]).opts(**opts)
+
         return DynamicMap(boxfn, streams=[self.stream])
 
     def hist(self):
         hist_opts = {'num_bins': self.kwds.get('bins', 10),
                      'bin_range': self.kwds.get('bin_range', None)}
+
         def hist(data):
             ds = Dataset(data)
             plot_opts = dict(self._plot_opts)
@@ -197,6 +215,7 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
                         norm=self._norm_opts)
             return hv.operation.histogram(ds, dimension=data.columns[-1],
                                           **hist_opts).opts(**opts)
+
         return DynamicMap(hist, streams=[self.stream])
 
     def kde(self):
@@ -204,8 +223,10 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
         plot_opts['invert_axes'] = self.kwds.get('orientation', False) == 'horizontal'
         opts = dict(plot=plot_opts, style=dict(alpha=self.kwds.get('alpha', 1)),
                     norm=self._norm_opts)
+
         def distfn(data):
             return Distribution(data, data.columns[-1]).opts(**opts)
+
         return DynamicMap(distfn, streams=[self.stream])
 
 
@@ -501,8 +522,10 @@ class HoloViewsFramePlot(object):
 def df_plot(self):
     return HoloViewsFramePlot(self)
 
+
 def series_plot(self):
     return HoloViewsSeriesPlot(self)
+
 
 DataFrame.plot = property(df_plot)
 DataFrames.plot = property(df_plot)
