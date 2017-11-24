@@ -503,24 +503,6 @@ def test_to_frame(stream):
     assert list(a.columns) == ['x']
 
 
-@gen_test()
-def test_plot():
-    pytest.importorskip('bokeh')
-    sdf = sd.Random(freq='10ms', interval='50ms')
-    result = sdf[['x', 'y']].plot()
-
-    cds = result['cds']
-
-    assert set(cds.data) == {'x', 'y', 'index'}
-    assert not len(cds.data['x'])
-
-    yield gen.sleep(0.130)
-    assert len(cds.data['x'])
-    assert len(set(map(len, cds.data.values()))) == 1
-
-    assert set(sdf.x.plot()['cds'].data) == {'x', 'index'}
-
-
 def test_instantiate_with_dict(stream):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = DataFrame(example=df, stream=stream)
