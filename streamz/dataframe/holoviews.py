@@ -88,6 +88,7 @@ class HoloViewsConverter(object):
 
     def table(self, x=None, y=None):
         allowed = ['width', 'height']
+
         def table(data):
             if len(data.columns) == 1:
                 data = data.reset_index()
@@ -125,6 +126,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         x = self.data.example.index.name or 'index'
         opts = dict(plot=dict(self._plot_opts, labelled=['x']),
                     norm=self._norm_opts)
+
         def multi_chart(data):
             charts = {}
             for c in data.columns[1:]:
@@ -242,7 +244,6 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
     displayable HoloViews objects.
     """
 
-
     def __call__(self, kind):
         return getattr(self, kind)()
 
@@ -290,6 +291,7 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
         opts = dict(plot=dict(self._plot_opts, invert_axes=invert),
                     style=dict(alpha=self.kwds.get('alpha', 1)),
                     norm=self._norm_opts)
+
         def hist(data):
             ds = Dataset(data)
             hist = histogram(ds, dimension=data.columns[-1], **hist_opts)
@@ -309,8 +311,6 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
                     .redim.range(**ranges).relabel(**self._relabel).opts(**opts))
 
         return DynamicMap(distfn, streams=[self.stream])
-
-
 
 
 class HoloViewsSeriesPlot(object):
@@ -482,7 +482,6 @@ class HoloViewsSeriesPlot(object):
         Element : Element or NdOverlay of Elements
         """
         return self(kind='table', **kwds)
-
 
 
 class HoloViewsFramePlot(object):
@@ -658,8 +657,10 @@ class HoloViewsFramePlot(object):
 def df_plot(self):
     return HoloViewsFramePlot(self)
 
+
 def series_plot(self):
     return HoloViewsSeriesPlot(self)
+
 
 DataFrame.plot = property(df_plot)
 DataFrames.plot = property(df_plot)
