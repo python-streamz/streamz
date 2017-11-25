@@ -595,19 +595,6 @@ def test_display(stream):
     s._ipython_display_()
 
 
-def test_tail(stream):
-    df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = DataFrame(example=df, stream=stream)
-
-    L = sdf.tail(2).stream.gather().sink_to_list()
-
-    sdf.emit(df)
-    sdf.emit(df)
-
-    assert_eq(L[0], df.tail(2))
-    assert_eq(L[1], df.tail(2))
-
-
 def test_random_source(client):
     n = len(client.cluster.scheduler.tasks)
     source = sd.Random(freq='1ms', interval='10ms', dask=True)
@@ -817,3 +804,19 @@ def test_window_full():
     assert_eq(L[0], df.iloc[:3])
     assert_eq(L[1], df.iloc[4:8])
     assert_eq(L[2], df.iloc[-4:])
+
+
+def test_tail():
+    df = pd.DataFrame({'x': [1, 2, 3]})
+    sdf = DataFrame(example=df)
+
+    L = sdf.tail(5).stream.sink_to_list()
+
+    sdf.emit(df)
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert len(L[0]) == 3
+    assert len(L[1]) == 5
+    assert len(L[2]) == 5
+    assert_eq(L[2], pd.DataFrame({'x': [2, 3, 1, 2, 3]}, index=[1, 2, 0, 1, 2]))

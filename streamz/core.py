@@ -222,7 +222,7 @@ class Stream(object):
 
     def _emit(self, x):
         result = []
-        for downstream in self.downstreams:
+        for downstream in list(self.downstreams):
             r = downstream.update(x, who=self)
             if type(r) is list:
                 result.extend(r)
