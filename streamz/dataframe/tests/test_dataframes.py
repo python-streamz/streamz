@@ -176,7 +176,8 @@ def test_unary_operators(op, getter):
 
 
 @pytest.mark.parametrize('func', [
-    lambda df: df.query('x > 1 and x < 4', engine='python')
+    lambda df: df.query('x > 1 and x < 4', engine='python'),
+    lambda df: df.x.value_counts().nlargest(2)
 ])
 def test_dataframe_simple(func):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
@@ -188,6 +189,7 @@ def test_dataframe_simple(func):
     a.emit(df)
 
     assert_eq(L[0], expected)
+
 
 def test_set_index():
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
@@ -299,7 +301,9 @@ def test_value_counts(stream):
 
     a = Series(example=s, stream=stream)
 
-    result = a.value_counts().stream.gather().sink_to_list()
+    b = a.value_counts()
+    assert b._stream_type == 'updating'
+    result = a.stream.gather().sink_to_list()
 
     a.emit(s)
     a.emit(s)

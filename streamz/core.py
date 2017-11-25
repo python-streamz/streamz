@@ -481,9 +481,12 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        result = self.func(x, *self.args, **self.kwargs)
-
-        return self._emit(result)
+        try:
+            result = self.func(x, *self.args, **self.kwargs)
+        except Exception as e:
+            logger.exception(e)
+        else:
+            return self._emit(result)
 
 
 def _truthy(x):
