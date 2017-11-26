@@ -33,7 +33,7 @@ class HoloViewsConverter(object):
             self.stream = Pipe(data=data.example)
         else:
             self.stream = Buffer(data.example, length=backlog)
-        data.stream.sink(self.stream.send)
+        data.stream.gather().sink(self.stream.send)
 
         # High-level options
         self.by = by
