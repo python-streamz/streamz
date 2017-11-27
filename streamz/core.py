@@ -575,7 +575,11 @@ class accumulate(Stream):
             self.state = x
             return self._emit(x)
         else:
-            result = self.func(self.state, x, **self.kwargs)
+            try:
+                result = self.func(self.state, x, **self.kwargs)
+            except Exception as e:
+                logger.exception(e)
+                return
             if self.returns_state:
                 state, result = result
             else:
