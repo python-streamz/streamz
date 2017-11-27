@@ -351,7 +351,8 @@ class Stream(object):
 
         return self.scan(update_frequencies, start={}, **kwargs)
 
-    def visualize(self, filename='mystream.png', source_node=False, **kwargs):
+    def visualize(self, filename='mystream.png', source_node=False,
+                  rankdir='LR', **kwargs):
         """Render the computation of this object's task graph using graphviz.
 
         Requires ``graphviz`` to be installed.
@@ -367,7 +368,8 @@ class Stream(object):
             Graph attributes to pass to graphviz like ``rankdir="LR"``
         """
         from .graph import visualize
-        return visualize(self, filename, source_node=source_node, **kwargs)
+        return visualize(self, filename, source_node=source_node,
+                         rankdir=rankdir, **kwargs)
 
     def to_dataframe(self, example):
         """ Convert a stream of Pandas dataframes to a DataFrame
