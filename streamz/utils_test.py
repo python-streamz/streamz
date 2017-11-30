@@ -1,5 +1,7 @@
 from contextlib import contextmanager
+import logging
 import os
+import six
 import shutil
 import tempfile
 
@@ -80,3 +82,26 @@ def gen_test(timeout=10):
                     loop.stop()
         return test_func
     return _
+
+
+@contextmanager
+def captured_logger(logger, level=logging.INFO, propagate=None):
+    """Capture output from the given Logger.
+    """
+    if isinstance(logger, str):
+        logger = logging.getLogger(logger)
+    orig_level = logger.level
+    orig_handlers = logger.handlers[:]
+    if propagate is not None:
+        orig_propagate = logger.propagate
+        logger.propagate = propagate
+    sio = six.StringIO()
+    logger.handlers[:] = [logging.StreamHandler(sio)]
+    logger.setLevel(level)
+    try:
+        yield sio
+    finally:
+        logger.handlers[:] = orig_handlers
+        logger.setLevel(orig_level)
+        if propagate is not None:
+            logger.propagate = orig_propagate
