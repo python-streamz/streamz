@@ -235,6 +235,13 @@ class Frames(BaseFrame):
     def count(self, **kwargs):
         return self.map_partitions(M.count, self, **kwargs)
 
+    def nlargest(self, n, *args, **kwargs):
+        return self.map_partitions(M.nlargest, self, n, *args, **kwargs)
+
+    def tail(self, n=5):
+        """ Round elements in frame """
+        return self.map_partitions(M.tail, self, n=n)
+
 
 class _DataFrameMixin(object):
     @property
@@ -427,7 +434,7 @@ class Rolling(object):
         if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
-            raise AttributeError("GroupBy has no attribute %r" % key)
+            raise AttributeError("Rolling has no attribute %r" % key)
 
     def _known_aggregation(self, op, *args, **kwargs):
         return self.root.accumulate_partitions(rolling_accumulator,
@@ -507,7 +514,7 @@ class Window(OperatorMixin):
         if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
-            raise AttributeError("GroupBy has no attribute %r" % key)
+            raise AttributeError("Window has no attribute %r" % key)
 
     def map_partitions(self, func, *args, **kwargs):
         args2 = [a.root if isinstance(a, Window) else a for a in args]
@@ -545,7 +552,11 @@ class Window(OperatorMixin):
                                               window=window,
                                               agg=agg,
                                               start=None,
-                                              returns_state=True)
+                                              returns_state=True,
+                                              stream_type='updating')
+
+    def full(self):
+        return self._known_aggregation(aggregations.Full())
 
     def apply(self, func):
         """ Apply an arbitrary function over each window of data """

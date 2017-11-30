@@ -18,7 +18,7 @@ import streamz as sz
 
 from ..core import Stream
 from streamz.sources import sink_to_file, PeriodicCallback
-from streamz.utils_test import inc, double, gen_test, tmpfile
+from streamz.utils_test import inc, double, gen_test, tmpfile, captured_logger
 from distributed.utils_test import loop
 
 
@@ -974,6 +974,46 @@ def test_execution_order():
     for ll, ll2 in zip(L, L2):
         assert ll2 == L2[0]
         assert ll != ll2
+
+
+@gen_test()
+def test_map_errors_log():
+    a = Stream()
+    b = a.delay(0.001).map(lambda x: 1 / x)
+    with captured_logger('streamz') as logger:
+        a._emit(0)
+        yield gen.sleep(0.1)
+
+        out = logger.getvalue()
+        assert 'ZeroDivisionError' in out
+
+
+def test_map_errors_raises():
+    a = Stream()
+    b = a.map(lambda x: 1 / x)
+    with pytest.raises(ZeroDivisionError):
+        a.emit(0)
+
+
+@gen_test()
+def test_accumulate_errors_log():
+    a = Stream()
+    b = a.delay(0.001).accumulate(lambda x, y: x / y)
+    with captured_logger('streamz') as logger:
+        a._emit(1)
+        a._emit(0)
+        yield gen.sleep(0.1)
+
+        out = logger.getvalue()
+        assert 'ZeroDivisionError' in out
+
+
+def test_accumulate_errors_raises():
+    a = Stream()
+    b = a.accumulate(lambda x, y: x / y)
+    with pytest.raises(ZeroDivisionError):
+        a.emit(1)
+        a.emit(0)
 
 
 if sys.version_info >= (3, 5):

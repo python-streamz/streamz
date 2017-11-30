@@ -222,7 +222,7 @@ class Stream(object):
 
     def _emit(self, x):
         result = []
-        for downstream in self.downstreams:
+        for downstream in list(self.downstreams):
             r = downstream.update(x, who=self)
             if type(r) is list:
                 result.extend(r)
@@ -481,9 +481,13 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        result = self.func(x, *self.args, **self.kwargs)
-
-        return self._emit(result)
+        try:
+            result = self.func(x, *self.args, **self.kwargs)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return self._emit(result)
 
 
 def _truthy(x):
@@ -570,7 +574,11 @@ class accumulate(Stream):
             self.state = x
             return self._emit(x)
         else:
-            result = self.func(self.state, x, **self.kwargs)
+            try:
+                result = self.func(self.state, x, **self.kwargs)
+            except Exception as e:
+                logger.exception(e)
+                raise
             if self.returns_state:
                 state, result = result
             else:
