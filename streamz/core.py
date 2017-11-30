@@ -1130,7 +1130,14 @@ def sync(loop, func, *args, **kwargs):
         else:
             return gen.with_timeout(timedelta(seconds=timeout), coro)
 
-    if not loop._running:
+    try:
+        loop_is_running = loop._running
+    except AttributeError:
+        try:
+            loop_is_running = loop.asyncio_loop.is_running()
+        except AttributeError:
+            raise NotImplementedError(type(loop))
+    if not loop_is_running:
         try:
             return loop.run_sync(make_coro)
         except RuntimeError:  # loop already running
