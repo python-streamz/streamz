@@ -256,7 +256,7 @@ class Stream(object):
                     del thread_state.asynchronous
 
                 raise gen.Return(result)
-            return sync(self.loop, _)
+            return self.loop.run_sync(_)
 
     def update(self, x, who=None):
         self._emit(x)
@@ -1114,59 +1114,3 @@ class latest(Stream):
             yield self.condition.wait()
             [x] = self.next
             yield self._emit(x)
-
-
-def sync(loop, func, *args, **kwargs):
-    """
-    Run coroutine in loop running in separate thread.
-    """
-    # This was taken from distrbuted/utils.py
-    timeout = kwargs.pop('callback_timeout', None)
-
-    def make_coro():
-        coro = gen.maybe_future(func(*args, **kwargs))
-        if timeout is None:
-            return coro
-        else:
-            return gen.with_timeout(timedelta(seconds=timeout), coro)
-
-    try:
-        loop_is_running = loop._running
-    except AttributeError:
-        try:
-            loop_is_running = loop.asyncio_loop.is_running()
-        except AttributeError:
-            raise NotImplementedError(type(loop))
-    if not loop_is_running:
-        try:
-            return loop.run_sync(make_coro)
-        except RuntimeError:  # loop already running
-            pass
-
-    e = threading.Event()
-    main_tid = get_thread_identity()
-    result = [None]
-    error = [False]
-
-    @gen.coroutine
-    def f():
-        try:
-            if main_tid == get_thread_identity():
-                raise RuntimeError("sync() called from thread of running loop")
-            yield gen.moment
-            thread_state.asynchronous = True
-            result[0] = yield make_coro()
-        except Exception as exc:
-            logger.exception(exc)
-            error[0] = sys.exc_info()
-        finally:
-            thread_state.asynchronous = False
-            e.set()
-
-    loop.add_callback(f)
-    while not e.is_set():
-        e.wait(1000000)
-    if error[0]:
-        six.reraise(*error[0])
-    else:
-        return result[0]
