@@ -1,24 +1,4 @@
-from __future__ import absolute_import, division, print_function
-
-from collections import deque
-from datetime import timedelta
-import functools
-import logging
-import six
-import sys
-import threading
-from time import time
-import weakref
-
-import toolz
-from tornado import gen
-from tornado.locks import Condition
-from tornado.ioloop import IOLoop
-from tornado.queues import Queue
-from collections import Iterable
-
-from .compatibility import get_thread_identity
-from .orderedweakset import OrderedWeakrefSet
+convenience
 
 no_default = '--no-default--'
 
@@ -483,6 +463,49 @@ class map(Stream):
     def update(self, x, who=None):
         try:
             result = self.func(x, *self.args, **self.kwargs)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return self._emit(result)
+
+
+@Stream.register_api()
+class smap(Stream):
+    """ Apply a function to every element in the stream, splayed out
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.smap(lambda a, b: a + b).sink(print)
+    >>> for i in range(5):
+    ...     source.emit((i, i))
+    0
+    2
+    4
+    6
+    8
+    """
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        try:
+            result = self.func(*x, *self.args, **self.kwargs)
         except Exception as e:
             logger.exception(e)
             raise
