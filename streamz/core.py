@@ -491,7 +491,7 @@ class map(Stream):
 
 
 @Stream.register_api()
-class smap(Stream):
+class starmap(Stream):
     """ Apply a function to every element in the stream, splayed out
 
     Parameters
@@ -524,8 +524,9 @@ class smap(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
+        y = x + self.args
         try:
-            result = self.func(*x, *self.args, **self.kwargs)
+            result = self.func(*y, **self.kwargs)
         except Exception as e:
             logger.exception(e)
             raise
