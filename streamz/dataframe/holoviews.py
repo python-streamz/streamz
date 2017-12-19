@@ -271,7 +271,7 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
     def bars(self):
         return self.chart(Bars)
 
-    def barh(self, x, y):
+    def barh(self):
         return self.bars().opts(plot={'Bars': dict(invert_axes=True)})
 
     def box(self):
