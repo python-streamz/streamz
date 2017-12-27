@@ -490,6 +490,50 @@ class map(Stream):
             return self._emit(result)
 
 
+@Stream.register_api()
+class starmap(Stream):
+    """ Apply a function to every element in the stream, splayed out
+
+    Parameters
+    ----------
+    func: callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.smap(lambda a, b: a + b).sink(print)
+    >>> for i in range(5):
+    ...     source.emit((i, i))
+    0
+    2
+    4
+    6
+    8
+    """
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        # this is one of a few stream specific kwargs
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        y = x + self.args
+        try:
+            result = self.func(*y, **self.kwargs)
+        except Exception as e:
+            logger.exception(e)
+            raise
+        else:
+            return self._emit(result)
+
+
 def _truthy(x):
     return not not x
 
