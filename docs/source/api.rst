@@ -26,6 +26,7 @@ Stream
    scatter
    sink
    sliding_window
+   starmap
    timed_window
    union
    unique
