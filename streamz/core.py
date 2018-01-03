@@ -107,7 +107,7 @@ class Stream(object):
                  loop=None, asynchronous=None, ensure_io_loop=False):
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
-            self.upstreams = upstreams
+            self.upstreams = list(upstreams)
         else:
             self.upstreams = [upstream]
 
