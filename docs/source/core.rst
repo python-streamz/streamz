@@ -225,7 +225,7 @@ slow down the flow of data through sensitive parts of the pipeline,
 particularly when they may be writing to slow resources like databases.
 
 Streamz helps you do these operations both with operations like ``delay``,
-``rate_limit``, and ``timed_window``, and also by passing `Torando
+``rate_limit``, and ``timed_window``, and also by passing `Tornado
 <http://www.tornadoweb.org/en/stable/>`_ futures back through the
 pipeline.  As data moves forward through the pipeline, futures that signal work
 completed move backwards.  In this way you can reliably avoid buildup of data
