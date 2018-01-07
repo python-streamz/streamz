@@ -24,7 +24,8 @@ class HoloViewsConverter(object):
                  xlim=None, ylim=None, xticks=None, yticks=None,
                  fontsize=None, colormap=None, stacked=False,
                  logx=False, logy=False, loglog=False, hover=False,
-                 **kwds):
+                 style_opts={}, plot_opts={}, use_index=True,
+                 value_label='value', group_label='Group', **kwds):
 
         # Set up HoloViews stream
         if isinstance(data, (Series, Seriess)):
@@ -40,7 +41,10 @@ class HoloViewsConverter(object):
         # High-level options
         self.by = by
         self.stacked = stacked
+        self.use_index = use_index
         self.kwds = kwds
+        self.value_label = value_label
+        self.group_label = group_label
 
         # Process style options
         if 'cmap' in kwds and colormap:
@@ -49,10 +53,10 @@ class HoloViewsConverter(object):
             cmap = kwds.pop('cmap')
         else:
             cmap = colormap
-        self._style_opts = {'fontsize': fontsize, 'cmap': cmap}
+        self._style_opts = {'fontsize': fontsize, 'cmap': cmap, **style_opts}
 
         # Process plot options
-        plot_options = {}
+        plot_options = dict(plot_opts)
         plot_options['logx'] = logx or loglog
         plot_options['logy'] = logy or loglog
         plot_options['show_grid'] = grid
@@ -83,7 +87,7 @@ class HoloViewsConverter(object):
         self._norm_opts = {'framewise': True}
 
     def reset_index(self, data):
-        if self.stream_type == 'updating':
+        if self.stream_type == 'updating' and self.use_index:
             return data.reset_index()
         else:
             return data
@@ -110,11 +114,13 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         return getattr(self, kind)(x, y)
 
     def single_chart(self, chart, x, y):
-        opts = dict(plot=self._plot_opts, norm=self._norm_opts)
+        opts = dict(plot=self._plot_opts, norm=self._norm_opts,
+                    style=self._style_opts)
         ranges = {x: self._dim_ranges['x'], y: self._dim_ranges['y']}
 
         def single_chart(data):
-            return (chart(self.reset_index(data), x, y).redim.range(**ranges)
+            ys = [y]+[c for c in data.columns if c not in (x, y)]
+            return (chart(self.reset_index(data), x, ys).redim.range(**ranges)
                     .relabel(**self._relabel).opts(**opts))
 
         return DynamicMap(single_chart, streams=[self.stream])
@@ -132,7 +138,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         def multi_chart(data):
             charts = {}
             for c in data.columns[1:]:
-                chart = element(data, x, c)
+                chart = element(data, x, c).redim(**{c: self.value_label})
                 ranges = {x: self._dim_ranges['x'], c: self._dim_ranges['y']}
                 charts[c] = (chart.relabel(**self._relabel)
                              .redim.range(**ranges).opts(**opts))
@@ -143,7 +149,12 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         return self.chart(Curve, x, y)
 
     def scatter(self, x, y):
-        return self.chart(Scatter, x, y)
+        scatter = self.chart(Scatter, x, y)
+        if 'c' in self.kwds:
+            color_opts = {'Scatter': {'colorbar': self.kwds.get('colorbar', False),
+                                      'color_index': self.kwds['c']}}
+            return scatter.opts(plot=color_opts)
+        return scatter
 
     def area(self, x, y):
         areas = self.chart(Area, x, y)
@@ -151,7 +162,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
             areas = areas.map(Area.stack, NdOverlay)
         return areas
 
-    def bars(self, x, y):
+    def bar(self, x, y):
         if x and y:
             return self.single_chart(Bars, x, y)
 
@@ -160,17 +171,17 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         opts = {'plot': dict(self._plot_opts, labelled=['x'],
                              stack_index=stack_index),
                 'norm': self._norm_opts}
-        ranges = {'Value': self._dim_ranges['y']}
+        ranges = {self.value_label: self._dim_ranges['y']}
 
         def bars(data):
             data = self.reset_index(data)
-            df = pd.melt(data, id_vars=[index], var_name='Group', value_name='Value')
-            return (Bars(df, [index, 'Group'], 'Value').redim.range(**ranges)
+            df = pd.melt(data, id_vars=[index], var_name=self.group_label, value_name=self.value_label)
+            return (Bars(df, [index, self.group_label], self.value_label).redim.range(**ranges)
                     .relabel(**self._relabel).opts(**opts))
         return DynamicMap(bars, streams=[self.stream])
 
     def barh(self, x, y):
-        return self.bars(x, y).opts(plot={'Bars': dict(invert_axes=True)})
+        return self.bar(x, y).opts(plot={'Bars': dict(invert_axes=True)})
 
     def box(self, x, y):
         if x and y:
@@ -179,19 +190,19 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         index = self.data.example.index.name or 'index'
         if self.by:
             id_vars = [index, self.by]
-            kdims = ['Group', self.by]
+            kdims = [self.group_label, self.by]
         else:
-            kdims = ['Group']
+            kdims = [self.group_label]
             id_vars = [index]
         invert = not self.kwds.get('vert', True)
         opts = {'plot': dict(self._plot_opts, labelled=[], invert_axes=invert),
                 'norm': self._norm_opts}
-        ranges = {'Value': self._dim_ranges['y']}
+        ranges = {self.value_label: self._dim_ranges['y']}
 
         def box(data):
             data = self.reset_index(data)
-            df = pd.melt(data, id_vars=id_vars, var_name='Group', value_name='Value')
-            return (BoxWhisker(df, kdims, 'Value').redim.range(**ranges)
+            df = pd.melt(data, id_vars=id_vars, var_name=self.group_label, value_name=self.value_label)
+            return (BoxWhisker(df, kdims, self.value_label).redim.range(**ranges)
                     .relabel(**self._relabel).opts(**opts))
         return DynamicMap(box, streams=[self.stream])
 
@@ -228,13 +239,13 @@ class HoloViewsFrameConverter(HoloViewsConverter):
 
         def kde(data):
             data = self.reset_index(data)
-            df = pd.melt(data, id_vars=[index], var_name='Group', value_name='Value')
+            df = pd.melt(data, id_vars=[index], var_name=self.group_label, value_name=self.value_label)
             ds = Dataset(df)
             if len(df):
-                overlay = ds.to(Distribution, 'Value').overlay()
+                overlay = ds.to(Distribution, self.value_label).overlay()
             else:
-                overlay = NdOverlay({0: Area([], 'Value', 'Value Density')},
-                                    ['Group'])
+                overlay = NdOverlay({0: Area([], self.value_label, self.value_label+' Density')},
+                                    [self.group_label])
             return overlay.relabel(**self._relabel).opts(**opts)
         return DynamicMap(kde, streams=[self.stream])
 
@@ -268,11 +279,11 @@ class HoloViewsSeriesConverter(HoloViewsConverter):
     def area(self):
         return self.chart(Area)
 
-    def bars(self):
+    def bar(self):
         return self.chart(Bars)
 
     def barh(self):
-        return self.bars().opts(plot={'Bars': dict(invert_axes=True)})
+        return self.bar().opts(plot={'Bars': dict(invert_axes=True)})
 
     def box(self):
         opts = dict(plot=self._plot_opts, norm=self._norm_opts)
@@ -571,7 +582,7 @@ class HoloViewsFramePlot(object):
         -------
         Element : Element or NdOverlay of Elements
         """
-        return self(x, y, kind='bars', **kwds)
+        return self(x, y, kind='bar', **kwds)
 
     def barh(self, **kwds):
         """
