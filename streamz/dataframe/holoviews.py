@@ -53,7 +53,7 @@ class HoloViewsConverter(object):
             cmap = kwds.pop('cmap')
         else:
             cmap = colormap
-        self._style_opts = {'fontsize': fontsize, 'cmap': cmap, **style_opts}
+        self._style_opts = dict(fontsize=fontsize, cmap=cmap, **style_opts)
 
         # Process plot options
         plot_options = dict(plot_opts)
@@ -119,7 +119,7 @@ class HoloViewsFrameConverter(HoloViewsConverter):
         ranges = {x: self._dim_ranges['x'], y: self._dim_ranges['y']}
 
         def single_chart(data):
-            ys = [y]+[c for c in data.columns if c not in (x, y)]
+            ys = [y] + [c for c in data.columns if c not in (x, y)]
             return (chart(self.reset_index(data), x, ys).redim.range(**ranges)
                     .relabel(**self._relabel).opts(**opts))
 
@@ -244,7 +244,8 @@ class HoloViewsFrameConverter(HoloViewsConverter):
             if len(df):
                 overlay = ds.to(Distribution, self.value_label).overlay()
             else:
-                overlay = NdOverlay({0: Area([], self.value_label, self.value_label+' Density')},
+                vdim = self.value_label + ' Density'
+                overlay = NdOverlay({0: Area([], self.value_label, vdim)},
                                     [self.group_label])
             return overlay.relabel(**self._relabel).opts(**opts)
         return DynamicMap(kde, streams=[self.stream])
