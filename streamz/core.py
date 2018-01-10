@@ -516,6 +516,55 @@ class sink(Stream):
 
 
 @Stream.register_api()
+class starsink(Stream):
+    """ Apply a function on every element
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> L = list()
+    >>> source.sink(L.append)
+    >>> source.sink(print)
+    >>> source.sink(print)
+    >>> source.emit(123)
+    123
+    123
+    >>> L
+    [123]
+
+    See Also
+    --------
+    map
+    Stream.sink_to_list
+    """
+    _graphviz_shape = 'trapezium'
+
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        # take the stream specific kwargs out
+        stream_name = kwargs.pop("stream_name", None)
+        self.kwargs = kwargs
+        self.args = args
+
+        Stream.__init__(self, upstream, stream_name=stream_name)
+        _global_sinks.add(self)
+
+    def update(self, x, who=None):
+        try:
+            y = x + self.args
+            result = self.func(*y, **self.kwargs)
+        except Exception as e:
+            print('Error in {}'.format(self.name))
+            print('args={}, kwargs={}'.format(self.args, self.kwargs))
+            print('x={}'.format(x))
+            raise e
+        if gen.isawaitable(result):
+            return result
+        else:
+            return []
+
+
+@Stream.register_api()
 class map(Stream):
     """ Apply a function to every element in the stream
 
