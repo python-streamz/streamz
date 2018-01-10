@@ -550,14 +550,8 @@ class starsink(Stream):
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        try:
-            y = x + self.args
-            result = self.func(*y, **self.kwargs)
-        except Exception as e:
-            print('Error in {}'.format(self.name))
-            print('args={}, kwargs={}'.format(self.args, self.kwargs))
-            print('x={}'.format(x))
-            raise e
+        y = x + self.args
+        result = self.func(*y, **self.kwargs)
         if gen.isawaitable(result):
             return result
         else:
