@@ -40,6 +40,20 @@ def test_basic():
     assert Lb == [0, 2, 4, 6]
 
 
+def test_star_sink():
+    L = []
+
+    def add(x, y):
+        L.append(x + y)
+
+    source = Stream()
+    source.starsink(add)
+
+    source.emit((1, 10))
+
+    assert L[0] == 11
+
+
 def test_no_output():
     source = Stream()
     assert source.emit(1) is None
