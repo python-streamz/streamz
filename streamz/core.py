@@ -7,6 +7,7 @@ import logging
 import six
 import sys
 import threading
+from collections import MutableMapping
 from time import time
 import weakref
 
@@ -524,7 +525,10 @@ class starmap(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        y = x + self.args
+        if self.args:
+            y = x + self.args
+        else:
+            y = x
         try:
             result = self.func(*y, **self.kwargs)
         except Exception as e:
@@ -980,14 +984,21 @@ class unique(Stream):
         if history:
             from zict import LRU
             self.seen = LRU(history, self.seen)
+            self.dict_seen = deque(maxlen=history)
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
-        if y not in self.seen:
-            self.seen[y] = 1
-            return self._emit(x)
+        # If y is a dict then we can't use LRU cache use FILO deque instead
+        if isinstance(y, MutableMapping):
+            if y not in self.dict_seen:
+                self.dict_seen.append(y)
+                return self._emit(x)
+        else:
+            if y not in self.seen:
+                self.seen[y] = 1
+                return self._emit(x)
 
 
 @Stream.register_api()
