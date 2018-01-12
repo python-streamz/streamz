@@ -359,7 +359,7 @@ generally.
 
 In the following example we pass filenames through a stream, convert them to
 Pandas dataframes, and then map pandas-level functions on those dataframes.
-For operations like this Streamz adds virtually no overhead>
+For operations like this Streamz adds virtually no overhead.
 
 .. code-block:: python
 
