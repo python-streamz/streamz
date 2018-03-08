@@ -80,14 +80,9 @@ interaction) or when using Dask (next section).
 .. code-block:: python
 
    from streamz import Stream
-   from tornado.ioloop import IOLoop
-   from threading import Thread
-   loop = IOLoop()
-   thread = Thread(target=loop.start, daemon=True)
-   thread.start()
 
-   source = Stream()
-   source.map(increment).rate_limit(0.500, loop=loop).sink(write)
+   source = Stream(ensure_io_loop=True)  # starts IOLoop in separate thread
+   source.map(increment).rate_limit('500ms').sink(write)
 
    for x in range(10):
        source.emit(x)

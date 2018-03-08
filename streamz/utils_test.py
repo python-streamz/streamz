@@ -5,8 +5,11 @@ import six
 import shutil
 import tempfile
 
+import pytest
 from tornado import gen
 from tornado.ioloop import IOLoop
+
+from .core import _io_loops
 
 
 @contextmanager
@@ -105,3 +108,11 @@ def captured_logger(logger, level=logging.INFO, propagate=None):
         logger.setLevel(orig_level)
         if propagate is not None:
             logger.propagate = orig_propagate
+
+
+@pytest.fixture
+def clean():
+    for loop in _io_loops:
+        loop.add_callback(loop.stop)
+
+    _io_loops.clear()

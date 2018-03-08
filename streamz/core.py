@@ -31,6 +31,23 @@ thread_state = threading.local()
 logger = logging.getLogger(__name__)
 
 
+_io_loops = []
+
+
+def get_io_loop(asynchronous=None):
+    if asynchronous:
+        return IOLoop.current()
+
+    if not _io_loops:
+        loop = IOLoop()
+        thread = threading.Thread(target=loop.start)
+        thread.daemon = True
+        thread.start()
+        _io_loops.append(loop)
+
+    return _io_loops[-1]
+
+
 def identity(x):
     return x
 
@@ -44,6 +61,16 @@ class Stream(object):
     subscribe to it.  Downstream Stream objects may connect at any point of a
     Stream graph to get a full view of the data coming off of that point to do
     with as they will.
+
+    Parameters
+    ----------
+    asynchronous: boolean or None
+        Whether or not this stream will be used in asynchronous functions or
+        normal Python functions.  Leave as None if you don't know.
+    ensure_io_loop: boolean
+        Ensure that some IOLoop will be created.  If asynchronous is None or
+        False then this will be in a separate thread, otherwise it will be
+        IOLoop.current
 
     Examples
     --------
@@ -75,35 +102,45 @@ class Stream(object):
     str_list = ['func', 'predicate', 'n', 'interval']
 
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
-                 loop=None, asynchronous=False):
-        self.asynchronous = asynchronous
+                 loop=None, asynchronous=None, ensure_io_loop=False):
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = upstreams
         else:
             self.upstreams = [upstream]
-        if loop is None:
-            for upstream in self.upstreams:
-                if upstream and upstream.loop:
-                    loop = upstream.loop
-                    break
-        self.loop = loop
+
+        self._set_asynchronous(asynchronous)
+        self._set_loop(loop)
+        if ensure_io_loop and not self.loop:
+            self._set_asynchronous(False)
+        if self.loop is None and self.asynchronous is not None:
+            self._set_loop(get_io_loop(self.asynchronous))
+
         for upstream in self.upstreams:
             if upstream:
                 upstream.downstreams.add(self)
+
         self.name = stream_name
-        if loop:
+
+    def _set_loop(self, loop):
+        self.loop = None
+        if loop is not None:
+            self._inform_loop(loop)
+        else:
             for upstream in self.upstreams:
-                if upstream:
-                    upstream._inform_loop(loop)
+                if upstream and upstream.loop:
+                    self.loop = upstream.loop
+                    inform = False
+                    break
 
     def _inform_loop(self, loop):
         """
         Percolate information about an event loop to the rest of the stream
         """
-        if self.loop is loop:
-            return
-        elif self.loop is None:
+        if self.loop is not None:
+            if self.loop is not loop:
+                raise ValueError("Two different event loops active")
+        else:
             self.loop = loop
             for upstream in self.upstreams:
                 if upstream:
@@ -111,8 +148,32 @@ class Stream(object):
             for downstream in self.downstreams:
                 if downstream:
                     downstream._inform_loop(loop)
+
+    def _set_asynchronous(self, asynchronous):
+        self.asynchronous = None
+        if asynchronous is not None:
+            self._inform_asynchronous(asynchronous)
         else:
-            raise ValueError("Two different event loops active")
+            for upstream in self.upstreams:
+                if upstream and upstream.asynchronous:
+                    self.asynchronous = upstream.asynchronous
+                    break
+
+    def _inform_asynchronous(self, asynchronous):
+        """
+        Percolate information about an event loop to the rest of the stream
+        """
+        if self.asynchronous is not None:
+            if self.asynchronous is not asynchronous:
+                raise ValueError("Stream has both asynchronous and synchronous elements")
+        else:
+            self.asynchronous = asynchronous
+            for upstream in self.upstreams:
+                if upstream:
+                    upstream._inform_asynchronous(asynchronous)
+            for downstream in self.downstreams:
+                if downstream:
+                    downstream._inform_asynchronous(asynchronous)
 
     @classmethod
     def register_api(cls, modifier=identity):
@@ -710,13 +771,12 @@ class timed_window(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, upstream, interval, loop=None, **kwargs):
-        loop = loop or upstream.loop or IOLoop.current()
+    def __init__(self, upstream, interval, **kwargs):
         self.interval = convert_interval(interval)
         self.buffer = []
         self.last = gen.moment
 
-        Stream.__init__(self, upstream, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -738,12 +798,11 @@ class delay(Stream):
     """ Add a time delay to results """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, upstream, interval, loop=None, **kwargs):
-        loop = loop or upstream.loop or IOLoop.current()
+    def __init__(self, upstream, interval, **kwargs):
         self.interval = convert_interval(interval)
         self.queue = Queue()
 
-        Stream.__init__(self, upstream, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -801,11 +860,10 @@ class buffer(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, upstream, n, loop=None, **kwargs):
-        loop = loop or upstream.loop or IOLoop.current()
+    def __init__(self, upstream, n, **kwargs):
         self.queue = Queue(maxsize=n)
 
-        Stream.__init__(self, upstream, loop=loop, **kwargs)
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -1139,12 +1197,11 @@ class latest(Stream):
     """
     _graphviz_shape = 'octagon'
 
-    def __init__(self, upstream, loop=None):
-        loop = loop or upstream.loop or IOLoop.current()
+    def __init__(self, upstream, **kwargs):
         self.condition = Condition()
         self.next = []
 
-        Stream.__init__(self, upstream, loop=loop)
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 

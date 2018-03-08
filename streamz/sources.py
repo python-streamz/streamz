@@ -8,8 +8,8 @@ from tornado import gen
 from .core import Stream
 
 
-def PeriodicCallback(callback, callback_time, **kwargs):
-    source = Stream()
+def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
+    source = Stream(asynchronous=asynchronous)
 
     def _():
         result = callback()
