@@ -40,6 +40,11 @@ def test_basic():
     assert Lb == [0, 2, 4, 6]
 
 
+def test_no_output():
+    source = Stream()
+    assert source.emit(1) is None
+
+
 def test_scan():
     source = Stream()
 

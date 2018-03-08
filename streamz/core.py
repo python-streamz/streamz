@@ -130,7 +130,6 @@ class Stream(object):
             for upstream in self.upstreams:
                 if upstream and upstream.loop:
                     self.loop = upstream.loop
-                    inform = False
                     break
 
     def _inform_loop(self, loop):
@@ -299,12 +298,13 @@ class Stream(object):
         done at any point
         """
         ts_async = getattr(thread_state, 'asynchronous', False)
-        if asynchronous or self.loop is None or ts_async or self.asynchronous:
+        if self.loop is None or asynchronous or self.asynchronous or ts_async:
             if not ts_async:
                 thread_state.asynchronous = True
             try:
                 result = self._emit(x)
-                return gen.convert_yielded(result)
+                if self.loop:
+                    return gen.convert_yielded(result)
             finally:
                 thread_state.asynchronous = ts_async
         else:
@@ -317,7 +317,7 @@ class Stream(object):
                     del thread_state.asynchronous
 
                 raise gen.Return(result)
-            return sync(self.loop, _)
+            sync(self.loop, _)
 
     def update(self, x, who=None):
         self._emit(x)
@@ -976,7 +976,7 @@ class combine_latest(Stream):
         self.last[self.upstreams.index(who)] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
-            return self.emit(tup)
+            return self._emit(tup)
 
 
 @Stream.register_api()
@@ -1230,12 +1230,6 @@ def sync(loop, func, *args, **kwargs):
             return coro
         else:
             return gen.with_timeout(timedelta(seconds=timeout), coro)
-
-    if not loop._running:
-        try:
-            return loop.run_sync(make_coro)
-        except RuntimeError:  # loop already running
-            pass
 
     e = threading.Event()
     main_tid = get_thread_identity()
