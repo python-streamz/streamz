@@ -12,7 +12,8 @@ from tornado import gen
 
 from streamz import Stream
 from streamz.utils_test import gen_test
-from streamz.dataframe import DataFrame, Series, DataFrames, Seriess
+from streamz.dataframe import (DataFrame, Series, DataFrames, Seriess,
+        Aggregation)
 import streamz.dataframe as sd
 from streamz.dask import DaskStream
 
@@ -835,3 +836,35 @@ def test_window_full():
     assert_eq(L[0], df.iloc[:3])
     assert_eq(L[1], df.iloc[4:8])
     assert_eq(L[2], df.iloc[-4:])
+
+
+def test_custom_aggregation():
+    df = pd.DataFrame({'x': np.arange(10, dtype=float), 'y': [1.0, 2.0] * 5})
+
+    class Custom(Aggregation):
+        def initial(self, new):
+            return 0
+
+        def on_new(self, state, new):
+            return state + 1, state
+
+        def on_old(self, state, new):
+            return state - 100, state
+
+    sdf = DataFrame(example=df)
+    L = sdf.aggregate(Custom()).stream.sink_to_list()
+
+    sdf.emit(df)
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert L == [0, 1, 2]
+
+    sdf = DataFrame(example=df)
+    L = sdf.window(n=5).aggregate(Custom()).stream.sink_to_list()
+
+    sdf.emit(df)
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert L == [1, -198, -397]
