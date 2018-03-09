@@ -2,7 +2,6 @@ from glob import glob
 import os
 
 import tornado.ioloop
-from tornado.ioloop import IOLoop
 from tornado import gen
 
 from .core import Stream
@@ -147,7 +146,6 @@ class from_kafka(Source):
     """
     def __init__(self, topics, consumer_params, poll_interval=0.1):
         import confluent_kafka as ck
-        IOLoop.current().add_callback(self.poll_kafka)
         self.cpars = consumer_params
         self.consumer = ck.Consumer(consumer_params)
         self.consumer.subscribe(topics)
@@ -155,6 +153,7 @@ class from_kafka(Source):
         self.sleep = poll_interval
 
         super(from_kafka, self).__init__(ensure_io_loop=True)
+        self.loop.add_callback(self.poll_kafka)
 
     @gen.coroutine
     def poll_kafka(self):
