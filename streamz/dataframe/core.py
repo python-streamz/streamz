@@ -58,7 +58,6 @@ class Frame(BaseFrame):
                                           start=None, stream_type='updating',
                                           returns_state=True)
 
-
     def sum(self):
         """ Sum frame """
         return self.aggregate(aggregations.Sum())
