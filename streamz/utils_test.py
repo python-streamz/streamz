@@ -115,4 +115,4 @@ def clean():
     for loop in _io_loops:
         loop.add_callback(loop.stop)
 
-    _io_loops.clear()
+    del _io_loops[:]
