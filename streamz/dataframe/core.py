@@ -52,34 +52,29 @@ class Frame(BaseFrame):
         """ Groupby aggreagtions """
         return GroupBy(self, other)
 
-    def sum(self):
-        """ Sum frame """
+    def aggregate(self, aggregation):
         return self.accumulate_partitions(aggregations.accumulator,
-                                          agg=aggregations.Sum(),
+                                          agg=aggregation,
                                           start=None, stream_type='updating',
                                           returns_state=True)
 
+
+    def sum(self):
+        """ Sum frame """
+        return self.aggregate(aggregations.Sum())
+
     def count(self):
         """ Count of frame """
-        return self.accumulate_partitions(aggregations.accumulator,
-                                          agg=aggregations.Count(),
-                                          start=None, stream_type='updating',
-                                          returns_state=True)
+        return self.aggregate(aggregations.Count())
 
     @property
     def size(self):
         """ size of frame """
-        return self.accumulate_partitions(aggregations.accumulator,
-                                          agg=aggregations.Size(),
-                                          start=None, stream_type='updating',
-                                          returns_state=True)
+        return self.aggregate(aggregations.Size())
 
     def mean(self):
         """ Average """
-        return self.accumulate_partitions(aggregations.accumulator,
-                                          agg=aggregations.Mean(),
-                                          start=None, stream_type='updating',
-                                          returns_state=True)
+        return self.aggregate(aggregations.Mean())
 
     def rolling(self, window, min_periods=1):
         """ Compute rolling aggregations
@@ -540,7 +535,7 @@ class Window(OperatorMixin):
     def reset_index(self):
         return Window(self.root.reset_index(), n=self.n, value=self.value)
 
-    def _known_aggregation(self, agg):
+    def aggregate(self, agg):
         if self.n is not None:
             diff = aggregations.diff_iloc
             window = self.n
@@ -556,28 +551,28 @@ class Window(OperatorMixin):
                                               stream_type='updating')
 
     def full(self):
-        return self._known_aggregation(aggregations.Full())
+        return self.aggregate(aggregations.Full())
 
     def apply(self, func):
         """ Apply an arbitrary function over each window of data """
-        result = self._known_aggregation(aggregations.Full())
+        result = self.aggregate(aggregations.Full())
         return result.map_partitions(func, result)
 
     def sum(self):
         """ Sum elements within window """
-        return self._known_aggregation(aggregations.Sum())
+        return self.aggregate(aggregations.Sum())
 
     def count(self):
         """ Count elements within window """
-        return self._known_aggregation(aggregations.Count())
+        return self.aggregate(aggregations.Count())
 
     def mean(self):
         """ Average elements within window """
-        return self._known_aggregation(aggregations.Mean())
+        return self.aggregate(aggregations.Mean())
 
     def var(self, ddof=1):
         """ Compute variance of elements within window """
-        return self._known_aggregation(aggregations.Var(ddof=ddof))
+        return self.aggregate(aggregations.Var(ddof=ddof))
 
     def std(self, ddof=1):
         """ Compute standard deviation of elements within window """
@@ -586,11 +581,11 @@ class Window(OperatorMixin):
     @property
     def size(self):
         """ Number of elements within window """
-        return self._known_aggregation(aggregations.Size())
+        return self.aggregate(aggregations.Size())
 
     def value_counts(self):
         """ Count groups of elements within window """
-        return self._known_aggregation(aggregations.ValueCounts())
+        return self.aggregate(aggregations.ValueCounts())
 
     def groupby(self, other):
         """ Groupby-aggregations within window """

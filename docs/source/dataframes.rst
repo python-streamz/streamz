@@ -109,6 +109,19 @@ following:
            new_value = total / count
            return new_state, new_value
 
+These aggregations can then used in a variety of different windowing schemes
+with the ``aggregate`` method as follows:
+
+.. code-block:: python
+
+    df.aggregate(Mean())
+
+    df.window(n=100).aggregate(Mean())
+
+    df.window(value='60s').aggregate(Mean())
+
+whose job it is to deliver new and old data to your aggregation for processing.
+
 
 Windowing Schemes
 +++++++++++++++++
@@ -144,6 +157,7 @@ These windowing schemes include the following:
 Windowing schemes generally maintain a deque of historical values within
 accumulated state.  As new data comes in they inspect that state and eject data
 that no longer falls within the window.
+
 
 Grouping
 ++++++++
