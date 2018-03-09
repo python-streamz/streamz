@@ -76,7 +76,7 @@ def test_zip(c, s, a, b):
 @pytest.mark.slow
 def test_sync(loop):
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop):  # flake8: noqa
+        with Client(s['address'], loop=loop) as client:  # flake8: noqa
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
@@ -128,6 +128,8 @@ def test_buffer(c, s, a, b):
 
     assert L == list(map(inc, range(10)))
 
+    assert source.loop == c.loop
+
 
 @pytest.mark.slow
 def test_buffer_sync(loop):
@@ -152,3 +154,13 @@ def test_buffer_sync(loop):
                 assert time.time() - start < 5
 
             assert L == list(map(inc, range(10)))
+
+
+@pytest.mark.xfail(reason='')
+@pytest.mark.slow
+def test_stream_shares_client_loop(loop):
+    with cluster() as (s, [a, b]):
+        with Client(s['address'], loop=loop) as client:  # flake8: noqa
+            source = Stream()
+            d = source.timed_window('20ms').scatter()
+            assert source.loop is client.loop

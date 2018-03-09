@@ -2,14 +2,13 @@ from glob import glob
 import os
 
 import tornado.ioloop
-from tornado.ioloop import IOLoop
 from tornado import gen
 
 from .core import Stream
 
 
-def PeriodicCallback(callback, callback_time, **kwargs):
-    source = Stream()
+def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
+    source = Stream(asynchronous=asynchronous)
 
     def _():
         result = callback()
@@ -63,7 +62,7 @@ class from_textfile(Source):
         self.file = f
 
         self.poll_interval = poll_interval
-        super(from_textfile, self).__init__(**kwargs)
+        super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
 
     @gen.coroutine
     def start(self):
@@ -104,7 +103,7 @@ class filenames(Source):
         self.seen = set()
         self.poll_interval = poll_interval
 
-        super(filenames, self).__init__()
+        super(filenames, self).__init__(ensure_io_loop=True)
 
     @gen.coroutine
     def start(self):
@@ -147,14 +146,14 @@ class from_kafka(Source):
     """
     def __init__(self, topics, consumer_params, poll_interval=0.1):
         import confluent_kafka as ck
-        IOLoop.current().add_callback(self.poll_kafka)
         self.cpars = consumer_params
         self.consumer = ck.Consumer(consumer_params)
         self.consumer.subscribe(topics)
         self.topics = topics
         self.sleep = poll_interval
 
-        super(from_kafka, self).__init__()
+        super(from_kafka, self).__init__(ensure_io_loop=True)
+        self.loop.add_callback(self.poll_kafka)
 
     @gen.coroutine
     def poll_kafka(self):

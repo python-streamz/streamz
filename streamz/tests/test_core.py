@@ -16,9 +16,10 @@ from tornado.ioloop import IOLoop
 
 import streamz as sz
 
-from ..core import Stream
+from streamz import Stream
 from streamz.sources import sink_to_file, PeriodicCallback
-from streamz.utils_test import inc, double, gen_test, tmpfile, captured_logger
+from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,
+        clean)
 from distributed.utils_test import loop
 
 
@@ -37,6 +38,11 @@ def test_basic():
 
     assert Lc == [1, 3, 6, 10]
     assert Lb == [0, 2, 4, 6]
+
+
+def test_no_output():
+    source = Stream()
+    assert source.emit(1) is None
 
 
 def test_scan():
@@ -194,7 +200,7 @@ def test_timed_window():
     assert not L[-1]
 
 
-def test_timed_window_timedelta():
+def test_timed_window_timedelta(clean):
     pytest.importorskip('pandas')
     source = Stream(asynchronous=True)
     a = source.timed_window('10ms')
@@ -257,7 +263,7 @@ def test_sink_with_args_and_kwargs():
 @gen_test()
 def test_counter():
     counter = itertools.count()
-    source = PeriodicCallback(lambda: next(counter), 0.001)
+    source = PeriodicCallback(lambda: next(counter), 0.001, asynchronous=True)
     L = source.sink_to_list()
     yield gen.sleep(0.05)
 
@@ -597,7 +603,7 @@ def test_filter_str():
     assert str(s) == '<filter: iseven>'
 
 
-def test_timed_window_str():
+def test_timed_window_str(clean):
     source = Stream()
     s = source.timed_window(.05)
     assert str(s) == '<timed_window: 0.05>'
@@ -736,7 +742,8 @@ def test_from_file():
             f.write('{"x": 3, "y": 2}\n')
             f.flush()
 
-            source = Stream.from_textfile(fn, poll_interval=0.010)
+            source = Stream.from_textfile(fn, poll_interval=0.010,
+                                          asynchronous=True)
             L = source.map(json.loads).pluck('x').sink_to_list()
 
             assert L == []
@@ -764,7 +771,7 @@ def test_filenames():
         with open(os.path.join(fn, 'b'), 'w') as f:
             pass
 
-        source = Stream.filenames(fn)
+        source = Stream.filenames(fn, asynchronous=True)
         L = source.sink_to_list()
         source.start()
 
@@ -850,7 +857,7 @@ def test_destroy():
     assert L == [2]
 
 
-def dont_test_stream_kwargs():
+def dont_test_stream_kwargs(clean):
     ''' Test the good and bad kwargs for the stream
         Currently just stream_name
     '''
@@ -923,11 +930,11 @@ def thread(loop):
     return thread
 
 
-def test_percolate_loop_information(loop, thread):
+def test_percolate_loop_information(clean):
     source = Stream()
     assert not source.loop
     s = source.timed_window(0.5)
-    assert source.loop is IOLoop.current()
+    assert source.loop is s.loop
 
 
 def test_separate_thread_without_time(loop, thread):
@@ -940,7 +947,7 @@ def test_separate_thread_without_time(loop, thread):
         assert L[-1] == i + 1
 
 
-def test_separate_thread_with_time(loop, thread):
+def test_separate_thread_with_time(clean):
     L = []
 
     @gen.coroutine
@@ -948,7 +955,7 @@ def test_separate_thread_with_time(loop, thread):
         yield gen.sleep(0.1)
         L.append(x)
 
-    source = Stream(loop=loop)
+    source = Stream(asynchronous=False)
     source.map(inc).sink(slow_write)
 
     start = time()
@@ -990,7 +997,7 @@ def test_execution_order():
 
 @gen_test()
 def test_map_errors_log():
-    a = Stream()
+    a = Stream(asynchronous=True)
     b = a.delay(0.001).map(lambda x: 1 / x)
     with captured_logger('streamz') as logger:
         a._emit(0)
@@ -1009,7 +1016,7 @@ def test_map_errors_raises():
 
 @gen_test()
 def test_accumulate_errors_log():
-    a = Stream()
+    a = Stream(asynchronous=True)
     b = a.delay(0.001).accumulate(lambda x, y: x / y)
     with captured_logger('streamz') as logger:
         a._emit(1)
@@ -1026,6 +1033,34 @@ def test_accumulate_errors_raises():
     with pytest.raises(ZeroDivisionError):
         a.emit(1)
         a.emit(0)
+
+
+@gen_test()
+def test_sync_in_event_loop():
+    a = Stream()
+    assert not a.asynchronous
+    L = a.timed_window(0.01).sink_to_list()
+    sleep(0.05)
+    assert L
+    assert a.loop
+    assert a.loop is not IOLoop.current()
+
+
+def test_share_common_ioloop(clean):
+    a = Stream()
+    b = Stream()
+    c = a.timed_window(0.01).combine_latest(b)
+    assert a.loop
+    assert a.loop is b.loop
+    assert a.loop is c.loop
+
+
+def test_share_common_ioloop(clean):
+    a = Stream()
+    b = Stream()
+    aa = a.timed_window(0.01)
+    bb = b.timed_window(0.01)
+    assert aa.loop is bb.loop
 
 
 if sys.version_info >= (3, 5):
