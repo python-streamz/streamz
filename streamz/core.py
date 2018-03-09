@@ -67,6 +67,8 @@ class Stream(object):
     asynchronous: boolean or None
         Whether or not this stream will be used in asynchronous functions or
         normal Python functions.  Leave as None if you don't know.
+        True will cause operations like emit to return awaitable Futures
+        False will use an Event loop in another thread (starts it if necessary)
     ensure_io_loop: boolean
         Ensure that some IOLoop will be created.  If asynchronous is None or
         False then this will be in a separate thread, otherwise it will be
@@ -838,7 +840,7 @@ class rate_limit(Stream):
         self.interval = convert_interval(interval)
         self.next = 0
 
-        Stream.__init__(self, upstream, **kwargs)
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
     @gen.coroutine
     def update(self, x, who=None):

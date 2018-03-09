@@ -67,7 +67,6 @@ However this quickly become cumbersome, especially when building complex
 pipelines.
 
 
-
 Related Work
 ------------
 
