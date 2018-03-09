@@ -121,8 +121,8 @@ Using Dask
 
 Dask_ is a parellel computing library that uses Tornado for concurrency and
 threads for computation.  The ``DaskStream`` object is a drop-in replacement
-for ``Stream`` (mostly).  We need to create a Dask client.  This will start a
-thread and IOLoop for us.
+for ``Stream`` (mostly). Typically we create a Dask client, and then
+``scatter`` a local Stream to become a DaskStream.
 
 .. code-block:: python
 
@@ -131,9 +131,9 @@ thread and IOLoop for us.
 
    from streamz import Stream
    source = Stream()
-   (source.scatter()       # move local data out to the cluster
-          .map(increment)  # apply a function remotely
-          .buffer(100)     # allow one hundred futures to stay on the cluster
+   (source.scatter()       # scatter local elements to cluster, creating a DaskStream
+          .map(increment)  # map a function remotely
+          .buffer(5)       # allow five futures to stay on the cluster at any time
           .gather()        # bring results back to local process
           .sink(write))    # call write locally
 
