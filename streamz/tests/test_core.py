@@ -919,13 +919,14 @@ def dont_test_stream_kwargs(clean):
 
 @pytest.fixture
 def thread(loop):
-    from threading import Thread
+    from threading import Thread, Event
     thread = Thread(target=loop.start)
     thread.daemon = True
     thread.start()
 
-    while not loop._running:
-        sleep(0.01)
+    event = Event()
+    loop.add_callback(event.set)
+    event.wait()
 
     return thread
 
