@@ -19,7 +19,7 @@ import streamz as sz
 from streamz import Stream
 from streamz.sources import sink_to_file, PeriodicCallback
 from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,
-        clean)
+        clean, await_for)
 from distributed.utils_test import loop
 
 
@@ -749,6 +749,8 @@ def test_from_file():
             assert L == []
 
             source.start()
+
+            yield await_for(lambda: len(L) == 3, timeout=5)
 
             assert L == [1, 2, 3]
 
