@@ -211,6 +211,11 @@ class Stream(object):
             return func
         return _
 
+    def start(self):
+        """ Start any upstream sources """
+        for upstream in self.upstreams:
+            upstream.start()
+
     def __str__(self):
         s_list = []
         if self.name:
