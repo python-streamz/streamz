@@ -164,3 +164,17 @@ def test_stream_shares_client_loop(loop):
             source = Stream()
             d = source.timed_window('20ms').scatter()
             assert source.loop is client.loop
+
+
+@gen_cluster(client=True)
+def test_starmap(c, s, a, b):
+    def add(x, y, z=0):
+        return x + y + z
+
+    source = Stream(asynchronous=True)
+    L = source.scatter().starmap(add, z=10).gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit((i, i))
+
+    assert L == [10, 12, 14, 16, 18]

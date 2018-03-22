@@ -4,6 +4,7 @@ from operator import getitem
 
 from tornado import gen
 
+from dask.compatibility import apply
 from distributed.client import default_client
 
 from .core import Stream
@@ -122,6 +123,21 @@ class gather(core.Stream):
         result = yield client.gather(x, asynchronous=True)
         result2 = yield self._emit(result)
         raise gen.Return(result2)
+
+
+@DaskStream.register_api()
+class starmap(DaskStream):
+    def __init__(self, upstream, func, **kwargs):
+        self.func = func
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+
+        DaskStream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        client = default_client()
+        result = client.submit(apply, self.func, x, self.kwargs)
+        return self._emit(result)
 
 
 @DaskStream.register_api()
