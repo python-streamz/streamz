@@ -44,6 +44,11 @@ class from_textfile(Source):
     f: file or string
     poll_interval: Number
         Interval to poll file for new data in seconds
+    delimiter: str ("\n")
+        Character(s) to use to split the data into parts
+    start: bool (False)
+        Whether to start running immediately; otherwise call stream.start()
+        explicitly.
 
     Example
     -------
@@ -56,25 +61,39 @@ class from_textfile(Source):
     -------
     Stream
     """
-    def __init__(self, f, poll_interval=0.100, **kwargs):
+    def __init__(self, f, poll_interval=0.100, delimiter='\n', start=False,
+                 **kwargs):
         if isinstance(f, str):
             f = open(f)
         self.file = f
+        self.delimiter = delimiter
 
         self.poll_interval = poll_interval
         super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
+        self.stopped = True
+        if start:
+            self.start()
+
+    def start(self):
+        self.stopped = False
+        self.loop.add_callback(self.do_poll)
 
     @gen.coroutine
-    def start(self):
+    def do_poll(self):
+        buffer = ''
         while True:
-            line = self.file.readline()
+            line = self.file.read()
             if line:
-                yield self._emit(line)
+                buffer = buffer + line
+                if self.delimiter in buffer:
+                    parts = buffer.split(self.delimiter)
+                    buffer = parts.pop(-1)
+                    for part in parts:
+                        yield self._emit(part + self.delimiter)
             else:
-                if self.poll_interval:
-                    yield gen.sleep(self.poll_interval)
-                else:
-                    return
+                yield gen.sleep(self.poll_interval)
+            if self.stopped:
+                break
 
 
 @Stream.register_api(staticmethod)
@@ -87,13 +106,16 @@ class filenames(Source):
         Directory path or globstring over which to search for files
     poll_interval: Number
         Seconds between checking path
+    start: bool (False)
+        Whether to start running immediately; otherwise call stream.start()
+        explicitly.
 
     Examples
     --------
     >>> source = Stream.filenames('path/to/dir')  # doctest: +SKIP
     >>> source = Stream.filenames('path/to/*.csv', poll_interval=0.500)  # doctest: +SKIP
     """
-    def __init__(self, path, poll_interval=0.100, **kwargs):
+    def __init__(self, path, poll_interval=0.100, start=False, **kwargs):
         if '*' not in path:
             if os.path.isdir(path):
                 if not path.endswith(os.path.sep):
@@ -102,11 +124,17 @@ class filenames(Source):
         self.path = path
         self.seen = set()
         self.poll_interval = poll_interval
-
+        self.stopped = True
         super(filenames, self).__init__(ensure_io_loop=True)
+        if start:
+            self.start()
+
+    def start(self):
+        self.stopped = False
+        self.loop.add_callback(self.do_poll)
 
     @gen.coroutine
-    def start(self):
+    def do_poll(self):
         while True:
             filenames = set(glob(self.path))
             new = filenames - self.seen
@@ -114,6 +142,8 @@ class filenames(Source):
                 self.seen.add(fn)
                 yield self._emit(fn)
             yield gen.sleep(self.poll_interval)  # TODO: remove poll if delayed
+            if self.stopped:
+                break
 
 
 @Stream.register_api(staticmethod)
