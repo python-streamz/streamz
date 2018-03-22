@@ -1063,5 +1063,17 @@ def test_share_common_ioloop(clean):
     assert aa.loop is bb.loop
 
 
+def test_start():
+    flag = []
+
+    class MySource(Stream):
+        def start(self):
+            flag.append(True)
+
+    s = MySource().map(inc)
+    s.start()
+    assert flag == [True]
+
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
