@@ -1,10 +1,12 @@
 from glob import glob
 import os
+import weakref
 
+import time
 import tornado.ioloop
 from tornado import gen
 
-from .core import Stream
+from .core import Stream, convert_interval
 
 
 def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
@@ -161,35 +163,193 @@ class from_kafka(Source):
     consumer_params: dict
         Settings to set up the stream, see
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         Examples:
-        url: Connection string (host:port) by which to reach Kafka
-        group: Identity of the consumer. If multiple sources share the same
+        bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
+        group.id: Identity of the consumer. If multiple sources share the same
             group, each message will be passed to only one of them.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
+    start: bool (False)
+        Whether to start polling upon instantiation
 
     Example
     -------
 
     >>> source = Stream.from_kafka(['mytopic'],
-    ...        dict(url='localhost:9092', group='streamz'))  # doctest: +SKIP
+    ...           {'bootstrap.servers': 'localhost:9092',
+    ...            'group.id': 'streamz'})  # doctest: +SKIP
     """
-    def __init__(self, topics, consumer_params, poll_interval=0.1):
-        import confluent_kafka as ck
+    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False,
+                 **kwargs):
         self.cpars = consumer_params
-        self.consumer = ck.Consumer(consumer_params)
-        self.consumer.subscribe(topics)
+        self.consumer = None
         self.topics = topics
-        self.sleep = poll_interval
+        self.poll_interval = poll_interval
+        super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
+        self.stopped = True
+        if start:
+            self.start()
 
-        super(from_kafka, self).__init__(ensure_io_loop=True)
-        self.loop.add_callback(self.poll_kafka)
+    def do_poll(self):
+        if self.consumer is not None:
+            msg = self.consumer.poll(0)
+            if msg and msg.value():
+                return msg.value()
 
     @gen.coroutine
     def poll_kafka(self):
         while True:
-            msg = self.consumer.poll(0)
-            if msg is None or msg.error():
-                yield gen.sleep(self.sleep)
+            val = self.do_poll()
+            if val:
+                yield self._emit(val)
             else:
-                yield self.emit(msg.value())
+                yield gen.sleep(self.poll_interval)
+            if self.stopped:
+                break
+
+    def start(self):
+        import confluent_kafka as ck
+        import distributed
+        if self.stopped:
+            finalize = distributed.compatibility.finalize
+            self.stopped = False
+            self.loop.add_callback(self.poll_kafka)
+            self.consumer = ck.Consumer(self.cpars)
+            self.consumer.subscribe(self.topics)
+
+            def close(ref):
+                ob = ref()
+                if ob is not None and ob.consumer is not None:
+                    ob.consumer.close()
+
+            finalize(self, close, weakref.ref(self))
+
+    def _close_consumer(self):
+        if self.consumer is not None:
+            self.consumer.close()
+            self.consumer = None
+        self.stopped = True
+
+
+class FromKafkaBatched(Stream):
+    """Base class for both local and cluster-based batched kafka processing"""
+    def __init__(self, topic, consumer_params, poll_interval='1s', npartitions=1,
+                 ensure_io_loop=True, **kwargs):
+        self.consumer_params = consumer_params
+        self.topic = topic
+        self.npartitions = npartitions
+        self.positions = [0] * npartitions
+        self.poll_interval = convert_interval(poll_interval)
+        self.stopped = True
+
+        super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
+
+    @gen.coroutine
+    def poll_kafka(self):
+        import confluent_kafka as ck
+        consumer = ck.Consumer(self.consumer_params)
+
+        while not self.stopped:
+            out = []
+
+            for partition in range(self.npartitions):
+                tp = ck.TopicPartition(self.topic, partition, 0)
+                try:
+                    low, high = consumer.get_watermark_offsets(tp, timeout=0.1)
+                except (RuntimeError, ck.KafkaException):
+                    continue
+                current_position = self.positions[partition]
+                lowest = max(current_position, low)
+                out.append((self.consumer_params, self.topic, partition, lowest,
+                            high - 1))
+                self.positions[partition] = high
+
+            for part in out:
+                yield self._emit(part)
+
+            else:
+                yield gen.sleep(self.poll_interval)
+
+    def start(self):
+        self.stopped = False
+        self.loop.add_callback(self.poll_kafka)
+
+
+@Stream.register_api(staticmethod)
+def from_kafka_batched(topic, consumer_params, poll_interval='1s',
+                       npartitions=1, start=False, dask=False, **kwargs):
+    """ Get messages from Kafka in batches
+
+    Uses the confluent-kafka library,
+    https://docs.confluent.io/current/clients/confluent-kafka-python/
+
+    This source will emit lists of messages for each partition of a single given
+    topic per time interval, if there is new data. If using dask, one future
+    will be produced per partition per time-step, if there is data.
+
+    Parameters
+    ----------
+    topic: str
+        Kafka topic to consume from
+    consumer_params: dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
+        group.id: Identity of the consumer. If multiple sources share the same
+            group, each message will be passed to only one of them.
+    poll_interval: number
+        Seconds that elapse between polling Kafka for new messages
+    npartitions: int
+        Number of partitions in the topic
+    start: bool (False)
+        Whether to start polling upon instantiation
+
+    Example
+    -------
+
+    >>> source = Stream.from_kafka_batched('mytopic',
+    ...           {'bootstrap.servers': 'localhost:9092',
+    ...            'group.id': 'streamz'}, npartitions=4)  # doctest: +SKIP
+    """
+    if dask:
+        from distributed.client import default_client
+        kwargs['loop'] = default_client().loop
+    source = FromKafkaBatched(topic, consumer_params,
+                              poll_interval=poll_interval,
+                              npartitions=npartitions, **kwargs)
+    if dask:
+        source = source.scatter()
+
+    if start:
+        source.start()
+
+    return source.starmap(get_message_batch)
+
+
+def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
+    """Fetch a batch of kafka messages in given topic/partition
+
+    This will block until messages are available, or timeout is reached.
+    """
+    import confluent_kafka as ck
+    t0 = time.time()
+    consumer = ck.Consumer(kafka_params)
+    tp = ck.TopicPartition(topic, partition, low)
+    consumer.assign([tp])
+    out = []
+    while True:
+        msg = consumer.poll(0)
+        if msg and msg.value():
+            if high >= msg.offset():
+                out.append(msg.value())
+            if high <= msg.offset():
+                break
+        else:
+            time.sleep(0.1)
+            if timeout is not None and time.time() - t0 > timeout:
+                break
+    consumer.close()
+    return out
