@@ -4,6 +4,7 @@ import os
 import six
 import shutil
 import tempfile
+from time import time, sleep
 
 import pytest
 from tornado import gen
@@ -116,3 +117,26 @@ def clean():
         loop.add_callback(loop.stop)
 
     del _io_loops[:]
+
+
+def wait_for(predicate, timeout, fail_func=None, period=0.001):
+    """Wait for predicate to turn true, or fail this test"""
+    # from distributed.utils_test
+    deadline = time() + timeout
+    while not predicate():
+        sleep(period)
+        if time() > deadline:
+            if fail_func is not None:
+                fail_func()
+            pytest.fail("condition not reached within %s seconds" % timeout)
+
+
+@gen.coroutine
+def await_for(predicate, timeout, fail_func=None, period=0.001):
+    deadline = time() + timeout
+    while not predicate():
+        yield gen.sleep(period)
+        if time() > deadline:
+            if fail_func is not None:
+                fail_func()
+            pytest.fail("condition not reached until %s seconds" % (timeout,))

@@ -1,4 +1,7 @@
-sudo: False
+sudo: required
+
+services:
+  - docker
 
 language: python
 
@@ -6,6 +9,9 @@ matrix:
   include:
     - python: 2.7
     - python: 3.6
+
+env:
+  - STREAMZ_LAUNCH_KAFKA=true
 
 install:
   # Install conda
@@ -16,7 +22,7 @@ install:
   - conda update conda
 
   # Install dependencies
-  - conda create -n test-streamz python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov networkx graphviz python-graphviz dask distributed pandas bokeh ipython ipykernel ipywidgets -c conda-forge -c bokeh
+  - conda create -n test-streamz python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov networkx graphviz python-graphviz dask distributed pandas bokeh ipython ipykernel ipywidgets python-confluent-kafka -c conda-forge -c bokeh
   - source activate test-streamz
   - pip install git+https://github.com/dask/distributed.git --upgrade --no-deps
 
