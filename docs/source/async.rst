@@ -7,7 +7,7 @@ this section.*
 
 When using time-based flow control like ``rate_limit``, ``delay``, or
 ``timed_window`` Streamz relies on the Tornado_ framework for concurrency.
-This allows us to handle many conncurent operations cheaply and consistently
+This allows us to handle many concurrent operations cheaply and consistently
 within a single thread.  However, this also adds complexity and requires some
 understanding of asynchronous programming.  There are a few different ways to
 use Streamz with a Tornado event loop.
@@ -119,7 +119,7 @@ threads or processes.
 Using Dask
 ----------
 
-Dask_ is a parellel computing library that uses Tornado for concurrency and
+Dask_ is a parallel computing library that uses Tornado for concurrency and
 threads for computation.  The ``DaskStream`` object is a drop-in replacement
 for ``Stream`` (mostly). Typically we create a Dask client, and then
 ``scatter`` a local Stream to become a DaskStream.
@@ -127,7 +127,7 @@ for ``Stream`` (mostly). Typically we create a Dask client, and then
 .. code-block:: python
 
    from dask.distributed import Client
-   client = Client(processes=False)  # starts thread pool, IOLoop in seaprate thread
+   client = Client(processes=False)  # starts thread pool, IOLoop in separate thread
 
    from streamz import Stream
    source = Stream()
@@ -142,7 +142,7 @@ for ``Stream`` (mostly). Typically we create a Dask client, and then
 
 This operates very much like the synchronous case in terms of coding style (no
 ``@gen.coroutine`` or ``yield``) but does computations on separate threads.
-This also provies parallelism and access to a dashboard at
+This also provides parallelism and access to a dashboard at
 http://localhost:8787/status .
 
 
