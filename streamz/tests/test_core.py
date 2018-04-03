@@ -717,6 +717,7 @@ def test_multi_connect():
 
     assert L == [3, 5]
 
+
 def test_disconnect():
     source = Stream()
 
