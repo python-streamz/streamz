@@ -679,7 +679,7 @@ def test_connect():
     source_downstream = Stream()
     # connect assumes this default behaviour
     # of stream initialization
-    assert not(source_downstream.downstreams)
+    assert not source_downstream.downstreams
     assert source_downstream.upstreams == [None]
 
     # initialize the second stream to connect to
@@ -702,7 +702,7 @@ def test_multi_connect():
     source_downstream = source0.union(source1)
     # connect assumes this default behaviour
     # of stream initialization
-    assert not(source_downstream.downstreams)
+    assert not source_downstream.downstreams
 
     # initialize the second stream to connect to
     source_upstream = Stream()
