@@ -696,6 +696,27 @@ def test_connect():
     assert L == [3, 5]
 
 
+def test_multi_connect():
+    source0 = Stream()
+    source1 = Stream()
+    source_downstream = source0.union(source1)
+    # connect assumes this default behaviour
+    # of stream initialization
+    assert not(source_downstream.downstreams)
+
+    # initialize the second stream to connect to
+    source_upstream = Stream()
+
+    sout = source_downstream.map(lambda x : x + 1)
+    L = list()
+    sout = sout.map(L.append)
+    source_upstream.connect(source_downstream)
+
+    source_upstream.emit(2)
+    source_upstream.emit(4)
+
+    assert L == [3, 5]
+
 def test_disconnect():
     source = Stream()
 
