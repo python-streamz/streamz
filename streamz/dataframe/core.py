@@ -135,55 +135,6 @@ class Frame(BaseFrame):
         """
         return Window(self, n=n, value=value)
 
-    def plot(self, backlog=1000, width=800, height=300, **kwargs):
-        """ Plot streaming dataframe as Bokeh plot
-
-        This is fragile.  It only works in the classic Jupyter Notebook.  It
-        only works on numeric data.  It assumes that the index is a datetime
-        index
-        """
-        from bokeh.palettes import Category10
-        from bokeh.io import output_notebook, push_notebook, show
-        from bokeh.models import value
-        from bokeh.plotting import figure, ColumnDataSource
-        output_notebook()
-
-        sdf = self.to_frame()
-
-        colors = Category10[max(3, min(10, len(sdf.columns)))]
-        data = {c: [] for c in sdf.columns}
-        data['index'] = []
-        cds = ColumnDataSource(data)
-
-        if ('x_axis_type' not in kwargs and
-                np.issubdtype(self.index.dtype, np.datetime64)):
-            kwargs['x_axis_type'] = 'datetime'
-
-        fig = figure(width=width, height=height, **kwargs)
-
-        for i, column in enumerate(sdf.columns):
-            color = colors[i % len(colors)]
-            fig.line(source=cds, x='index', y=column, color=color, legend=value(column))
-
-        fig.legend.click_policy = 'hide'
-        fig.min_border_left = 30
-        fig.min_border_bottom = 30
-
-        result = show(fig, notebook_handle=True)
-
-        loop = IOLoop.current()
-
-        def push_data(df):
-            df = df.reset_index()
-            d = {c: df[c] for c in df.columns}
-
-            def _():
-                cds.stream(d, backlog)
-                push_notebook(handle=result)
-            loop.add_callback(_)
-
-        return {'figure': fig, 'cds': cds, 'stream': sdf.stream.gather().map(push_data)}
-
     def _cumulative_aggregation(self, op):
         return self.accumulate_partitions(_cumulative_accumulator,
                                           returns_state=True,
