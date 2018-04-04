@@ -562,6 +562,8 @@ class map(Stream):
 class starmap(Stream):
     """ Apply a function to every element in the stream, splayed out
 
+    See ``itertools.starmap``
+
     Parameters
     ----------
     func: callable
@@ -573,7 +575,7 @@ class starmap(Stream):
     Examples
     --------
     >>> source = Stream()
-    >>> source.smap(lambda a, b: a + b).sink(print)
+    >>> source.starmap(lambda a, b: a + b).sink(print)
     >>> for i in range(5):
     ...     source.emit((i, i))
     0
