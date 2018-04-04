@@ -517,25 +517,21 @@ class sink(Stream):
 
 @Stream.register_api()
 class starsink(Stream):
-    """ Apply a function on every element
+    """ Apply a function on every element, splayed out
 
     Examples
     --------
     >>> source = Stream()
-    >>> L = list()
-    >>> source.sink(L.append)
-    >>> source.sink(print)
-    >>> source.sink(print)
-    >>> source.emit(123)
-    123
-    123
-    >>> L
-    [123]
+    >>> source.starsink(lambda x, y: print(x, y))
+    >>> source.emit((123, 'abc'))
+    123, 'abc'
 
     See Also
     --------
-    map
+    sink
     Stream.sink_to_list
+    map
+    starmap
     """
     _graphviz_shape = 'trapezium'
 
