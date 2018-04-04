@@ -38,6 +38,8 @@ class Mean(Aggregation):
         if len(new):
             totals = totals + new.sum()
             counts = counts + new.count()
+        if isinstance(counts, Number) and counts == 0:
+            counts = 1
         return (totals, counts), totals / counts
 
     def on_old(self, acc, old):
@@ -45,6 +47,8 @@ class Mean(Aggregation):
         if len(old):
             totals = totals - old.sum()
             counts = counts - old.count()
+        if isinstance(counts, Number) and counts == 0:
+            counts = 1
         return (totals, counts), totals / counts
 
     def initial(self, new):
