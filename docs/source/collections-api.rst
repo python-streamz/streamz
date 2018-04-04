@@ -41,7 +41,6 @@ Dataframes
    DataFrame.cumprod
    DataFrame.cummin
    DataFrame.cummax
-   DataFrame.plot
 
 .. autosummary::
    GroupBy
