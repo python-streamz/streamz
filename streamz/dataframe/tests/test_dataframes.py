@@ -97,18 +97,19 @@ def test_exceptions(stream):
 ])
 def test_reductions(stream, func):
     df = pd.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
-    sdf = DataFrame(example=df, stream=stream)
+    for example in [df, df.iloc[:0]]:
+        sdf = DataFrame(example=example, stream=stream)
 
-    df_out = func(sdf).stream.gather().sink_to_list()
+        df_out = func(sdf).stream.gather().sink_to_list()
 
-    x = sdf.x
-    x_out = func(x).stream.gather().sink_to_list()
+        x = sdf.x
+        x_out = func(x).stream.gather().sink_to_list()
 
-    sdf.emit(df)
-    sdf.emit(df)
+        sdf.emit(df)
+        sdf.emit(df)
 
-    assert_eq(df_out[-1], func(pd.concat([df, df])))
-    assert_eq(x_out[-1], func(pd.concat([df, df]).x))
+        assert_eq(df_out[-1], func(pd.concat([df, df])))
+        assert_eq(x_out[-1], func(pd.concat([df, df]).x))
 
 
 @pytest.mark.parametrize('op', [
