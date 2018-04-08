@@ -221,21 +221,26 @@ class from_kafka(Source):
             def close(ref):
                 ob = ref()
                 if ob is not None and ob.consumer is not None:
-                    ob.consumer.close()
+                    consumer = ob.consumer
+                    ob.consumer = None
+                    consumer.unsubscribe()
+                    consumer.close()  # may raise with latest ck, that's OK
 
             finalize(self, close, weakref.ref(self))
 
     def _close_consumer(self):
         if self.consumer is not None:
-            self.consumer.close()
+            consumer = self.consumer
             self.consumer = None
+            consumer.unsubscribe()
+            consumer.close()
         self.stopped = True
 
 
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
-    def __init__(self, topic, consumer_params, poll_interval='1s', npartitions=1,
-                 ensure_io_loop=True, **kwargs):
+    def __init__(self, topic, consumer_params, poll_interval='1s',
+                 npartitions=1, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
@@ -250,26 +255,30 @@ class FromKafkaBatched(Stream):
         import confluent_kafka as ck
         consumer = ck.Consumer(self.consumer_params)
 
-        while not self.stopped:
-            out = []
+        try:
+            while not self.stopped:
+                out = []
 
-            for partition in range(self.npartitions):
-                tp = ck.TopicPartition(self.topic, partition, 0)
-                try:
-                    low, high = consumer.get_watermark_offsets(tp, timeout=0.1)
-                except (RuntimeError, ck.KafkaException):
-                    continue
-                current_position = self.positions[partition]
-                lowest = max(current_position, low)
-                out.append((self.consumer_params, self.topic, partition, lowest,
-                            high - 1))
-                self.positions[partition] = high
+                for partition in range(self.npartitions):
+                    tp = ck.TopicPartition(self.topic, partition, 0)
+                    try:
+                        low, high = consumer.get_watermark_offsets(tp,
+                                                                   timeout=0.1)
+                    except (RuntimeError, ck.KafkaException):
+                        continue
+                    current_position = self.positions[partition]
+                    lowest = max(current_position, low)
+                    out.append((self.consumer_params, self.topic, partition,
+                                lowest, high - 1))
+                    self.positions[partition] = high
 
-            for part in out:
-                yield self._emit(part)
+                for part in out:
+                    yield self._emit(part)
 
-            else:
-                yield gen.sleep(self.poll_interval)
+                else:
+                    yield gen.sleep(self.poll_interval)
+        finally:
+            consumer.close()
 
     def start(self):
         self.stopped = False
@@ -340,16 +349,18 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
     tp = ck.TopicPartition(topic, partition, low)
     consumer.assign([tp])
     out = []
-    while True:
-        msg = consumer.poll(0)
-        if msg and msg.value():
-            if high >= msg.offset():
-                out.append(msg.value())
-            if high <= msg.offset():
-                break
-        else:
-            time.sleep(0.1)
-            if timeout is not None and time.time() - t0 > timeout:
-                break
-    consumer.close()
+    try:
+        while True:
+            msg = consumer.poll(0)
+            if msg and msg.value():
+                if high >= msg.offset():
+                    out.append(msg.value())
+                if high <= msg.offset():
+                    break
+            else:
+                time.sleep(0.1)
+                if timeout is not None and time.time() - t0 > timeout:
+                    break
+    finally:
+        consumer.close()
     return out
