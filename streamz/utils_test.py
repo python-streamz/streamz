@@ -32,21 +32,6 @@ def tmpfile(extension=''):
                 pass
 
 
-@contextmanager
-def filetext(text, extension='', open=open, mode='w'):
-    with tmpfile(extension=extension) as filename:
-        f = open(filename, mode=mode)
-        try:
-            f.write(text)
-        finally:
-            try:
-                f.close()
-            except AttributeError:
-                pass
-
-        yield filename
-
-
 def inc(x):
     return x + 1
 
@@ -125,7 +110,7 @@ def wait_for(predicate, timeout, fail_func=None, period=0.001):
     deadline = time() + timeout
     while not predicate():
         sleep(period)
-        if time() > deadline:
+        if time() > deadline:  # pragma: no cover
             if fail_func is not None:
                 fail_func()
             pytest.fail("condition not reached within %s seconds" % timeout)
@@ -136,7 +121,7 @@ def await_for(predicate, timeout, fail_func=None, period=0.001):
     deadline = time() + timeout
     while not predicate():
         yield gen.sleep(period)
-        if time() > deadline:
+        if time() > deadline:  # pragma: no cover
             if fail_func is not None:
                 fail_func()
             pytest.fail("condition not reached until %s seconds" % (timeout,))
