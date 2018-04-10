@@ -508,7 +508,11 @@ class sink(Stream):
         _global_sinks.add(self)
 
     def update(self, x, who=None):
-        result = self.func(x, *self.args, **self.kwargs)
+        try:
+            result = self.func(x, *self.args, **self.kwargs)
+        except Exception:
+            return []
+
         if gen.isawaitable(result):
             return result
         else:
