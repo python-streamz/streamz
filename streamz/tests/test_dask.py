@@ -178,3 +178,14 @@ def test_starmap(c, s, a, b):
         yield source.emit((i, i))
 
     assert L == [10, 12, 14, 16, 18]
+
+
+@gen_cluster(client=True)
+def test_unique(c, s, a, b):
+    source = Stream(asynchronous=True)
+    L = source.scatter().unique(key=lambda x: x.key).gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit(1)
+
+    assert L == [1]
