@@ -178,3 +178,12 @@ def test_starmap(c, s, a, b):
         yield source.emit((i, i))
 
     assert L == [10, 12, 14, 16, 18]
+
+
+def test_dask_not_dask():
+    with cluster() as (s, [a, b]):
+        with Client(s['address']):
+            s = Stream()
+            s2 = s.scatter()
+            with pytest.raises(ValueError):
+                s.zip(s2)

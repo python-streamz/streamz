@@ -105,11 +105,18 @@ class Stream(object):
 
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
                  loop=None, asynchronous=None, ensure_io_loop=False):
+        from .dask import DaskStream
+
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = list(upstreams)
         else:
             self.upstreams = [upstream]
+        if upstreams:
+            if (all(isinstance(u, DaskStream) for u in upstreams) !=
+                    any(isinstance(u, DaskStream) for u in upstreams)):
+                raise ValueError('Must combine only DaskStreams '
+                                 'or no DaskStreams')
 
         self._set_asynchronous(asynchronous)
         self._set_loop(loop)
