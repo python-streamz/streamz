@@ -117,3 +117,24 @@ did.
     ``source.emit``.
 
 .. _Dask: https://dask.pydata.org/en/latest/
+
+
+Gotchas
++++++++
+
+An important gotcha with ``DaskStream`` is that if a ``Stream`` node is
+downstream of a ``DaskStream`` node without a ``gather`` between then the
+``Stream`` node will receive the future not the data itself.
+
+For example
+
+.. code-block:: python
+
+   source = Stream()
+   source2 = Stream()
+   a = source.scatter().map(inc)
+   b = source2.combine_latest(a)
+
+In this case b is now a ``Stream`` node and does not have access to the actual
+data on the dask cluster.
+Any operations done downstream of b would be performed on the future.
