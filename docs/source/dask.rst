@@ -135,6 +135,6 @@ For example
    a = source.scatter().map(inc)
    b = source2.combine_latest(a)
 
-In this case b is now a ``Stream`` node and does not have access to the actual
+In this case ``b`` is now a ``Stream`` node and does not have access to the actual
 data on the dask cluster.
-Any operations done downstream of b would be performed on the future.
+Any operations done downstream of ``b`` would be performed on the future.
