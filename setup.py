@@ -3,6 +3,10 @@
 from os.path import exists
 from setuptools import setup
 
+packages = ['streamz', 'streamz.dataframe']
+
+tests = [p + '.tests' for p in packages]
+
 
 setup(name='streamz',
       version='0.3.0',
@@ -12,7 +16,7 @@ setup(name='streamz',
       maintainer_email='mrocklin@gmail.com',
       license='BSD',
       keywords='streams',
-      packages=['streamz', 'streamz.dataframe', 'streamz.tests'],
+      packages=packages + tests,
       long_description=(open('README.rst').read() if exists('README.rst')
                         else ''),
       install_requires=list(open('requirements.txt').read().strip().split('\n')),
