@@ -176,6 +176,14 @@ class Stream(object):
                 if downstream:
                     downstream._inform_asynchronous(asynchronous)
 
+    def _add_upstream(self, upstream):
+        if self.upstreams == [None]:
+            self.upstreams = [upstream]
+        else:
+            self.upstreams.append(upstream)
+    def _add_downstream(self, downstream):
+        self.downstreams.add(downstream)
+
     @classmethod
     def register_api(cls, modifier=identity):
         """ Add callable to Stream API
@@ -344,12 +352,9 @@ class Stream(object):
         downstream: Stream
             The downstream stream to connect to
         '''
-        self.downstreams.add(downstream)
+        self._add_downstream(downstream)
 
-        if downstream.upstreams == [None]:
-            downstream.upstreams = [self]
-        else:
-            downstream.upstreams.append(self)
+        downstream._add_upstream(self)
 
     def disconnect(self, downstream):
         ''' Disconnect this stream to a downstream element.
@@ -913,6 +918,10 @@ class zip(Stream):
         upstreams2 = [upstream for upstream in upstreams if isinstance(upstream, Stream)]
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
+
+    def _add_upstream(self, upstream):
+        self.buffers[upstream] = deque()
+        super()._add_upstream(upstream)
 
     def pack_literals(self, tup):
         """ Fill buffers for literals whenever we empty them """

@@ -1100,5 +1100,18 @@ def test_start():
     assert flag == [True]
 
 
+def test_connect_zip():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+    x = a.zip(b)
+    l = x.sink_to_list()
+    c.connect(x)
+    a.emit(1)
+    b.emit(1)
+    assert not l
+    c.emit(1)
+    assert l == [(1, 1, 1)]
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
