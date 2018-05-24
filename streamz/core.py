@@ -987,6 +987,15 @@ class combine_latest(Stream):
             self.emit_on = upstreams
         Stream.__init__(self, upstreams=upstreams, **kwargs)
 
+    def _add_upstream(self, upstream):
+        self.last.append(None)
+        self.missing.update([upstream])
+        if self.emit_on != self.upstreams:
+            super()._add_upstream(upstream)
+        else:
+            super()._add_upstream(upstream)
+            self.emit_on = self.upstreams
+
     def update(self, x, who=None):
         if self.missing and who in self.missing:
             self.missing.remove(who)
