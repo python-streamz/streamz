@@ -1113,5 +1113,6 @@ def test_connect_zip():
     c.emit(1)
     assert l == [(1, 1, 1)]
 
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
