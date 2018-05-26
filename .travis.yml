@@ -24,6 +24,7 @@ install:
   # Install dependencies
   - conda create -n test-streamz python=$TRAVIS_PYTHON_VERSION pytest tornado toolz flake8 coverage codecov networkx graphviz python-graphviz dask distributed pandas bokeh ipython ipykernel ipywidgets python-confluent-kafka -c conda-forge -c bokeh
   - source activate test-streamz
+  - pip install git+https://github.com/dask/dask.git --upgrade --no-deps
   - pip install git+https://github.com/dask/distributed.git --upgrade --no-deps
 
   - python setup.py install
