@@ -3,7 +3,11 @@ Streamz
 
 |Build Status| |Doc Status| |Version Status|
 
-See documentation at `streamz.readthedocs.org <https://streamz.readthedocs.org>`_.
+Streamz helps you build pipelines to manage continuous streams of data. It is simple to use in simple cases, but also supports complex pipelines that involve branching, joining, flow control, feedback, back pressure, and so on.
+
+Optionally, Streamz can also work with Pandas dataframes to provide sensible streaming operations on continuous tabular data.
+
+To learn more about how to use Streamz see documentation at `streamz.readthedocs.org <https://streamz.readthedocs.org>`_.
 
 LICENSE
 -------
