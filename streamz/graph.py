@@ -5,6 +5,8 @@ from functools import partial
 import os
 import re
 
+from .core import combine_latest
+
 
 def _clean_text(text, match=None):
     ''' Clean text, remove forbidden characters.
@@ -29,6 +31,7 @@ def create_graph(node, graph, prior_node=None, pc=None):
     node: Stream instance
     graph: networkx.DiGraph instance
     """
+    edge_kwargs = {}
     if node is None:
         return
     t = hash(node)
@@ -40,6 +43,11 @@ def create_graph(node, graph, prior_node=None, pc=None):
                    fillcolor=node._graphviz_fillcolor)
     if prior_node:
         tt = hash(prior_node)
+        # If we emit on something other than all the upstreams vis it
+        if (isinstance(node, combine_latest)
+                and node.emit_on != node.upstreams
+                and prior_node in node.emit_on):
+            edge_kwargs['style'] = 'dashed'
         if graph.has_edge(t, tt):
             return
         if pc == 'downstream':
@@ -62,6 +70,7 @@ def create_edge_label_graph(node, graph, prior_node=None, pc=None, i=None):
     node: Stream instance
     graph: networkx.DiGraph instance
     """
+    edge_kwargs = {}
     if node is None:
         return
     t = hash(node)
@@ -73,6 +82,11 @@ def create_edge_label_graph(node, graph, prior_node=None, pc=None, i=None):
                    fillcolor=node._graphviz_fillcolor)
     if prior_node:
         tt = hash(prior_node)
+        # If we emit on something other than all the upstreams vis it
+        if (isinstance(node, combine_latest)
+                and node.emit_on != node.upstreams
+                and prior_node in node.emit_on):
+            edge_kwargs['style'] = 'dashed'
         if graph.has_edge(t, tt):
             return
         if i is None:
