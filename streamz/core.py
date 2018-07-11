@@ -30,7 +30,6 @@ thread_state = threading.local()
 
 logger = logging.getLogger(__name__)
 
-
 _io_loops = []
 
 
@@ -166,7 +165,8 @@ class Stream(object):
         """
         if self.asynchronous is not None:
             if self.asynchronous is not asynchronous:
-                raise ValueError("Stream has both asynchronous and synchronous elements")
+                raise ValueError(
+                    "Stream has both asynchronous and synchronous elements")
         else:
             self.asynchronous = asynchronous
             for upstream in self.upstreams:
@@ -181,6 +181,7 @@ class Stream(object):
             self.upstreams = [upstream]
         else:
             self.upstreams.append(upstream)
+
     def _add_downstream(self, downstream):
         self.downstreams.add(downstream)
 
@@ -211,12 +212,15 @@ class Stream(object):
 
             >>> Stream.foo(...)  # Foo operates as a static method
         """
+
         def _(func):
             @functools.wraps(func)
             def wrapped(*args, **kwargs):
                 return func(*args, **kwargs)
+
             setattr(cls, func.__name__, modifier(wrapped))
             return func
+
         return _
 
     def start(self):
@@ -332,6 +336,7 @@ class Stream(object):
                     del thread_state.asynchronous
 
                 raise gen.Return(result)
+
             sync(self.loop, _)
 
     def update(self, x, who=None):
@@ -419,6 +424,7 @@ class Stream(object):
 
     def frequencies(self, **kwargs):
         """ Count occurrences of elements """
+
         def update_frequencies(last, x):
             return toolz.assoc(last, x, last.get(x, 0) + 1)
 
@@ -544,6 +550,7 @@ class map(Stream):
     6
     8
     """
+
     def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # this is one of a few stream specific kwargs
@@ -589,6 +596,7 @@ class starmap(Stream):
     6
     8
     """
+
     def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # this is one of a few stream specific kwargs
@@ -633,6 +641,7 @@ class filter(Stream):
     2
     4
     """
+
     def __init__(self, upstream, predicate, **kwargs):
         if predicate is None:
             predicate = _truthy
@@ -915,7 +924,8 @@ class zip(Stream):
                         for upstream in upstreams
                         if isinstance(upstream, Stream)}
 
-        upstreams2 = [upstream for upstream in upstreams if isinstance(upstream, Stream)]
+        upstreams2 = [upstream for upstream in upstreams if
+                      isinstance(upstream, Stream)]
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
@@ -979,7 +989,7 @@ class combine_latest(Stream):
         self.missing = set(upstreams)
         if emit_on is not None:
             if not isinstance(emit_on, Iterable):
-                emit_on = (emit_on, )
+                emit_on = (emit_on,)
             emit_on = tuple(
                 upstreams[x] if isinstance(x, int) else x for x in emit_on)
             self.emit_on = emit_on
@@ -1028,6 +1038,7 @@ class flatten(Stream):
     --------
     partition
     """
+
     def update(self, x, who=None):
         L = []
         for item in x:
@@ -1059,6 +1070,7 @@ class unique(Stream):
     1
     3
     """
+
     def __init__(self, upstream, history=None, key=identity, **kwargs):
         self.seen = dict()
         self.key = key
@@ -1088,6 +1100,7 @@ class union(Stream):
     Stream.zip
     Stream.combine_latest
     """
+
     def __init__(self, *upstreams, **kwargs):
         super(union, self).__init__(upstreams=upstreams, **kwargs)
 
@@ -1122,6 +1135,7 @@ class pluck(Stream):
     'Alice'
     'Bob'
     """
+
     def __init__(self, upstream, pick, **kwargs):
         self.pick = pick
         super(pluck, self).__init__(upstream, **kwargs)
@@ -1151,6 +1165,7 @@ class collect(Stream):
     ...
     [1, 2]
     """
+
     def __init__(self, upstream, cache=None, **kwargs):
         if cache is None:
             cache = deque()
@@ -1183,6 +1198,7 @@ class zip_latest(Stream):
     Stream.combine_latest
     Stream.zip
     """
+
     def __init__(self, lossless, *upstreams, **kwargs):
         upstreams = (lossless,) + upstreams
         self.last = [None for _ in upstreams]
