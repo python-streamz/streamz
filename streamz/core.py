@@ -185,6 +185,15 @@ class Stream(object):
     def _add_downstream(self, downstream):
         self.downstreams.add(downstream)
 
+    def _remove_downstream(self, downstream):
+        self.downstreams.remove(downstream)
+
+    def _remove_upstream(self, upstream):
+        if len(self.upstreams) == 1:
+            self.upstreams == [None]
+        else:
+            self.upstreams.pop(self.upstreams.index(upstream))
+
     @classmethod
     def register_api(cls, modifier=identity):
         """ Add callable to Stream API
@@ -369,9 +378,9 @@ class Stream(object):
         downstream: Stream
             The downstream stream to disconnect from
         '''
-        self.downstreams.remove(downstream)
+        self._remove_downstream(downstream)
 
-        downstream.upstreams.remove(self)
+        downstream._remove_upstream(self)
 
     @property
     def upstream(self):
@@ -933,6 +942,11 @@ class zip(Stream):
         self.buffers[upstream] = deque()
         super()._add_upstream(upstream)
 
+    def _remove_upstream(self, upstream):
+        self.buffers.pop(upstream)
+        super()._remove_upstream(upstream)
+
+
     def pack_literals(self, tup):
         """ Fill buffers for literals whenever we empty them """
         inp = list(tup)[::-1]
@@ -1005,6 +1019,19 @@ class combine_latest(Stream):
         else:
             super()._add_upstream(upstream)
             self.emit_on = self.upstreams
+
+    def _remove_upstream(self, upstream):
+        if self.emit_on == upstream:
+            raise RuntimeError("Can't remove the emit on upstream, consider"
+                               "adding an emit on first")
+        self.last.pop(self.last.index(upstream))
+        self.missing.remove(upstream)
+        if self.emit_on == self.upstreams:
+            super()._remove_upstream(upstream)
+            self.emit_on = self.upstreams
+        else:
+            super()._remove_upstream(upstream)
+
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
