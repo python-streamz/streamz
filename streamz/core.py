@@ -1024,7 +1024,7 @@ class combine_latest(Stream):
         if self.emit_on == upstream:
             raise RuntimeError("Can't remove the emit on upstream, consider"
                                "adding an emit on first")
-        self.last.pop(self.last.index(upstream))
+        self.last.pop(self.upstreams.index(upstream))
         self.missing.remove(upstream)
         if self.emit_on == self.upstreams:
             super()._remove_upstream(upstream)
