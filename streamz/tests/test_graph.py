@@ -1,13 +1,14 @@
 from operator import add, mul
 import os
 
+import matplotlib.pyplot as plt
 import pytest
 nx = pytest.importorskip('networkx')
 
 from streamz import Stream, create_graph, visualize
 from streamz.utils_test import tmpfile
 
-from ..graph import _clean_text
+from ..graph import _clean_text, node_style, run_vis
 
 
 def test_create_graph():
@@ -55,3 +56,35 @@ def test_cleantext():
     expected_text = "JFDSM ;FFDS; "
     cleaned_text = _clean_text(text)
     assert cleaned_text == expected_text
+
+
+def test_run_vis_smoke():
+    source = Stream()
+
+    def sleep_inc(x):
+        if x == 5:
+            raise RuntimeError()
+        return x + 1
+
+    def print_sleep(x):
+        print(x)
+
+    b = source.map(sleep_inc)
+    b.sink(print_sleep)
+    b.sink(print_sleep)
+    gv = run_vis(
+        source,
+        source_node=True,
+        edge_style={"color": "k"},
+        node_label_style={"font_size": 10},
+        edge_label_style=lambda x: {"label": x["label"], "font_size": 15},
+        node_style=node_style,
+        force_draw=True,
+    )
+    plt.pause(.1)
+    for i in range(10):
+        try:
+            source.emit(i)
+            plt.pause(.1)
+        except RuntimeError:
+            pass
