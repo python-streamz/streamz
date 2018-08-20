@@ -51,6 +51,9 @@ class from_textfile(Source):
     start: bool (False)
         Whether to start running immediately; otherwise call stream.start()
         explicitly.
+    from_end: bool (False)
+        Whether to begin streaming from the end of the file (i.e., only emit
+        lines appended after the stream starts).
 
     Example
     -------
@@ -64,11 +67,12 @@ class from_textfile(Source):
     Stream
     """
     def __init__(self, f, poll_interval=0.100, delimiter='\n', start=False,
-                 **kwargs):
+                 from_end=False, **kwargs):
         if isinstance(f, str):
             f = open(f)
         self.file = f
         self.delimiter = delimiter
+        self.from_end = from_end
 
         self.poll_interval = poll_interval
         super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
@@ -78,6 +82,8 @@ class from_textfile(Source):
 
     def start(self):
         self.stopped = False
+        if self.from_end:
+            self.file.seek(0, 2)
         self.loop.add_callback(self.do_poll)
 
     @gen.coroutine

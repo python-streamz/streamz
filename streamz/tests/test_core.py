@@ -785,6 +785,26 @@ def test_from_file():
                 yield gen.sleep(0.01)
                 assert time() < start + 2  # reads within 2s
 
+            source = Stream.from_textfile(fn, poll_interval=0.010,
+                                          asynchronous=True, start=False,
+                                          from_end=True)
+            L = source.map(json.loads).pluck('x').sink_to_list()
+
+            source.start()
+
+            yield gen.sleep(0.10)
+
+            assert L == []
+
+            f.write('{"x": 6, "y": 2}\n')
+            f.write('{"x": 7, "y": 2}\n')
+            f.flush()
+
+            yield await_for(lambda: len(L) == 2, timeout=5)
+
+            assert L == [6, 7]
+
+
 
 @gen_test()
 def test_filenames():
