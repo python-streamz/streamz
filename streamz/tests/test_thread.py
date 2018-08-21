@@ -6,9 +6,6 @@ from streamz import Stream
 from streamz.thread import thread_scatter as scatter
 
 
-# from tornado import gen
-
-
 def test_map():
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
