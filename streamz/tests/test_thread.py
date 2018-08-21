@@ -1,21 +1,16 @@
-import time
 from concurrent.futures import Future
 from operator import add
 
-import pytest
-
-pytest.importorskip('dask.distributed')
-
-# from tornado import gen
-
+from distributed.utils_test import inc  # flake8: noqa
 from streamz import Stream
 from streamz.thread import thread_scatter as scatter
 
-from distributed.utils_test import inc  # flake8: noqa
+
+# from tornado import gen
 
 
 def test_map():
-    source = Stream()
+    source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
@@ -47,7 +42,7 @@ def test_scan_state():
         acc = acc + i
         return acc, acc
 
-    L = source.scan(f, returns_state=True).gather().sink_to_list()
+    L = scatter(source).scan(f, returns_state=True).gather().sink_to_list()
     for i in range(3):
         source.emit(i)
 
@@ -73,8 +68,8 @@ def test_starmap():
     def add(x, y, z=0):
         return x + y + z
 
-    source = Stream()
-    L = scatter(source).starmap(add, z=10).gather().sink_to_list()
+    source = Stream(asynchronous=True)
+    L = source.thread_scatter().starmap(add, z=10).gather().sink_to_list()
 
     for i in range(5):
         source.emit((i, i))
