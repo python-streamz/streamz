@@ -54,11 +54,11 @@ def test_zip():
     L = c.gather().sink_to_list()
 
     a.emit(1)
-    b.emit('a')
+    b.emit("a")
     a.emit(2)
-    b.emit('b')
+    b.emit("b")
 
-    assert L == [(1, 'a'), (2, 'b')]
+    assert L == [(1, "a"), (2, "b")]
 
 
 def test_starmap():
