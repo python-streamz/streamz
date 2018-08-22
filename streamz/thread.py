@@ -105,6 +105,7 @@ class gather(core.Stream):
     def update(self, x, who=None):
         self._emit(result_maybe(x))
 
+
 @ThreadStream.register_api()
 class map(ThreadStream):
     def __init__(self, upstream, func, *args, **kwargs):
@@ -122,8 +123,14 @@ class map(ThreadStream):
 
 @ThreadStream.register_api()
 class accumulate(ThreadStream):
-    def __init__(self, upstream, func, start=core.no_default,
-                 returns_state=False, **kwargs):
+    def __init__(
+        self,
+        upstream,
+        func,
+        start=core.no_default,
+        returns_state=False,
+        **kwargs
+    ):
         self.func = func
         self.state = start
         self.returns_state = returns_state
@@ -150,7 +157,7 @@ class accumulate(ThreadStream):
 class starmap(ThreadStream):
     def __init__(self, upstream, func, **kwargs):
         self.func = func
-        stream_name = kwargs.pop('stream_name', None)
+        stream_name = kwargs.pop("stream_name", None)
         self.kwargs = kwargs
 
         ThreadStream.__init__(self, upstream, stream_name=stream_name)
