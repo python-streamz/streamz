@@ -1231,14 +1231,13 @@ def sync(loop, func, *args, **kwargs):
     Run coroutine in loop running in separate thread.
     """
     # This was taken from distrbuted/utils.py
-    timeout = kwargs.pop('callback_timeout', None)
 
-    def make_coro():
-        coro = gen.maybe_future(func(*args, **kwargs))
-        if timeout is None:
-            return coro
-        else:
-            return gen.with_timeout(timedelta(seconds=timeout), coro)
+    # Tornado's PollIOLoop doesn't raise when using closed, do it ourselves
+    if PollIOLoop and ((isinstance(loop, PollIOLoop) and getattr(loop, '_closing', False)) or
+            (hasattr(loop, 'asyncio_loop') and loop.asyncio_loop._closed)):
+        raise RuntimeError("IOLoop is closed")
+
+    timeout = kwargs.pop('callback_timeout', None)
 
     e = threading.Event()
     main_tid = get_thread_identity()
@@ -1252,17 +1251,23 @@ def sync(loop, func, *args, **kwargs):
                 raise RuntimeError("sync() called from thread of running loop")
             yield gen.moment
             thread_state.asynchronous = True
-            result[0] = yield make_coro()
+            future = func(*args, **kwargs)
+            if timeout is not None:
+                future = gen.with_timeout(timedelta(seconds=timeout), future)
+            result[0] = yield future
         except Exception as exc:
-            logger.exception(exc)
             error[0] = sys.exc_info()
         finally:
             thread_state.asynchronous = False
             e.set()
 
     loop.add_callback(f)
-    while not e.is_set():
-        e.wait(1000000)
+    if timeout is not None:
+        if not e.wait(timeout):
+            raise gen.TimeoutError("timed out after %s s." % (timeout,))
+    else:
+        while not e.is_set():
+            e.wait(10)
     if error[0]:
         six.reraise(*error[0])
     else:
