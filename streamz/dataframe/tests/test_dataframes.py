@@ -18,7 +18,6 @@ import streamz.dataframe as sd
 from streamz.dask import DaskStream
 
 from distributed import Client
-from distributed.utils_test import loop  # flake8: noqa
 
 
 @pytest.fixture(scope="module")
@@ -31,7 +30,7 @@ def client():
 
 
 @pytest.fixture(params=['core', 'dask'])
-def stream(loop, request, client):  # flake8: noqa
+def stream(request, client):  # flake8: noqa
     if request.param == 'core':
         return Stream()
     else:
