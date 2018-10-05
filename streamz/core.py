@@ -1260,7 +1260,7 @@ def sync(loop, func, *args, **kwargs):
             if timeout is not None:
                 future = gen.with_timeout(timedelta(seconds=timeout), future)
             result[0] = yield future
-        except Exception as exc:
+        except Exception:
             error[0] = sys.exc_info()
         finally:
             thread_state.asynchronous = False
