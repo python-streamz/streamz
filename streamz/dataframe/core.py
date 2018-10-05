@@ -209,9 +209,8 @@ class _DataFrameMixin(object):
     def __dir__(self):
         o = set(dir(type(self)))
         o.update(self.__dict__)
-        o.update(c for c in self.columns if
-                 (isinstance(c, pd.compat.string_types) and
-                 pd.compat.isidentifier(c)))
+        o.update(c for c in self.columns
+                 if (isinstance(c, pd.compat.string_types) and pd.compat.isidentifier(c)))
         return list(o)
 
     def assign(self, **kwargs):

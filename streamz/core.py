@@ -1238,8 +1238,8 @@ def sync(loop, func, *args, **kwargs):
     # This was taken from distrbuted/utils.py
 
     # Tornado's PollIOLoop doesn't raise when using closed, do it ourselves
-    if PollIOLoop and ((isinstance(loop, PollIOLoop) and getattr(loop, '_closing', False)) or
-            (hasattr(loop, 'asyncio_loop') and loop.asyncio_loop._closed)):
+    if PollIOLoop and ((isinstance(loop, PollIOLoop) and getattr(loop, '_closing', False))
+            or (hasattr(loop, 'asyncio_loop') and loop.asyncio_loop._closed)):
         raise RuntimeError("IOLoop is closed")
 
     timeout = kwargs.pop('callback_timeout', None)
