@@ -15,6 +15,11 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
+try:
+    from tornado.ioloop import PollIOLoop
+except ImportError:
+    PollIOLoop = None  # dropped in tornado 6.0
+
 from collections import Iterable
 
 from .compatibility import get_thread_identity
