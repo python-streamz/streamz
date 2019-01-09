@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
+import atexit
 from collections import deque
 from datetime import timedelta
 import functools
@@ -15,6 +16,10 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
+try:
+    import confluent_kafka as ck
+except ImportError:
+    ck = None  # confluent_kafka is only required when interacting with Kafka
 try:
     from tornado.ioloop import PollIOLoop
 except ImportError:
@@ -1229,6 +1234,54 @@ class latest(Stream):
             yield self.condition.wait()
             [x] = self.next
             yield self._emit(x)
+
+
+@Stream.register_api()
+class to_kafka(Stream):
+    """ Writes data in the stream to Kafka
+
+    The Confluent client sends messages in batches and asynchronously. When a
+    message is received, or in the event of an error, this stream will emit
+    a tuple in the form of (err, msg) see
+    https://github.com/confluentinc/confluent-kafka-python
+
+    Parameters
+    ----------
+    topic : string
+        The topic which to write
+    producer_config : dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.map(lambda x: x + 1).to_kafka('test', {'bootstrap.servers': 'localhost'}).sink(
+    ...     lambda x: print(x[1].topic(), x[1].partition()))
+    >>> for i in range(3):
+    ...     source.emit(i)
+    test 0
+    test 0
+    test 0
+    """
+    def __init__(self, upstream, topic, producer_config, **kwargs):
+        self.topic = topic
+        self.producer = ck.Producer(producer_config)
+        atexit.register(self.producer.flush)
+
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+
+        _global_sinks.add(self)
+
+    def update(self, x, who=None):
+        self.producer.poll(0)
+        self.producer.produce(self.topic, str(x).encode('utf-8'), callback=self.cb)
+
+    def cb(self, err, msg):
+        self.emit((err, msg))
 
 
 def sync(loop, func, *args, **kwargs):
