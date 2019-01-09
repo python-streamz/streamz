@@ -1274,8 +1274,6 @@ class to_kafka(Stream):
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
-        _global_sinks.add(self)
-
     def update(self, x, who=None):
         self.producer.poll(0)
         self.producer.produce(self.topic, str(x).encode('utf-8'), callback=self.cb)
