@@ -14,7 +14,7 @@ from distributed.utils import sync
 from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # flake8: noqa
 
 
-@gen_cluster(client=True)
+@gen_cluster(client=True, check_new_threads=False)
 def test_map(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
