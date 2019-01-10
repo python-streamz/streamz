@@ -17,10 +17,6 @@ from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
 try:
-    import confluent_kafka as ck
-except ImportError:
-    ck = None  # confluent_kafka is only required when interacting with Kafka
-try:
     from tornado.ioloop import PollIOLoop
 except ImportError:
     PollIOLoop = None  # dropped in tornado 6.0
@@ -1268,6 +1264,8 @@ class to_kafka(Stream):
     test 0
     """
     def __init__(self, upstream, topic, producer_config, **kwargs):
+        import confluent_kafka as ck
+
         self.topic = topic
         self.producer = ck.Producer(producer_config)
         atexit.register(self.producer.flush)
