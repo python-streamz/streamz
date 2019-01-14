@@ -1254,11 +1254,13 @@ class to_kafka(Stream):
 
     Examples
     --------
+    >>> ARGS = {'bootstrap.servers': 'localhost:9092'}
     >>> source = Stream()
-    >>> source.map(lambda x: x + 1).to_kafka('test', {'bootstrap.servers': 'localhost'}).sink(
-    ...     lambda x: print(x[1].topic(), x[1].partition()))
+    >>> kafka = source.map(lambda x: x + 1).to_kafka('test', ARGS)
+    >>> kafka.sink(lambda x: print(x[1].topic(), x[1].partition()))
     >>> for i in range(3):
     ...     source.emit(i)
+    >>> kafka.flush()
     test 0
     test 0
     test 0
