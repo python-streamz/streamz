@@ -122,6 +122,7 @@ def test_from_kafka():
         stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
         out = stream.sink_to_list()
         stream.start()
+        sleep(5)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -173,6 +174,7 @@ def test_from_kafka_thread():
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
+        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -202,6 +204,7 @@ def test_kafka_batch():
         stream = Stream.from_kafka_batched(TOPIC, ARGS)
         out = stream.sink_to_list()
         stream.start()
+        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -219,6 +222,7 @@ def test_kafka_dask_batch(c, s, w1, w2):
         stream = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True,
                                            dask=True)
         stream.start()
+        sleep(2)
         assert isinstance(stream, DaskStream)
         out = stream.gather().sink_to_list()
         for i in range(10):
