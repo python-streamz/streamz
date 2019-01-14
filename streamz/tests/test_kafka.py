@@ -186,7 +186,7 @@ def test_kafka_batch():
         kafka.flush()
         # out may still be empty or first item of out may be []
         wait_for(lambda: any(out) and out[-1][-1] == b'value-9', 10, period=0.2)
-        stream.stopped = True
+        stream.upstream.stopped = True
 
 
 @gen_cluster(client=True, timeout=60)
@@ -209,4 +209,4 @@ def test_kafka_dask_batch(c, s, w1, w2):
             timeout -= 0.2
             assert timeout > 0, "Timeout"
         assert out[0][-1] == b'value-9'
-        stream.stopped = True
+        stream.upstream.stopped = True
