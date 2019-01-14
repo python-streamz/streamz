@@ -144,6 +144,27 @@ def test_from_kafka():
 
 
 @gen_test(timeout=60)
+def test_to_kafka():
+    ARGS = {'bootstrap.servers': 'localhost:9092'}
+    with kafka_service():
+        source = Stream()
+        kafka = source.to_kafka(TOPIC, ARGS)
+        out = kafka.sink_to_list()
+
+        for i in range(10):
+            source.emit(b'value-%d' % i)
+        kafka.flush()
+        wait_for(lambda: len(out) == 10, 10, period=0.1)
+        assert out[-1].err is None
+
+        source.emit('final message')
+        kafka.flush()
+        wait_for(lambda: len(out) == 11, 10, period=0.1)
+        assert out[-1].msg == b'final message'
+        assert out[-1].err is None
+
+
+@gen_test(timeout=60)
 def test_from_kafka_thread():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',

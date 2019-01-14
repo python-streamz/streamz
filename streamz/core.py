@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-import atexit
-from collections import deque
+from collections import deque, namedtuple
 from datetime import timedelta
 import functools
 import logging
@@ -1236,9 +1235,10 @@ class latest(Stream):
 class to_kafka(Stream):
     """ Writes data in the stream to Kafka
 
-    The Confluent client sends messages in batches and asynchronously. When a
-    message is received, or in the event of an error, this stream will emit
-    a tuple in the form of (err, msg) see
+    The Confluent client sends messages in batches and asynchronously. This
+    stream accepts a string or bytes object. Call ``flush`` to ensure all
+    messages are pushed. When a message is received, or in the event of an
+    error, this stream will emit a tuple in the form of (err, msg) see
     https://github.com/confluentinc/confluent-kafka-python
 
     Parameters
@@ -1263,21 +1263,25 @@ class to_kafka(Stream):
     test 0
     test 0
     """
+    Result = namedtuple('Result', ['err', 'msg'])
+
     def __init__(self, upstream, topic, producer_config, **kwargs):
         import confluent_kafka as ck
 
         self.topic = topic
         self.producer = ck.Producer(producer_config)
-        atexit.register(self.producer.flush)
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
     def update(self, x, who=None):
         self.producer.poll(0)
-        self.producer.produce(self.topic, str(x).encode('utf-8'), callback=self.cb)
+        self.producer.produce(self.topic, x, callback=self.cb)
+
+    def flush(self, timeout=-1):
+        self.producer.flush(timeout)
 
     def cb(self, err, msg):
-        self.emit((err, msg))
+        self.emit(self.Result(err, msg.value() if msg else None))
 
 
 def sync(loop, func, *args, **kwargs):
