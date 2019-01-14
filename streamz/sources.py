@@ -217,16 +217,7 @@ class from_kafka(Source):
             self.stopped = False
             self.loop.add_callback(self.poll_kafka)
             self.consumer = ck.Consumer(self.cpars)
-            self.consumer.subscribe(self.topics)
-
-            # Wait for the consumer to be subscribed
-            start = time.time()
-            while True:
-                msg = self.consumer.poll(self.poll_interval)
-                if msg and msg.error() == ck.KafkaError._PARTITION_EOF:
-                    break
-                if time.time() > start + self.subscribe_timeout:
-                    raise RuntimeError("Failed to subscribe to topic")
+            self._blocking_subscribe()
 
             def close(ref):
                 ob = ref()
@@ -237,6 +228,18 @@ class from_kafka(Source):
                     consumer.close()  # may raise with latest ck, that's OK
 
             finalize(self, close, weakref.ref(self))
+
+    def _blocking_subscribe(self):
+        from confluent_kafka import KafkaError
+        self.consumer.subscribe(self.topics)
+
+        start = time.time()
+        while True:
+            msg = self.consumer.poll(self.poll_interval)
+            if msg and msg.error() == KafkaError._PARTITION_EOF:
+                break
+            if time.time() > start + self.subscribe_timeout:
+                raise RuntimeError("Failed to subscribe to topic")
 
     def _close_consumer(self):
         if self.consumer is not None:
