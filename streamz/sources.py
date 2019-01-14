@@ -180,13 +180,11 @@ class from_kafka(Source):
     ...           {'bootstrap.servers': 'localhost:9092',
     ...            'group.id': 'streamz'})  # doctest: +SKIP
     """
-    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False,
-                 subscribe_timeout=10, **kwargs):
+    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False, **kwargs):
         self.cpars = consumer_params
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
-        self.subscribe_timeout = subscribe_timeout
         super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
         if start:
@@ -217,7 +215,7 @@ class from_kafka(Source):
             self.stopped = False
             self.loop.add_callback(self.poll_kafka)
             self.consumer = ck.Consumer(self.cpars)
-            self._blocking_subscribe()
+            self.consumer.subscribe(self.topics)
 
             def close(ref):
                 ob = ref()
@@ -228,18 +226,6 @@ class from_kafka(Source):
                     consumer.close()  # may raise with latest ck, that's OK
 
             finalize(self, close, weakref.ref(self))
-
-    def _blocking_subscribe(self):
-        from confluent_kafka import KafkaError
-        self.consumer.subscribe(self.topics)
-
-        start = time.time()
-        while True:
-            msg = self.consumer.poll(self.poll_interval)
-            if msg and msg.error() == KafkaError._PARTITION_EOF:
-                break
-            if time.time() > start + self.subscribe_timeout:
-                raise RuntimeError("Failed to subscribe to topic")
 
     def _close_consumer(self):
         if self.consumer is not None:
