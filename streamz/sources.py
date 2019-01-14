@@ -181,11 +181,12 @@ class from_kafka(Source):
     ...            'group.id': 'streamz'})  # doctest: +SKIP
     """
     def __init__(self, topics, consumer_params, poll_interval=0.1, start=False,
-                 **kwargs):
+                 subscribe_timeout=10, **kwargs):
         self.cpars = consumer_params
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
+        self.subscribe_timeout = subscribe_timeout
         super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
         if start:
@@ -217,6 +218,15 @@ class from_kafka(Source):
             self.loop.add_callback(self.poll_kafka)
             self.consumer = ck.Consumer(self.cpars)
             self.consumer.subscribe(self.topics)
+
+            # Wait for the consumer to be subscribed
+            start = time.time()
+            while True:
+                msg = self.consumer.poll(self.poll_interval)
+                if msg and msg.error() == ck.KafkaError._PARTITION_EOF:
+                    break
+                if time.time() > start + self.subscribe_timeout:
+                    raise RuntimeError("Failed to subscribe to topic")
 
             def close(ref):
                 ob = ref()
