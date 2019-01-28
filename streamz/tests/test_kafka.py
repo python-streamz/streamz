@@ -61,7 +61,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 def launch_kafka():
     stop_docker(let_fail=True)
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
-           "ADVERTISED_HOST=127.0.01 --env ADVERTISED_PORT=9092 "
+           "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
     print(cmd)
     cid = subprocess.check_output(shlex.split(cmd)).decode()[:-1]
@@ -145,7 +145,7 @@ def test_from_kafka():
 
 
 @gen_test(timeout=60)
-def test_to_kafka():
+async def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
     with kafka_service():
         source = Stream()
@@ -153,10 +153,8 @@ def test_to_kafka():
         out = kafka.sink_to_list()
 
         for i in range(10):
-            source.emit(b'value-%d' % i)
-        kafka.flush()
-        wait_for(lambda: len(out) == 10, 10, period=0.1)
-        assert out[-1].err is None
+            await source.emit(b'value-%d' % i, asynchronous=True)
+        print(out)
 
         source.emit('final message')
         kafka.flush()

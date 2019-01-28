@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque, namedtuple
+from collections import deque
 from datetime import timedelta
 import functools
 import logging
@@ -1254,18 +1254,16 @@ class to_kafka(Stream):
 
     Examples
     --------
+    >>> from streamz import Stream
     >>> ARGS = {'bootstrap.servers': 'localhost:9092'}
     >>> source = Stream()
-    >>> kafka = source.map(lambda x: x + 1).to_kafka('test', ARGS)
-    >>> kafka.sink(lambda x: print(x[1].topic(), x[1].partition()))
-    >>> for i in range(3):
-    ...     source.emit(i)
-    >>> kafka.flush()
-    test 0
-    test 0
-    test 0
+    >>> source.map(lambda x: str(x)).to_kafka('test', ARGS)
+    <to_kafka>
+    >>> for i in range(10):
+    ...     # In script simply use await keyword
+    ...     asyncio.wait(source.emit(i, asynchronous=True))
+
     """
-    Result = namedtuple('Result', ['err', 'msg'])
 
     def __init__(self, upstream, topic, producer_config, **kwargs):
         import confluent_kafka as ck
@@ -1275,15 +1273,30 @@ class to_kafka(Stream):
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
+        self.loop.add_callback(self.cb)
+
     def update(self, x, who=None):
-        self.producer.poll(0)
-        self.producer.produce(self.topic, x, callback=self.cb)
+        future = gen.Future()
+        loop = self.loop.current()
+
+        def cb(err, msg):
+            if err:
+                exc = Exception((err, msg.value() if msg else None))
+                loop.add_callback(future.set_exception, exc)
+            else:
+                loop.add_callback(future.set_result, None)
+
+        self.producer.produce(self.topic, x, callback=cb)
+
+        return future
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            self.producer.poll(65500)
 
     def flush(self, timeout=-1):
         self.producer.flush(timeout)
-
-    def cb(self, err, msg):
-        self.emit(self.Result(err, msg.value() if msg else None))
 
 
 def sync(loop, func, *args, **kwargs):
