@@ -5,6 +5,7 @@ from numbers import Number
 
 import numpy as np
 import pandas as pd
+from .utils import is_series_like, is_index_like
 
 
 class Aggregation(object):
@@ -324,7 +325,7 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
         acc = {'dfs': [],
                'state': agg.initial(new, grouper=grouper),
                'size-state': size.initial(new, grouper=grouper)}
-        if isinstance(grouper, (pd.Series, pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_series_like(grouper) or is_index_like(grouper):
             acc['groupers'] = deque([])
 
     dfs = acc['dfs']
@@ -396,7 +397,7 @@ class GroupbyAggregation(Aggregation):
 
         g = df.groupby(grouper)
 
-        if self.columns is not None:
+        if self.columns is not None and isinstance(df, pd.DataFrame):
             g = g[self.columns]
 
         return g
@@ -416,7 +417,7 @@ class GroupbySum(GroupbyAggregation):
     def initial(self, new, grouper=None):
         if hasattr(grouper, 'iloc'):
             grouper = grouper.iloc[:0]
-        if isinstance(grouper, (pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_index_like(grouper):
             grouper = grouper[:0]
         return self.grouped(new.iloc[:0], grouper=grouper).sum()
 
@@ -437,7 +438,7 @@ class GroupbyCount(GroupbyAggregation):
     def initial(self, new, grouper=None):
         if hasattr(grouper, 'iloc'):
             grouper = grouper.iloc[:0]
-        if isinstance(grouper, (pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_index_like(grouper):
             grouper = grouper[:0]
         return self.grouped(new.iloc[:0], grouper=grouper).count()
 
@@ -458,7 +459,7 @@ class GroupbySize(GroupbyAggregation):
     def initial(self, new, grouper=None):
         if hasattr(grouper, 'iloc'):
             grouper = grouper.iloc[:0]
-        if isinstance(grouper, (pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_index_like(grouper):
             grouper = grouper[:0]
         return self.grouped(new.iloc[:0], grouper=grouper).size()
 
@@ -496,7 +497,7 @@ class GroupbyMean(GroupbyAggregation):
     def initial(self, new, grouper=None):
         if hasattr(grouper, 'iloc'):
             grouper = grouper.iloc[:0]
-        if isinstance(grouper, (pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_index_like(grouper):
             grouper = grouper[:0]
         g = self.grouped(new.iloc[:0], grouper=grouper)
         return (g.sum(), g.count())
@@ -532,7 +533,7 @@ class GroupbyVar(GroupbyAggregation):
     def initial(self, new, grouper=None):
         if hasattr(grouper, 'iloc'):
             grouper = grouper.iloc[:0]
-        if isinstance(grouper, (pd.Index, np.ndarray)):
+        if isinstance(grouper, np.ndarray) or is_index_like(grouper):
             grouper = grouper[:0]
 
         new = new.iloc[:0]
