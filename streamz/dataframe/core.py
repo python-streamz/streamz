@@ -645,14 +645,10 @@ class GroupBy(object):
                                       start=None,
                                       returns_state=True)
 
-        for _, s_type in _stream_types[stream_type]:
-            if is_dataframe_like(example):
+        for typ, s_type in _stream_types[stream_type]:
+            if isinstance(example, typ):
                 return s_type(outstream, example)
-            elif is_series_like(example):
-                return s_type(outstream, example)
-            elif is_index_like(example):
-                return s_type(outstream, example)
-        return Streaming(outstream, example, stream_type=stream_type)
+            return Streaming(outstream, example, stream_type=stream_type)
 
     def count(self):
         """ Groupby-count """
@@ -733,12 +729,8 @@ class WindowedGroupBy(GroupBy):
                                       diff=diff,
                                       window=window)
 
-        for _, s_type in _stream_types[stream_type]:
-            if is_dataframe_like(example):
-                return s_type(outstream, example)
-            elif is_series_like(example):
-                return s_type(outstream, example)
-            elif is_index_like(example):
+        for typ, s_type in _stream_types[stream_type]:
+            if isinstance(example, typ):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
