@@ -1,6 +1,5 @@
 from __future__ import division, print_function
 
-import cudf
 import numpy as np
 import pytest
 from dask.dataframe.utils import assert_eq
@@ -9,6 +8,8 @@ from distributed import Client
 from streamz import Stream
 from streamz.dask import DaskStream
 from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
+
+cudf = pytest.importorskip("cudf")
 
 
 @pytest.fixture(scope="module")
