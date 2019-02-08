@@ -397,7 +397,7 @@ class GroupbyAggregation(Aggregation):
 
         g = df.groupby(grouper)
 
-        if self.columns is not None and isinstance(df, pd.DataFrame):
+        if self.columns is not None:
             g = g[self.columns]
 
         return g
