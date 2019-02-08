@@ -10,6 +10,9 @@ matrix:
     - python: 2.7
     - python: 3.6
 
+ignore:
+  - streamz/dataframe/tests/test_cudf.py
+
 env:
   - STREAMZ_LAUNCH_KAFKA=true
 
