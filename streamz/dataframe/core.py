@@ -648,7 +648,7 @@ class GroupBy(object):
         for typ, s_type in _stream_types[stream_type]:
             if isinstance(example, typ):
                 return s_type(outstream, example)
-            return Streaming(outstream, example, stream_type=stream_type)
+        return Streaming(outstream, example, stream_type=stream_type)
 
     def count(self):
         """ Groupby-count """
