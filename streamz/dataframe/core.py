@@ -273,7 +273,6 @@ class DataFrame(Frame, _DataFrameMixin):
     --------
     Series
     """
-    _subtype = object
 
     def __init__(self, *args, **kwargs):
         # {'x': sdf.x + 1, 'y': sdf.y - 1} - works only with pandas
@@ -327,7 +326,6 @@ class Series(Frame, _SeriesMixin):
     --------
     DataFrame
     """
-    _subtype = object
 
     def __init__(self, *args, **kwargs):
         example = kwargs.get('example', None) if "example" in kwargs else args[1]
@@ -346,7 +344,6 @@ class Series(Frame, _SeriesMixin):
 
 
 class Index(Series):
-    _subtype = object
 
     def __init__(self, *args, **kwargs):
         example = kwargs.get('example', None) if "example" in kwargs else args[1]
