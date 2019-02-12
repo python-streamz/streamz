@@ -1,8 +1,9 @@
 from __future__ import division, print_function
 
-from collections import OrderedDict
 import operator
+from collections import OrderedDict
 from time import time
+
 try:
     import cudf
 except ImportError:
@@ -18,7 +19,7 @@ from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
-from .utils import is_dataframe_like, is_series_like, is_index_like
+from .utils import is_index_like, is_frame_like, FrameType
 
 
 class BaseFrame(Streaming):
@@ -289,12 +290,11 @@ class DataFrame(Frame, _DataFrameMixin):
                                     for k, v in args[0].items()})
             DataFrame.__init__(self, stream, example)
         else:
-            example = kwargs.get('example', None) if "example" in kwargs else args[1]
-            assert example is not None
-            if not is_dataframe_like(example):
-                msg = "Streaming DataFrame expects an example of DataFrame like objects. Got: {}.".format(example)
-                raise TypeError(msg)
-            self._subtype = type(example)
+            try:
+                example = kwargs.get('example', None) if "example" in kwargs else args[1]
+            except IndexError:
+                example = None
+            is_frame_like(self, FrameType.DATAFRAME, example)
             super(DataFrame, self).__init__(*args, **kwargs)
 
     def verify(self, x):
@@ -328,12 +328,14 @@ class Series(Frame, _SeriesMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        example = kwargs.get('example', None) if "example" in kwargs else args[1]
-        assert example is not None
-        if not is_series_like(example):
-            msg = "Streaming Series expects an example of Series like objects. Got: {}.".format(example)
-            raise TypeError(msg)
-        self._subtype = type(example)
+        try:
+            example = kwargs.get('example', None) if "example" in kwargs else args[1]
+        except IndexError:
+            example = None
+        if isinstance(self, Index):
+            is_frame_like(self, FrameType.INDEX, example)
+        else:
+            is_frame_like(self, FrameType.SERIES, example)
         super(Series, self).__init__(*args, **kwargs)
 
     def value_counts(self):
@@ -344,15 +346,7 @@ class Series(Frame, _SeriesMixin):
 
 
 class Index(Series):
-
-    def __init__(self, *args, **kwargs):
-        example = kwargs.get('example', None) if "example" in kwargs else args[1]
-        assert example is not None
-        if not is_index_like(example):
-            msg = "Streaming Index expects an example of Index like objects. Got: {}.".format(example)
-            raise TypeError(msg)
-        self._subtype = type(example)
-        super(Series, self).__init__(*args, **kwargs)
+    pass
 
 
 class DataFrames(Frames, _DataFrameMixin):
@@ -390,6 +384,7 @@ class Rolling(object):
     >>> sdf.rolling(10).x.mean()  # doctest: +SKIP
     >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
     """
+
     def __init__(self, sdf, window, min_periods):
         self.root = sdf
         if not isinstance(window, int):
@@ -410,12 +405,12 @@ class Rolling(object):
 
     def _known_aggregation(self, op, *args, **kwargs):
         return self.root.accumulate_partitions(rolling_accumulator,
-                                              window=self.window,
-                                              op=op,
-                                              args=args,
-                                              kwargs=kwargs,
-                                              start=(),
-                                              returns_state=True)
+                                               window=self.window,
+                                               op=op,
+                                               args=args,
+                                               kwargs=kwargs,
+                                               start=(),
+                                               returns_state=True)
 
     def sum(self):
         """ Rolling sum """
@@ -468,6 +463,7 @@ class Window(OperatorMixin):
     --------
     DataFrame.window: contains full docstring
     """
+
     def __init__(self, sdf, n=None, value=None):
         if value is None and isinstance(n, (str, pd.Timedelta)):
             value = n
@@ -520,12 +516,12 @@ class Window(OperatorMixin):
             diff = aggregations.diff_loc
             window = self.value
         return self.root.accumulate_partitions(aggregations.window_accumulator,
-                                              diff=diff,
-                                              window=window,
-                                              agg=agg,
-                                              start=None,
-                                              returns_state=True,
-                                              stream_type='updating')
+                                               diff=diff,
+                                               window=window,
+                                               agg=agg,
+                                               start=None,
+                                               returns_state=True,
+                                               stream_type='updating')
 
     def full(self):
         return self.aggregate(aggregations.Full())
@@ -601,6 +597,7 @@ def _accumulate_size(accumulator, new):
 
 class GroupBy(object):
     """ Groupby aggregations on streaming dataframes """
+
     def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
@@ -674,6 +671,7 @@ class GroupBy(object):
 
 class WindowedGroupBy(GroupBy):
     """ Groupby aggregations over a window of data """
+
     def __init__(self, root, grouper, index=None, n=None, value=None):
         self.root = root
         self.grouper = grouper
@@ -734,14 +732,13 @@ class WindowedGroupBy(GroupBy):
 
 def _random_df(tup):
     last, now, freq = tup
-    index = pd.DatetimeIndex(start=(last + freq.total_seconds()) * 1e9,
-                             end=now * 1e9,
-                             freq=freq)
+    index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
+                          end=now * 1e9, freq=freq)
 
     df = pd.DataFrame({'x': np.random.random(len(index)),
                        'y': np.random.poisson(size=len(index)),
                        'z': np.random.normal(0, 1, size=len(index))},
-                       index=index)
+                      index=index)
     return df
 
 
@@ -766,6 +763,7 @@ class Random(DataFrame):
     -------
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
+
     def __init__(self, freq='100ms', interval='500ms', dask=False):
         if dask:
             from streamz.dask import DaskStream
