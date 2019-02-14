@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque
+from collections import deque, namedtuple
 from datetime import timedelta
 import functools
 import logging
@@ -1235,11 +1235,8 @@ class latest(Stream):
 class to_kafka(Stream):
     """ Writes data in the stream to Kafka
 
-    The Confluent client sends messages in batches and asynchronously. This
-    stream accepts a string or bytes object. Call ``flush`` to ensure all
-    messages are pushed. When a message is received, or in the event of an
-    error, this stream will emit a tuple in the form of (err, msg) see
-    https://github.com/confluentinc/confluent-kafka-python
+    This stream accepts a string or bytes object. Call ``flush`` to ensure all
+    messages are pushed. Responses from Kafka are pushed downstream.
 
     Parameters
     ----------
@@ -1250,20 +1247,20 @@ class to_kafka(Stream):
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         Examples:
-        bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
+        bootstrap.servers: Connection string (host:port) to Kafka
 
     Examples
     --------
     >>> from streamz import Stream
     >>> ARGS = {'bootstrap.servers': 'localhost:9092'}
     >>> source = Stream()
-    >>> source.map(lambda x: str(x)).to_kafka('test', ARGS)
+    >>> kafka = source.map(lambda x: str(x)).to_kafka('test', ARGS)
     <to_kafka>
     >>> for i in range(10):
-    ...     # In script simply use await keyword
-    ...     asyncio.wait(source.emit(i, asynchronous=True))
-
+    ...     source.emit(i)
+    >>> kafka.flush()
     """
+    Result = namedtuple('Result', ['err', 'msg'])
 
     def __init__(self, upstream, topic, producer_config, **kwargs):
         import confluent_kafka as ck
@@ -1273,27 +1270,26 @@ class to_kafka(Stream):
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
-        self.loop.add_callback(self.cb)
-
     def update(self, x, who=None):
         future = gen.Future()
-        loop = self.loop.current()
 
-        def cb(err, msg):
-            if err:
-                exc = Exception((err, msg.value() if msg else None))
-                loop.add_callback(future.set_exception, exc)
-            else:
-                loop.add_callback(future.set_result, None)
+        def _():
+            while True:
+                self.producer.poll(0)
+                try:
+                    self.producer.produce(self.topic, x, callback=self.cb)
+                    future.set_result(None)
+                    return
+                except BufferError:
+                    pass
+                except Exception as e:
+                    future.set_exception(e)
 
-        self.producer.produce(self.topic, x, callback=cb)
-
+        self.loop.add_callback(_)
         return future
 
-    @gen.coroutine
-    def cb(self):
-        while True:
-            self.producer.poll(65500)
+    def cb(self, err, msg):
+        self._emit(self.Result(err, msg.value() if msg else None))
 
     def flush(self, timeout=-1):
         self.producer.flush(timeout)
