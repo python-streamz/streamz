@@ -237,6 +237,58 @@ class from_kafka(Source):
         self.stopped = True
 
 
+class ConsumerFactory:
+    def __init__(self, consumer_params, topic):
+        self.consumer_params = self._fix_params(consumer_params)
+        self.topic = topic
+        self.consumers = {}
+        self.ck = None
+
+    def _fix_params(self, consumer_params):
+        if 'group.id' not in consumer_params:
+            import warnings
+            import uuid
+            group_id = "consumer-{}".format(uuid.uuid4())
+            warnings.warn("Consumer group id is not specified, Job restarts consume messages from offset 0.\n" +
+                          "Use group.id: {} for restarting this job from a check point in future.".format(group_id))
+            consumer_params['group.id'] = group_id
+
+        consumer_params['enable.auto.commit'] = 'false'
+        # consumer_params['max_poll_interval_ms'] = 20*60*1000
+        return consumer_params
+
+    def get_consumer(self, partition, low):
+        topic_partition = self._topic_partition(partition, low)
+        if topic_partition not in self.consumers:
+            return self._fully_configured_consumer(topic_partition)
+        else:
+            consumer = self.consumers[topic_partition]
+            try:
+                consumer_offset = consumer.committed([topic_partition])[0].offset
+                if consumer_offset != topic_partition.offset:
+                    consumer.seek(topic_partition)
+            except RuntimeError:
+                return self._fully_configured_consumer(topic_partition)
+            return consumer
+
+    def _fully_configured_consumer(self, topic_partition):
+        ck = self.get_ck_module()
+        consumer = ck.Consumer(self.consumer_params)
+        consumer.assign([topic_partition])
+        self.consumers[topic_partition] = consumer
+        return consumer
+
+    def _topic_partition(self, partition, low):
+        ck = self.get_ck_module()
+        return ck.TopicPartition(self.topic, partition, low)
+
+    def get_ck_module(self):
+        if not self.ck:
+            import confluent_kafka as ck
+            self.ck = ck
+        return self.ck
+
+
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
@@ -244,15 +296,16 @@ class FromKafkaBatched(Stream):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
-        self.positions = [0] * npartitions
+        self.positions = [-1] * npartitions
         self.poll_interval = convert_interval(poll_interval)
         self.stopped = True
+        self.consumer_factory = ConsumerFactory(consumer_params, topic)
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
 
     @gen.coroutine
     def poll_kafka(self):
-        import confluent_kafka as ck
+        ck = self.consumer_factory.get_ck_module()
         consumer = ck.Consumer(self.consumer_params)
 
         try:
@@ -267,9 +320,12 @@ class FromKafkaBatched(Stream):
                     except (RuntimeError, ck.KafkaException):
                         continue
                     current_position = self.positions[partition]
+                    if current_position == -1:
+                        last_committed_offset = consumer.committed([tp])[0].offset
+                        if last_committed_offset >= 0:
+                            current_position = last_committed_offset
                     lowest = max(current_position, low)
-                    out.append((self.consumer_params, self.topic, partition,
-                                lowest, high - 1))
+                    out.append((self.consumer_factory, partition, lowest, high - 1))
                     self.positions[partition] = high
 
                 for part in out:
@@ -338,29 +394,29 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
+def get_message_batch(kc_factory, partition, low, high, timeout=None):
     """Fetch a batch of kafka messages in given topic/partition
 
     This will block until messages are available, or timeout is reached.
     """
-    import confluent_kafka as ck
     t0 = time.time()
-    consumer = ck.Consumer(kafka_params)
-    tp = ck.TopicPartition(topic, partition, low)
-    consumer.assign([tp])
+    consumer = kc_factory.get_consumer(partition, low)
     out = []
-    try:
-        while True:
-            msg = consumer.poll(0)
-            if msg and msg.value():
-                if high >= msg.offset():
-                    out.append(msg.value())
-                if high <= msg.offset():
-                    break
-            else:
-                time.sleep(0.1)
-                if timeout is not None and time.time() - t0 > timeout:
-                    break
-    finally:
-        consumer.close()
+    while True:
+        msg = consumer.poll(0)
+        if msg and msg.value():
+            if high >= msg.offset():
+                out.append(msg.value())
+            if high <= msg.offset():
+                break
+        else:
+            time.sleep(0.1)
+            if timeout is not None and time.time() - t0 > timeout:
+                break
+
+    if low <= high:
+        try:
+            consumer.commit(asynchronous=False)
+        except:
+            pass
     return out
