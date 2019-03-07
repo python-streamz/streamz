@@ -145,25 +145,6 @@ def test_from_kafka():
 
 
 @gen_test(timeout=60)
-async def test_to_kafka():
-    ARGS = {'bootstrap.servers': 'localhost:9092'}
-    with kafka_service():
-        source = Stream()
-        kafka = source.to_kafka(TOPIC, ARGS)
-        out = kafka.sink_to_list()
-
-        for i in range(10):
-            await source.emit(b'value-%d' % i, asynchronous=True)
-        print(out)
-
-        source.emit('final message')
-        kafka.flush()
-        wait_for(lambda: len(out) == 11, 10, period=0.1)
-        assert out[-1].msg == b'final message'
-        assert out[-1].err is None
-
-
-@gen_test(timeout=60)
 def test_from_kafka_thread():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
@@ -233,3 +214,69 @@ def test_kafka_dask_batch(c, s, w1, w2):
             assert timeout > 0, "Timeout"
         assert out[0][-1] == b'value-9'
         stream.upstream.stopped = True
+
+
+@gen_test(timeout=60)
+async def test_to_kafka():
+    
+    ARGS = {'bootstrap.servers': 'localhost:9092'}
+    
+    with kafka_service():
+        source = Stream()
+        kafka = source.to_kafka(TOPIC, ARGS)
+        out = kafka.sink_to_list()
+
+        for i in range(10):
+            await source.emit(b'value-%d' % i, asynchronous=True)
+
+        source.emit('final message')
+        kafka.flush()
+        wait_for(lambda: len(out) == 11, 10, period=0.1)
+        assert out[-1].msg == b'final message'
+        assert out[-1].err is None
+
+
+@gen_test(timeout=60)
+def test_to_kafka_batched():
+
+    ARGS = {'bootstrap.servers': 'localhost:9092'}
+
+    source = Stream()
+    kafka = source.to_kafka_batched(TOPIC, ARGS, 5)     
+    out = kafka.sink_to_list()
+    sleep(2)
+
+    for i in range(10):
+        source.emit(b'test_to_kafka_batched-%d' %i)
+
+    source.emit('final message')
+    kafka.flush()
+    wait_for(lambda: len(out) == 11, 10, period=0.1)
+    assert out[-1].msg == b'final message'
+    assert out[-1].err is None
+
+
+@gen_cluster(client = True, timeout = 60) 
+def test_to_kafka_batched_dask(c,s,w1,w2):
+    
+    ARGS = {'bootstrap.servers':'localhost:9092'}
+    
+    batch_size = 5
+    source = Stream(asynchronous=True).scatter()
+    source2=source.to_kafka_batched(source,TOPIC,ARGS,batch_size,asynchronous=True)
+    
+    assert(isinstance(source2,DaskStream))
+    
+    out = source2.sink_to_list()
+    
+    for i in range(0,10):
+        source.emit(b'test_to_kafka_batched_dask_v23-%d' %i)
+    
+    source.emit('final message')
+    source2.flush()
+    
+    wait_for(lambda: len(out) == 11, 10, period=0.1)
+    
+    assert out[-1].msg == b'final message'
+    assert out[-1].err is None
+
