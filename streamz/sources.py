@@ -180,8 +180,7 @@ class from_kafka(Source):
     ...           {'bootstrap.servers': 'localhost:9092',
     ...            'group.id': 'streamz'})  # doctest: +SKIP
     """
-    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False,
-                 **kwargs):
+    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False, **kwargs):
         self.cpars = consumer_params
         self.consumer = None
         self.topics = topics

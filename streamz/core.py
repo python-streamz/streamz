@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque
+from collections import deque, namedtuple
 from datetime import timedelta
 import functools
 import logging
@@ -1229,6 +1229,95 @@ class latest(Stream):
             yield self.condition.wait()
             [x] = self.next
             yield self._emit(x)
+
+
+@Stream.register_api()
+class to_kafka(Stream):
+    """ Writes data in the stream to Kafka
+
+    This stream accepts a string or bytes object. Call ``flush`` to ensure all
+    messages are pushed. Responses from Kafka are pushed downstream.
+
+    Parameters
+    ----------
+    topic : string
+        The topic which to write
+    producer_config : dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers: Connection string (host:port) to Kafka
+
+    Examples
+    --------
+    >>> from streamz import Stream
+    >>> ARGS = {'bootstrap.servers': 'localhost:9092'}
+    >>> source = Stream()
+    >>> kafka = source.map(lambda x: str(x)).to_kafka('test', ARGS)
+    <to_kafka>
+    >>> for i in range(10):
+    ...     source.emit(i)
+    >>> kafka.flush()
+    """
+    Result = namedtuple('Result', ['err', 'msg'])
+
+    def __init__(self, upstream, topic, producer_config, **kwargs):
+        import confluent_kafka as ck
+
+        self.topic = topic
+        self.producer = ck.Producer(producer_config)
+
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+
+    def update(self, x, who=None):
+        future = gen.Future()
+
+        def _():
+            while True:
+                self.producer.poll(0)
+                try:
+                    self.producer.produce(self.topic, x, callback=self.cb)
+                    future.set_result(None)
+                    return
+                except BufferError:
+                    pass
+                except Exception as e:
+                    future.set_exception(e)
+
+        self.loop.add_callback(_)
+        return future
+
+    def cb(self, err, msg):
+        self._emit(self.Result(err, msg.value() if msg else None))
+
+    def flush(self, timeout=-1):
+        self.producer.flush(timeout)
+
+
+@Stream.register_api()
+class to_kafka_batched(Stream):
+    def __init__(self, upstream, topic, producer_config, n, **kwargs):
+        import confluent_kafka as ck
+
+        self.topic = topic
+        self.producer = ck.Producer(producer_config)
+        self.n = n
+        self.buffer = []
+
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+
+    def update(self, x, who=None):
+        self.buffer.append(x)
+        if len(self.buffer) >= self.n:
+            self.flush(False)
+
+    def flush(self, producer=True):
+        for x in self.buffer:
+            self.producer.produce(self.topic, x)
+        self.buffer = []
+        if producer:
+            self.producer.flush()
 
 
 def sync(loop, func, *args, **kwargs):

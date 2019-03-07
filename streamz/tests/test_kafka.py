@@ -61,7 +61,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 def launch_kafka():
     stop_docker(let_fail=True)
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
-           "ADVERTISED_HOST=127.0.01 --env ADVERTISED_PORT=9092 "
+           "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
     print(cmd)
     cid = subprocess.check_output(shlex.split(cmd)).decode()[:-1]
@@ -122,6 +122,7 @@ def test_from_kafka():
         stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
         out = stream.sink_to_list()
         stream.start()
+        sleep(5)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -144,6 +145,25 @@ def test_from_kafka():
 
 
 @gen_test(timeout=60)
+async def test_to_kafka():
+    ARGS = {'bootstrap.servers': 'localhost:9092'}
+    with kafka_service():
+        source = Stream()
+        kafka = source.to_kafka(TOPIC, ARGS)
+        out = kafka.sink_to_list()
+
+        for i in range(10):
+            await source.emit(b'value-%d' % i, asynchronous=True)
+        print(out)
+
+        source.emit('final message')
+        kafka.flush()
+        wait_for(lambda: len(out) == 11, 10, period=0.1)
+        assert out[-1].msg == b'final message'
+        assert out[-1].err is None
+
+
+@gen_test(timeout=60)
 def test_from_kafka_thread():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
@@ -152,6 +172,7 @@ def test_from_kafka_thread():
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
+        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -181,12 +202,13 @@ def test_kafka_batch():
         stream = Stream.from_kafka_batched(TOPIC, ARGS)
         out = stream.sink_to_list()
         stream.start()
+        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # out may still be empty or first item of out may be []
         wait_for(lambda: any(out) and out[-1][-1] == b'value-9', 10, period=0.2)
-        stream.stopped = True
+        stream.upstream.stopped = True
 
 
 @gen_cluster(client=True, timeout=60)
@@ -198,6 +220,7 @@ def test_kafka_dask_batch(c, s, w1, w2):
         stream = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True,
                                            dask=True)
         stream.start()
+        sleep(2)
         assert isinstance(stream, DaskStream)
         out = stream.gather().sink_to_list()
         for i in range(10):
@@ -209,4 +232,4 @@ def test_kafka_dask_batch(c, s, w1, w2):
             timeout -= 0.2
             assert timeout > 0, "Timeout"
         assert out[0][-1] == b'value-9'
-        stream.stopped = True
+        stream.upstream.stopped = True
