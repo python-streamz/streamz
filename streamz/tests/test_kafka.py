@@ -15,6 +15,7 @@ from streamz.utils_test import gen_test, wait_for
 pytest.importorskip('distributed')
 from distributed.utils_test import gen_cluster  # flake8: noqa
 
+#Instead of downloading and launching Kafka, one can also set up a local Kafka cluster.
 KAFKA_FILE = 'kafka_2.11-1.0.0'
 LAUNCH_KAFKA = os.environ.get('STREAMZ_LAUNCH_KAFKA', '') == 'true'
 TOPIC = 'test'
