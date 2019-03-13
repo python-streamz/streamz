@@ -942,7 +942,7 @@ def dont_test_stream_kwargs(clean):
 
 
 @pytest.fixture
-def thread(loop):
+def thread(loop):   # noqa: E811
     from threading import Thread, Event
     thread = Thread(target=loop.start)
     thread.daemon = True
