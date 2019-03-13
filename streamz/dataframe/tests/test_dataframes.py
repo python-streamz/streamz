@@ -12,8 +12,7 @@ from tornado import gen
 
 from streamz import Stream
 from streamz.utils_test import gen_test
-from streamz.dataframe import (DataFrame, Series, DataFrames, Seriess,
-        Aggregation)
+from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
 import streamz.dataframe as sd
 from streamz.dask import DaskStream
 
@@ -141,12 +140,12 @@ def test_binary_operators(op, getter, stream):
         return
 
     a = DataFrame(example=df, stream=stream)
-    l = op(getter(a), 2).stream.gather().sink_to_list()
+    li = op(getter(a), 2).stream.gather().sink_to_list()
     r = op(2, getter(a)).stream.gather().sink_to_list()
 
     a.emit(df)
 
-    assert_eq(l[0], left)
+    assert_eq(li[0], left)
     assert_eq(r[0], right)
 
 
@@ -382,24 +381,24 @@ def test_setitem_overwrites(stream):
 @pytest.mark.parametrize('kwargs,op', [
     ({}, 'sum'),
     ({}, 'mean'),
-    pytest.mark.slow(({}, 'min')),
+    pytest.param({}, 'min', marks=pytest.mark.slow),
     ({}, 'median'),
-    pytest.mark.slow(({}, 'max')),
-    pytest.mark.slow(({}, 'var')),
-    pytest.mark.slow(({}, 'count')),
+    pytest.param({}, 'max', marks=pytest.mark.slow),
+    pytest.param({}, 'var', marks=pytest.mark.slow),
+    pytest.param({}, 'count', marks=pytest.mark.slow),
     ({'ddof': 0}, 'std'),
-    pytest.mark.slow(({'quantile': 0.5}, 'quantile')),
+    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow),
     ({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate')
 ])
 @pytest.mark.parametrize('window', [
-    pytest.mark.slow(2),
+    pytest.param(2, marks=pytest.mark.slow),
     7,
-    pytest.mark.slow('3h'),
+    pytest.param('3h', marks=pytest.mark.slow),
     pd.Timedelta('200 minutes')
 ])
 @pytest.mark.parametrize('m', [
     2,
-    pytest.mark.slow(5)
+    pytest.param(5, marks=pytest.mark.slow)
 ])
 @pytest.mark.parametrize('pre_get,post_get', [
     (lambda df: df, lambda df: df),
@@ -451,7 +450,7 @@ def test_integration_from_stream(stream):
 
 
 @gen_test()
-def test_random_source():
+def test_random_source2():
     source = sd.Random(freq='10ms', interval='100ms')
     L = source.stream.sink_to_list()
     yield gen.sleep(0.5)
@@ -612,14 +611,14 @@ def test_tail(stream):
 def test_random_source(client):
     n = len(client.cluster.scheduler.tasks)
     source = sd.Random(freq='1ms', interval='10ms', dask=True)
-    L = source.x.stream.gather().sink_to_list()
+    source.x.stream.gather().sink_to_list()
     sleep(0.20)
     assert len(client.cluster.scheduler.tasks) < n + 10
 
 
 def test_example_type_error_message():
     try:
-        sdf = DataFrame(example=[123])
+        DataFrame(example=[123])
     except Exception as e:
         assert 'DataFrame' in str(e)
         assert '[123]' in str(e)
@@ -710,7 +709,7 @@ def test_windowing_n(func, n, getter):
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
     lambda x: x.std(),
-    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
+    pytest.param(lambda x: x.var(ddof=0), marks=pytest.mark.xfail),
 ])
 @pytest.mark.parametrize('value', ['10h', '1d'])
 @pytest.mark.parametrize('getter', [
@@ -765,7 +764,7 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     lambda x: x.size(),
     lambda x: x.var(ddof=1),
     lambda x: x.std(ddof=1),
-    pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know"),
+    pytest.param(lambda x: x.var(ddof=0), marks=pytest.mark.xfail),
 ])
 @pytest.mark.parametrize('n', [1, 4])
 @pytest.mark.parametrize('getter', [

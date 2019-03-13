@@ -18,9 +18,9 @@ import streamz as sz
 
 from streamz import Stream
 from streamz.sources import sink_to_file, PeriodicCallback
-from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,
-        clean, await_for)
-from distributed.utils_test import loop
+from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
+        clean, await_for)  # noqa: F401
+from distributed.utils_test import loop   # noqa: F401
 
 
 def test_basic():
@@ -200,7 +200,7 @@ def test_timed_window():
     assert not L[-1]
 
 
-def test_timed_window_timedelta(clean):
+def test_timed_window_timedelta(clean):  # noqa: F811
     pytest.importorskip('pandas')
     source = Stream(asynchronous=True)
     a = source.timed_window('10ms')
@@ -243,6 +243,7 @@ def test_sink_to_file():
 
         assert data == 'a\nb\n'
 
+
 def test_sink_with_args_and_kwargs():
     L = dict()
 
@@ -253,7 +254,7 @@ def test_sink_with_args_and_kwargs():
         L[key].append(elem)
 
     s = Stream()
-    s2 = s.sink(mycustomsink, "cat", "super")
+    s.sink(mycustomsink, "cat", "super")
 
     s.emit(1)
     s.emit(2)
@@ -603,7 +604,7 @@ def test_filter_str():
     assert str(s) == '<filter: iseven>'
 
 
-def test_timed_window_str(clean):
+def test_timed_window_str(clean):  # noqa: F811
     source = Stream()
     s = source.timed_window(.05)
     assert str(s) == '<timed_window: 0.05>'
@@ -790,9 +791,9 @@ def test_from_file():
 def test_filenames():
     with tmpfile() as fn:
         os.mkdir(fn)
-        with open(os.path.join(fn, 'a'), 'w') as f:
+        with open(os.path.join(fn, 'a'), 'w'):
             pass
-        with open(os.path.join(fn, 'b'), 'w') as f:
+        with open(os.path.join(fn, 'b'), 'w'):
             pass
 
         source = Stream.filenames(fn, asynchronous=True)
@@ -804,7 +805,7 @@ def test_filenames():
 
         assert L == [os.path.join(fn, x) for x in ['a', 'b']]
 
-        with open(os.path.join(fn, 'c'), 'w') as f:
+        with open(os.path.join(fn, 'c'), 'w'):
             pass
 
         while len(L) < 3:
@@ -848,7 +849,7 @@ def test_latest():
         yield gen.sleep(0.050)
         L.append(x)
 
-    s = source.map(inc).latest().map(slow_write)  # flake8: noqa
+    s = source.map(inc).latest().map(slow_write)  # noqa: F841
 
     source.emit(1)
     yield gen.sleep(0.010)
@@ -881,7 +882,7 @@ def test_destroy():
     assert L == [2]
 
 
-def dont_test_stream_kwargs(clean):
+def dont_test_stream_kwargs(clean):  # noqa: F811
     ''' Test the good and bad kwargs for the stream
         Currently just stream_name
     '''
@@ -916,7 +917,7 @@ def dont_test_stream_kwargs(clean):
                sin.union,
                partial(sin.pluck, 0),
                sin.collect,
-               ]
+              ]
 
     good_kwargs = dict(stream_name=test_name)
     bad_kwargs = dict(foo="bar")
@@ -941,8 +942,8 @@ def dont_test_stream_kwargs(clean):
     sin.emit(1)
 
 
-@pytest.fixture
-def thread(loop):   # noqa: E811
+@pytest.fixture  # noqa: F811
+def thread(loop):
     from threading import Thread, Event
     thread = Thread(target=loop.start)
     thread.daemon = True
@@ -955,14 +956,14 @@ def thread(loop):   # noqa: E811
     return thread
 
 
-def test_percolate_loop_information(clean):
+def test_percolate_loop_information(clean):  # noqa: F811
     source = Stream()
     assert not source.loop
     s = source.timed_window(0.5)
     assert source.loop is s.loop
 
 
-def test_separate_thread_without_time(loop, thread):
+def test_separate_thread_without_time(loop, thread):  # noqa: F811
     assert thread.is_alive()
     source = Stream(loop=loop)
     L = source.map(inc).sink_to_list()
@@ -972,7 +973,7 @@ def test_separate_thread_without_time(loop, thread):
         assert L[-1] == i + 1
 
 
-def test_separate_thread_with_time(clean):
+def test_separate_thread_with_time(clean):  # noqa: F811
     L = []
 
     @gen.coroutine
@@ -997,11 +998,11 @@ def test_execution_order():
         s = Stream()
         b = s.pluck(1)
         a = s.pluck(0)
-        l = a.combine_latest(b, emit_on=a).sink_to_list()
+        li = a.combine_latest(b, emit_on=a).sink_to_list()
         z = [(1, 'red'), (2, 'blue'), (3, 'green')]
         for zz in z:
             s.emit(zz)
-        L.append((l, ))
+        L.append((li, ))
     for ll in L:
         assert ll == L[0]
 
@@ -1010,11 +1011,11 @@ def test_execution_order():
         s = Stream()
         a = s.pluck(0)
         b = s.pluck(1)
-        l = a.combine_latest(b, emit_on=a).sink_to_list()
+        li = a.combine_latest(b, emit_on=a).sink_to_list()
         z = [(1, 'red'), (2, 'blue'), (3, 'green')]
         for zz in z:
             s.emit(zz)
-        L2.append((l,))
+        L2.append((li,))
     for ll, ll2 in zip(L, L2):
         assert ll2 == L2[0]
         assert ll != ll2
@@ -1023,7 +1024,7 @@ def test_execution_order():
 @gen_test()
 def test_map_errors_log():
     a = Stream(asynchronous=True)
-    b = a.delay(0.001).map(lambda x: 1 / x)
+    b = a.delay(0.001).map(lambda x: 1 / x)  # noqa: F841
     with captured_logger('streamz') as logger:
         a._emit(0)
         yield gen.sleep(0.1)
@@ -1034,7 +1035,7 @@ def test_map_errors_log():
 
 def test_map_errors_raises():
     a = Stream()
-    b = a.map(lambda x: 1 / x)
+    b = a.map(lambda x: 1 / x)  # noqa: F841
     with pytest.raises(ZeroDivisionError):
         a.emit(0)
 
@@ -1042,7 +1043,7 @@ def test_map_errors_raises():
 @gen_test()
 def test_accumulate_errors_log():
     a = Stream(asynchronous=True)
-    b = a.delay(0.001).accumulate(lambda x, y: x / y)
+    b = a.delay(0.001).accumulate(lambda x, y: x / y)  # noqa: F841
     with captured_logger('streamz') as logger:
         a._emit(1)
         a._emit(0)
@@ -1054,7 +1055,7 @@ def test_accumulate_errors_log():
 
 def test_accumulate_errors_raises():
     a = Stream()
-    b = a.accumulate(lambda x, y: x / y)
+    b = a.accumulate(lambda x, y: x / y)  # noqa: F841
     with pytest.raises(ZeroDivisionError):
         a.emit(1)
         a.emit(0)
@@ -1071,16 +1072,7 @@ def test_sync_in_event_loop():
     assert a.loop is not IOLoop.current()
 
 
-def test_share_common_ioloop(clean):
-    a = Stream()
-    b = Stream()
-    c = a.timed_window(0.01).combine_latest(b)
-    assert a.loop
-    assert a.loop is b.loop
-    assert a.loop is c.loop
-
-
-def test_share_common_ioloop(clean):
+def test_share_common_ioloop(clean):  # noqa: F811
     a = Stream()
     b = Stream()
     aa = a.timed_window(0.01)

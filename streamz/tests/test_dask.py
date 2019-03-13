@@ -11,10 +11,10 @@ from streamz import Stream
 
 from distributed import Future, Client
 from distributed.utils import sync
-from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # flake8: noqa
+from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # noqa: F401
 
 
-@gen_cluster(client=True)
+@gen_cluster(client=True, check_new_threads=False)
 def test_map(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
@@ -73,10 +73,10 @@ def test_zip(c, s, a, b):
     assert L == [(1, 'a'), (2, 'b')]
 
 
-@pytest.mark.slow
-def test_sync(loop):  # noqa: E811
+@pytest.mark.slow  # noqa: F811
+def test_sync(loop):
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as client:  # flake8: noqa
+        with Client(s['address'], loop=loop) as client:  # noqa: F841
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
@@ -90,10 +90,10 @@ def test_sync(loop):  # noqa: E811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow
-def test_sync_2(loop):  # noqa: E811
+@pytest.mark.slow  # noqa: F811
+def test_sync_2(loop):
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop):  # flake8: noqa
+        with Client(s['address'], loop=loop):  # noqa: F841
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
@@ -131,10 +131,10 @@ def test_buffer(c, s, a, b):
     assert source.loop == c.loop
 
 
-@pytest.mark.slow
-def test_buffer_sync(loop):  # noqa: E811
+@pytest.mark.slow  # noqa: F811
+def test_buffer_sync(loop):
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as c:  # flake8: noqa
+        with Client(s['address'], loop=loop) as c:  # noqa: F841
             source = Stream()
             buff = source.scatter().map(slowinc, delay=0.5).buffer(5)
             L = buff.gather().sink_to_list()
@@ -147,7 +147,6 @@ def test_buffer_sync(loop):  # noqa: E811
 
             for i in range(5, 10):
                 source.emit(i)
-            end2 = time.time()
 
             while len(L) < 10:
                 time.sleep(0.01)
@@ -156,13 +155,13 @@ def test_buffer_sync(loop):  # noqa: E811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.xfail(reason='')
+@pytest.mark.xfail(reason='')  # noqa: F811
 @pytest.mark.slow
 def test_stream_shares_client_loop(loop):  # noqa: E811
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as client:  # flake8: noqa
+        with Client(s['address'], loop=loop) as client:  # noqa: F841
             source = Stream()
-            d = source.timed_window('20ms').scatter()
+            d = source.timed_window('20ms').scatter()  # noqa: F841
             assert source.loop is client.loop
 
 
