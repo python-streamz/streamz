@@ -74,7 +74,7 @@ def test_zip(c, s, a, b):
 
 
 @pytest.mark.slow
-def test_sync(loop):
+def test_sync(loop):  # noqa: E811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # flake8: noqa
             source = Stream()
@@ -91,7 +91,7 @@ def test_sync(loop):
 
 
 @pytest.mark.slow
-def test_sync_2(loop):
+def test_sync_2(loop):  # noqa: E811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # flake8: noqa
             source = Stream()
@@ -132,7 +132,7 @@ def test_buffer(c, s, a, b):
 
 
 @pytest.mark.slow
-def test_buffer_sync(loop):
+def test_buffer_sync(loop):  # noqa: E811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # flake8: noqa
             source = Stream()
@@ -158,7 +158,7 @@ def test_buffer_sync(loop):
 
 @pytest.mark.xfail(reason='')
 @pytest.mark.slow
-def test_stream_shares_client_loop(loop):
+def test_stream_shares_client_loop(loop):  # noqa: E811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # flake8: noqa
             source = Stream()
