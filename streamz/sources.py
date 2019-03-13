@@ -149,6 +149,92 @@ class filenames(Source):
 
 
 @Stream.register_api(staticmethod)
+class from_socket(Source):
+    """
+    Creates events by reading from a socket.
+
+    The stream of incoming bytes is split on a given delimiter, and the parts
+    become the emitted events.
+
+    Based on example at
+    https://www.tornadoweb.org/en/stable/ioloop.html#tornado.ioloop.IOLoop
+
+    Parameters
+    ----------
+    port : int
+        The port to open and listen on. It only gets opened when the source
+        is started, and closed upon ``stop()``
+    delimiter : bytes
+        The incoming data will be split on this value. The resulting events
+        will still have the delimiter at the end.
+    start : bool
+        Whether to immediately initiate the source. You probably want to
+        set up downstream nodes first.
+
+    Example
+    -------
+
+    >>> source = Source.from_socket(4567)  # doctest: +SKIP
+    """
+    def __init__(self, port, delimiter=b'\n', start=False):
+        self.delimiter = delimiter
+        super(from_socket, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.port = port
+        self.sock = None
+        if start:
+            self.start()
+
+    def start(self):
+        """Sets up socket and puts connection handler on event loop"""
+        import socket
+        if self.stopped:
+            self.stopped = False
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sock.setblocking(0)
+            self.sock.bind(("", self.port))
+            self.sock.listen(128)
+            self.loop.add_handler(self.sock.fileno(), self.connection_ready,
+                                  self.loop.READ)
+
+    def stop(self):
+        """Closes socket and cleans event handler"""
+        # TODO: how to have this auto-clean itself?
+        if not self.stopped:
+            self.loop.remove_handler(self.sock.fileno())
+            self.sock.close()
+            self.sock = None
+            self.stopped = True
+
+    @gen.coroutine
+    def handle_connection(self, connection):
+        """Open connection was created, read until closed"""
+        from tornado.iostream import IOStream
+        stream = IOStream(connection)
+        while True:
+            try:
+                message = yield stream.read_until(self.delimiter)
+            except tornado.iostream.StreamClosedError:
+                break
+            yield self._emit(message)
+
+    def connection_ready(self, *_):
+        """Handle a new incoming connection"""
+        import socket
+        import errno
+        while True:
+            try:
+                connection, address = self.sock.accept()
+            except socket.error as e:
+                if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
+                    raise
+                return
+            connection.setblocking(0)
+            self.loop.spawn_callback(self.handle_connection, connection)
+
+
+@Stream.register_api(staticmethod)
 class from_kafka(Source):
     """ Accepts messages from Kafka
 
