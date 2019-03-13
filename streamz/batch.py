@@ -53,7 +53,7 @@ class Batch(Streaming):
         This calls ``pd.DataFrame`` on all list-elements of this stream
         """
         import pandas as pd
-        import streamz.dataframe  # flake8: noqa
+        import streamz.dataframe  # noqa: F401
         return self.map_partitions(pd.DataFrame, self)
 
     def to_stream(self):

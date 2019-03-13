@@ -706,9 +706,8 @@ class WindowedGroupBy(GroupBy):
 
 def _random_df(tup):
     last, now, freq = tup
-    index = pd.DatetimeIndex(start=(last + freq.total_seconds()) * 1e9,
-                             end=now * 1e9,
-                             freq=freq)
+    index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
+                          end=now * 1e9, freq=freq)
 
     df = pd.DataFrame({'x': np.random.random(len(index)),
                        'y': np.random.poisson(size=len(index)),
