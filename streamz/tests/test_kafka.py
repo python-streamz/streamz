@@ -145,7 +145,7 @@ def test_from_kafka():
 
 
 @gen_test(timeout=60)
-async def test_to_kafka():
+def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
     with kafka_service():
         source = Stream()
