@@ -153,8 +153,7 @@ def test_to_kafka():
         out = kafka.sink_to_list()
 
         for i in range(10):
-            await source.emit(b'value-%d' % i, asynchronous=True)
-        print(out)
+            yield source.emit(b'value-%d' % i, asynchronous=True)
 
         source.emit('final message')
         kafka.flush()
