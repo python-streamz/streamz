@@ -6,7 +6,7 @@ import time
 import tornado.ioloop
 from tornado import gen
 
-from .core import Stream, convert_interval
+from .core import Stream, convert_interval, get_io_loop
 
 
 def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
@@ -232,6 +232,68 @@ class from_socket(Source):
                 return
             connection.setblocking(0)
             self.loop.spawn_callback(self.handle_connection, connection)
+
+
+@Stream.register_api(staticmethod)
+class from_http_server(Source):
+    """Listen for HTTP POSTs on given port
+
+    Each connection will emit one event, containing the body data of
+    the request
+
+    Parameters
+    ----------
+    port : int
+        The port to listen on
+    path : str
+        Specific path to listen on. Can be regex, but content is not used.
+    start : bool
+        Whether to immediately startup the server. Usually you want to connect
+        downstream nodes first, and then call ``.start()``.
+
+    Example
+    -------
+    >>> source = Source.from_http_server(4567)  # doctest: +SKIP
+    """
+
+    def __init__(self, port, path='/.*', start=False):
+        self.port = port
+        self.path = path
+        super(from_http_server, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.server = None
+        if start:
+            self.start()
+
+    def _start_server(self):
+        from tornado.web import Application, RequestHandler, HTTPServer
+
+        class Handler(RequestHandler):
+            source = self
+
+            @gen.coroutine
+            def post(self):
+                yield self.source._emit(self.request.body)
+                self.write('OK')
+
+        application = Application([
+            (self.path, Handler),
+        ])
+        self.server = HTTPServer(application)
+        self.server.listen(self.port)
+
+    def start(self):
+        """Start HTTP server and listen"""
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        """Shutdown HTTP server"""
+        if not self.stopped:
+            self.server.stop()
+            self.server = None
+            self.stopped = True
 
 
 @Stream.register_api(staticmethod)

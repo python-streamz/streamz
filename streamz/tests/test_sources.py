@@ -1,3 +1,4 @@
+import pytest
 from streamz import Source
 import socket
 import time
@@ -55,3 +56,19 @@ def test_socket_multiple_connection():
         sock.close()
 
     assert l == [b'data\n', b'data\n', b'data2\n']
+
+
+def test_http():
+    requests = pytest.importorskip('requests')
+    port = 9875
+    s = Source.from_http_server(port)
+    l = s.sink_to_list()
+    s.start()
+
+    r = requests.post('http://localhost:%i/' % port, data=b'data')
+    assert l == [b'data']
+    assert r.ok
+
+    r = requests.post('http://localhost:%i/other' % port, data=b'data2')
+    assert l == [b'data', b'data2']
+    assert r.ok
