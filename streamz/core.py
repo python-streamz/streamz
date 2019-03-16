@@ -1269,14 +1269,28 @@ class to_kafka(Stream):
         self.producer = ck.Producer(producer_config)
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        self.stopped = False
+        self.polltime = 0.5
+        self.loop.add_callback(self.poll)
+
+    @gen.coroutine
+    def poll(self):
+        while True:
+            # executes callbacks for any delivered data, in this thread
+            # if no meesages were sent, nothing happens
+            self.producer.poll(0)
+            if self.stopped:
+                # kill producer?
+                break
+            yield gen.sleep(self.polltime)
 
     def update(self, x, who=None):
         future = gen.Future()
 
         def _():
             while True:
-                self.producer.poll(0)
                 try:
+                    # this runs asynchronously, in C-K's thread
                     self.producer.produce(self.topic, x, callback=self.cb)
                     future.set_result(None)
                     return
@@ -1288,8 +1302,9 @@ class to_kafka(Stream):
         self.loop.add_callback(_)
         return future
 
+    @gen.coroutine
     def cb(self, err, msg):
-        self._emit(self.Result(err, msg.value() if msg else None))
+        yield self._emit(self.Result(err, msg.value() if msg else None))
 
     def flush(self, timeout=-1):
         self.producer.flush(timeout)
@@ -1310,14 +1325,15 @@ class to_kafka_batched(Stream):
     def update(self, x, who=None):
         self.buffer.append(x)
         if len(self.buffer) >= self.n:
-            self.flush(False)
+            self.loop.add_callback(self.flush, False)
 
+    @gen.coroutine
     def flush(self, producer=True):
         for x in self.buffer:
-            self.producer.produce(self.topic, x)
+            yield self.producer.produce(self.topic, x)
         self.buffer = []
         if producer:
-            self.producer.flush()
+            yield self.producer.flush()
 
 
 def sync(loop, func, *args, **kwargs):

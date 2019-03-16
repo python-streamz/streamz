@@ -6,18 +6,16 @@ import random
 import requests
 import shlex
 import subprocess
-from time import sleep
 from tornado import gen
 
 from ..core import Stream
 from ..dask import DaskStream
-from streamz.utils_test import gen_test, wait_for
+from streamz.utils_test import gen_test, wait_for, await_for
 pytest.importorskip('distributed')
 from distributed.utils_test import gen_cluster  # flake8: noqa
 
 KAFKA_FILE = 'kafka_2.11-1.0.0'
 LAUNCH_KAFKA = os.environ.get('STREAMZ_LAUNCH_KAFKA', '') == 'true'
-TOPIC = 'test'
 ck = pytest.importorskip('confluent_kafka')
 
 
@@ -82,20 +80,12 @@ def launch_kafka():
     return cid
 
 
-def create_kafka_topic(cid, topic, partitions):
-    cmd = ("docker exec {cid} /opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
-           "--create --zookeeper localhost:2181 --replication-factor 1 "
-           "--partitions {parts} --topic {topic}".format(
-                cid=cid, parts=partitions, topic=topic))
-    out = subprocess.check_output(shlex.split(cmd))
-    return b'Created topic' in out
-
-
 _kafka = [None]
 
 
 @contextmanager
 def kafka_service():
+    TOPIC = "test-%i" % random.randint(0, 10000)
     if _kafka[0] is None:
         if LAUNCH_KAFKA:
             launch_kafka()
@@ -110,7 +100,7 @@ def kafka_service():
         if out > 0:
             raise RuntimeError('Timeout waiting for kafka')
         _kafka[0] = producer
-    yield _kafka[0]
+    yield _kafka[0], TOPIC
 
 
 @gen_test(timeout=60)
@@ -119,17 +109,17 @@ def test_from_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
+        kafka, TOPIC = kafka
         stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
         out = stream.sink_to_list()
         stream.start()
-        sleep(5)
+        yield gen.sleep(0.1)  # for loop to run
         for i in range(10):
+            yield gen.sleep(0.2)
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
-        startlen = len([o for o in out if o])
-        wait_for(lambda: len([o for o in out if o]) == startlen + 10, 10,
-                 period=0.1)  # list may include some test data
+        wait_for(lambda: len(out) == 10, 10, period=0.1)
         assert out[-1] == b'value-9'
 
         kafka.produce(TOPIC, b'final message')
@@ -142,18 +132,20 @@ def test_from_kafka():
         # absolute sleep here, since we expect output list *not* to change
         yield gen.sleep(1)
         assert out[-1] == b'final message'
+        stream._close_consumer()
 
 
 @gen_test(timeout=60)
 def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
-    with kafka_service():
+    with kafka_service() as kafka:
+        _, TOPIC = kafka
         source = Stream()
         kafka = source.to_kafka(TOPIC, ARGS)
         out = kafka.sink_to_list()
 
         for i in range(10):
-            yield source.emit(b'value-%d' % i, asynchronous=True)
+            yield source.emit(b'value-%d' % i)
 
         source.emit('final message')
         kafka.flush()
@@ -168,17 +160,15 @@ def test_from_kafka_thread():
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
+        kafka, TOPIC = kafka
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
-        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
-        startlen = len([o for o in out if o])
-        wait_for(lambda: len([o for o in out if o]) == startlen + 10, 10,
-                 period=0.1)
+        wait_for(lambda: len(out) == 10, 10, period=0.1)
 
         assert out[-1] == b'value-9'
         kafka.produce(TOPIC, b'final message')
@@ -189,8 +179,9 @@ def test_from_kafka_thread():
         kafka.produce(TOPIC, b'lost message')
         kafka.flush()
         # absolute sleep here, since we expect output list *not* to change
-        sleep(1)
+        yield gen.sleep(1)
         assert out[-1] == b'final message'
+        stream._close_consumer()
 
 
 def test_kafka_batch():
@@ -198,10 +189,10 @@ def test_kafka_batch():
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
+        kafka, TOPIC = kafka
         stream = Stream.from_kafka_batched(TOPIC, ARGS)
         out = stream.sink_to_list()
         stream.start()
-        sleep(2)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
@@ -216,19 +207,16 @@ def test_kafka_dask_batch(c, s, w1, w2):
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
+        kafka, TOPIC = kafka
         stream = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True,
                                            dask=True)
-        stream.start()
-        sleep(2)
-        assert isinstance(stream, DaskStream)
         out = stream.gather().sink_to_list()
+        stream.start()
+        yield gen.sleep(5)  # this frees the loop while dask workers report in
+        assert isinstance(stream, DaskStream)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
-        timeout = 10
-        while not any(out):
-            yield gen.sleep(0.2)
-            timeout -= 0.2
-            assert timeout > 0, "Timeout"
-        assert out[0][-1] == b'value-9'
+        yield await_for(lambda: any(out), 10, period=0.2)
+        assert b'value-1' in out[0]
         stream.upstream.stopped = True
