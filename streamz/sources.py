@@ -149,6 +149,71 @@ class filenames(Source):
 
 
 @Stream.register_api(staticmethod)
+class from_tcp(Source):
+    """
+    Creates events by reading from a socket using tornado TCPServer
+
+    The stream of incoming bytes is split on a given delimiter, and the parts
+    become the emitted events.
+
+    Parameters
+    ----------
+    port : int
+        The port to open and listen on. It only gets opened when the source
+        is started, and closed upon ``stop()``
+    delimiter : bytes
+        The incoming data will be split on this value. The resulting events
+        will still have the delimiter at the end.
+    start : bool
+        Whether to immediately initiate the source. You probably want to
+        set up downstream nodes first.
+
+    Example
+    -------
+
+    >>> source = Source.from_tcp(4567)  # doctest: +SKIP
+    """
+    def __init__(self, port, delimiter=b'\n', start=False):
+        super(from_tcp, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.port = port
+        self.server = None
+        self.delimiter = delimiter
+        if start:
+            self.start()
+
+    @gen.coroutine
+    def _start_server(self):
+        from tornado.tcpserver import TCPServer
+        from tornado.iostream import StreamClosedError
+
+        class EmitServer(TCPServer):
+            source = self
+
+            @gen.coroutine
+            def handle_stream(self, stream, address):
+                while True:
+                    try:
+                        data = yield stream.read_until(self.source.delimiter)
+                        yield self.source._emit(data)
+                    except StreamClosedError:
+                        break
+
+        self.server = EmitServer()
+        self.server.listen(self.port)
+
+    def start(self):
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        if not self.stopped:
+            self.server.stop()
+            self.stopped = True
+
+
+@Stream.register_api(staticmethod)
 class from_socket(Source):
     """
     Creates events by reading from a socket.

@@ -58,6 +58,35 @@ def test_socket_multiple_connection():
     assert l == [b'data\n', b'data\n', b'data2\n']
 
 
+def test_tcp():
+    port = 9876
+    s = Source.from_tcp(port)
+    l = s.sink_to_list()
+    s.start()
+    time.sleep(0.02)
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("localhost", port))
+        sock.send(b'data\n')
+        time.sleep(0.02)
+        sock.close()
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("localhost", port))
+        sock.send(b'data\n')
+        time.sleep(0.02)
+
+        sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock2.connect(("localhost", port))
+        sock2.send(b'data2\n')
+        time.sleep(0.02)
+    finally:
+        s.stop()
+
+    assert l == [b'data\n', b'data\n', b'data2\n']
+
+
 def test_http():
     requests = pytest.importorskip('requests')
     port = 9875
