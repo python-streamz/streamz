@@ -150,8 +150,7 @@ def test_to_kafka():
         source.emit('final message')
         kafka.flush()
         wait_for(lambda: len(out) == 11, 10, period=0.1)
-        assert out[-1].msg == b'final message'
-        assert out[-1].err is None
+        assert out[-1] == b'final message'
 
 
 @gen_test(timeout=60)

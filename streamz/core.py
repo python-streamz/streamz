@@ -1260,8 +1260,6 @@ class to_kafka(Stream):
     ...     source.emit(i)
     >>> kafka.flush()
     """
-    Result = namedtuple('Result', ['err', 'msg'])
-
     def __init__(self, upstream, topic, producer_config, **kwargs):
         import confluent_kafka as ck
 
@@ -1289,6 +1287,7 @@ class to_kafka(Stream):
         future = gen.Future()
         self.futures.append(future)
 
+        @gen.coroutine
         def _():
             while True:
                 try:
@@ -1296,9 +1295,10 @@ class to_kafka(Stream):
                     self.producer.produce(self.topic, x, callback=self.cb)
                     return
                 except BufferError:
-                    pass
+                    yield gen.sleep(0.1)
                 except Exception as e:
                     future.set_exception(e)
+                    return
 
         self.loop.add_callback(_)
         return future
@@ -1306,8 +1306,11 @@ class to_kafka(Stream):
     @gen.coroutine
     def cb(self, err, msg):
         future = self.futures.pop(0)
-        future.set_result(None)
-        yield self._emit(self.Result(err, msg.value() if msg else None))
+        if msg is not None and msg.value() is not None:
+            future.set_result(None)
+            yield self._emit(msg.value())
+        else:
+            future.set_exception(err or msg.error())
 
     def flush(self, timeout=-1):
         self.producer.flush(timeout)
