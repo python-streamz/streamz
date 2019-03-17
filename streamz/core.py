@@ -1268,7 +1268,7 @@ class to_kafka(Stream):
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
         self.stopped = False
-        self.polltime = 0.5
+        self.polltime = 0.2
         self.loop.add_callback(self.poll)
         self.futures = []
 
@@ -1295,7 +1295,7 @@ class to_kafka(Stream):
                     self.producer.produce(self.topic, x, callback=self.cb)
                     return
                 except BufferError:
-                    yield gen.sleep(0.1)
+                    yield gen.sleep(self.polltime)
                 except Exception as e:
                     future.set_exception(e)
                     return
