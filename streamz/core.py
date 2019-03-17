@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque, namedtuple
+from collections import deque
 from datetime import timedelta
 import functools
 import logging
@@ -1314,32 +1314,6 @@ class to_kafka(Stream):
 
     def flush(self, timeout=-1):
         self.producer.flush(timeout)
-
-
-@Stream.register_api()
-class to_kafka_batched(Stream):
-    def __init__(self, upstream, topic, producer_config, n, **kwargs):
-        import confluent_kafka as ck
-
-        self.topic = topic
-        self.producer = ck.Producer(producer_config)
-        self.n = n
-        self.buffer = []
-
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
-
-    def update(self, x, who=None):
-        self.buffer.append(x)
-        if len(self.buffer) >= self.n:
-            self.loop.add_callback(self.flush, False)
-
-    @gen.coroutine
-    def flush(self, producer=True):
-        for x in self.buffer:
-            yield self.producer.produce(self.topic, x)
-        self.buffer = []
-        if producer:
-            yield self.producer.flush()
 
 
 def sync(loop, func, *args, **kwargs):
