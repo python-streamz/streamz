@@ -1,6 +1,5 @@
 from glob import glob
 import os
-import weakref
 
 import time
 import tornado.ioloop
