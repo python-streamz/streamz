@@ -1272,6 +1272,7 @@ class to_kafka(Stream):
         self.stopped = False
         self.polltime = 0.5
         self.loop.add_callback(self.poll)
+        self.futures = []
 
     @gen.coroutine
     def poll(self):
@@ -1286,13 +1287,13 @@ class to_kafka(Stream):
 
     def update(self, x, who=None):
         future = gen.Future()
+        self.futures.append(future)
 
         def _():
             while True:
                 try:
                     # this runs asynchronously, in C-K's thread
                     self.producer.produce(self.topic, x, callback=self.cb)
-                    future.set_result(None)
                     return
                 except BufferError:
                     pass
@@ -1304,6 +1305,8 @@ class to_kafka(Stream):
 
     @gen.coroutine
     def cb(self, err, msg):
+        future = self.futures.pop(0)
+        future.set_result(None)
         yield self._emit(self.Result(err, msg.value() if msg else None))
 
     def flush(self, timeout=-1):
