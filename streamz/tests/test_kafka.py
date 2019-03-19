@@ -202,6 +202,7 @@ def test_kafka_batch():
 
 @gen_cluster(client=True, timeout=60)
 def test_kafka_dask_batch(c, s, w1, w2):
+    import time
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}

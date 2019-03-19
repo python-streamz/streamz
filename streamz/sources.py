@@ -209,6 +209,7 @@ class from_kafka(Source):
 
     def start(self):
         import confluent_kafka as ck
+        import weakref
         if self.stopped:
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
@@ -218,9 +219,14 @@ class from_kafka(Source):
             # blocks for consumer thread to come up
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
+            self._destruct = weakref.finalize(self, from_kafka._close_consumer,
+                                              weakref.ref(self))
 
     def _close_consumer(self):
-        if self.consumer is not None:
+        import weakref
+        if isinstance(self, weakref.ref):
+            self = self()
+        if self is not None and self.consumer is not None:
             consumer = self.consumer
             self.consumer = None
             consumer.unsubscribe()
