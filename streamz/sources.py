@@ -331,7 +331,8 @@ class from_http_server(Source):
             self.start()
 
     def _start_server(self):
-        from tornado.web import Application, RequestHandler, HTTPServer
+        from tornado.web import Application, RequestHandler
+        from tornado.httpserver import HTTPServer
 
         class Handler(RequestHandler):
             source = self
