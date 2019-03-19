@@ -1274,13 +1274,10 @@ class to_kafka(Stream):
 
     @gen.coroutine
     def poll(self):
-        while True:
+        while not self.stopped:
             # executes callbacks for any delivered data, in this thread
-            # if no meesages were sent, nothing happens
+            # if no messages were sent, nothing happens
             self.producer.poll(0)
-            if self.stopped:
-                # kill producer?
-                break
             yield gen.sleep(self.polltime)
 
     def update(self, x, who=None):

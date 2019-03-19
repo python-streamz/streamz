@@ -167,12 +167,12 @@ def test_from_kafka_thread():
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
-        wait_for(lambda: len(out) == 10, 10, period=0.1)
+        yield await_for(lambda: len(out) == 10, 10, period=0.1)
 
         assert out[-1] == b'value-9'
         kafka.produce(TOPIC, b'final message')
         kafka.flush()
-        wait_for(lambda: out[-1] == b'final message', 10, period=0.1)
+        yield await_for(lambda: out[-1] == b'final message', 10, period=0.1)
 
         stream._close_consumer()
         kafka.produce(TOPIC, b'lost message')
