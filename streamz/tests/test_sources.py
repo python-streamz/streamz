@@ -104,3 +104,9 @@ def test_http():
     time.sleep(0.02)  # allow loop to run
     assert out == [b'data', b'data2']
     assert r.ok
+
+    s.stop()
+
+    with pytest.raises(requests.exceptions.RequestException):
+        requests.post('http://localhost:%i/other' % port, data=b'data2')
+

@@ -178,7 +178,7 @@ class from_tcp(Source):
         self.port = port
         self.server = None
         self.delimiter = delimiter
-        if start:
+        if start:  # pragma: no cover
             self.start()
 
     @gen.coroutine
@@ -246,7 +246,7 @@ class from_socket(Source):
         self.stopped = True
         self.port = port
         self.sock = None
-        if start:
+        if start:  # pragma: no cover
             self.start()
 
     def start(self):
@@ -290,7 +290,7 @@ class from_socket(Source):
         while True:
             try:
                 connection, address = self.sock.accept()
-            except socket.error as e:
+            except socket.error as e:  # pragma: no cover
                 if e.args[0] not in (errno.EWOULDBLOCK, errno.EAGAIN):
                     raise
                 return
@@ -326,7 +326,7 @@ class from_http_server(Source):
         super(from_http_server, self).__init__(ensure_io_loop=True)
         self.stopped = True
         self.server = None
-        if start:
+        if start:  # pragma: no cover
             self.start()
 
     def _start_server(self):
