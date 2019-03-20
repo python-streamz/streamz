@@ -1,6 +1,8 @@
 import pytest
 from streamz import Source
 import socket
+from tornado import gen
+from streamz.utils_test import gen_test
 import time
 
 
@@ -93,11 +95,14 @@ def test_http():
     s = Source.from_http_server(port)
     out = s.sink_to_list()
     s.start()
+    time.sleep(0.02)  # allow loop to run
 
     r = requests.post('http://localhost:%i/' % port, data=b'data')
+    time.sleep(0.02)  # allow loop to run
     assert out == [b'data']
     assert r.ok
 
     r = requests.post('http://localhost:%i/other' % port, data=b'data2')
+    time.sleep(0.02)  # allow loop to run
     assert out == [b'data', b'data2']
     assert r.ok
