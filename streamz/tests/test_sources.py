@@ -1,61 +1,9 @@
 import pytest
 from streamz import Source
+from streamz.utils_test import wait_for, await_for, gen_test
+from tornado import gen
 import socket
 import time
-
-
-def test_socket():
-    port = 9876
-    s = Source.from_socket(port)
-    out = s.sink_to_list()
-    s.start()
-
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", port))
-        sock.send(b'data')
-        time.sleep(0.02)
-        assert out == []
-        sock.send(b'\n')
-        time.sleep(0.02)
-        assert out == [b'data\n']
-        sock.send(b'\nmore\ndata')
-        time.sleep(0.02)
-    finally:
-        s.stop()
-        sock.close()  # no error
-
-    assert out == [b'data\n', b'\n', b'more\n']
-
-
-def test_socket_multiple_connection():
-    port = 9876
-    s = Source.from_socket(port)
-    out = s.sink_to_list()
-    s.start()
-
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", port))
-        sock.send(b'data\n')
-        time.sleep(0.02)
-        sock.close()
-
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", port))
-        sock.send(b'data\n')
-        time.sleep(0.02)
-
-        sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock2.connect(("localhost", port))
-        sock2.send(b'data2\n')
-        time.sleep(0.02)
-    finally:
-        s.stop()
-        sock2.close()
-        sock.close()
-
-    assert out == [b'data\n', b'data\n', b'data2\n']
 
 
 def test_tcp():
@@ -69,22 +17,46 @@ def test_tcp():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", port))
         sock.send(b'data\n')
-        time.sleep(0.02)
         sock.close()
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", port))
         sock.send(b'data\n')
-        time.sleep(0.02)
 
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock2.connect(("localhost", port))
         sock2.send(b'data2\n')
-        time.sleep(0.02)
     finally:
         s.stop()
 
-    assert out == [b'data\n', b'data\n', b'data2\n']
+    wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2, period=0.01)
+
+
+@gen_test(timeout=60)
+def test_tcp_async():
+    port = 9876
+    s = Source.from_tcp(port)
+    out = s.sink_to_list()
+    s.start()
+    yield gen.sleep(0.02)
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("localhost", port))
+        sock.send(b'data\n')
+        sock.close()
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(("localhost", port))
+        sock.send(b'data\n')
+
+        sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock2.connect(("localhost", port))
+        sock2.send(b'data2\n')
+        yield await_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2,
+                        period=0.01)
+    finally:
+        s.stop()
 
 
 def test_http():
@@ -96,17 +68,14 @@ def test_http():
     time.sleep(0.02)  # allow loop to run
 
     r = requests.post('http://localhost:%i/' % port, data=b'data')
-    time.sleep(0.02)  # allow loop to run
-    assert out == [b'data']
+    wait_for(lambda: out == [b'data'], 2, period=0.01)
     assert r.ok
 
     r = requests.post('http://localhost:%i/other' % port, data=b'data2')
-    time.sleep(0.02)  # allow loop to run
-    assert out == [b'data', b'data2']
+    wait_for(lambda: out == [b'data', b'data2'], 2, period=0.01)
     assert r.ok
 
     s.stop()
 
     with pytest.raises(requests.exceptions.RequestException):
         requests.post('http://localhost:%i/other' % port, data=b'data2')
-
