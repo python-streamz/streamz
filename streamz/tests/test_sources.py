@@ -7,7 +7,7 @@ import time
 def test_socket():
     port = 9876
     s = Source.from_socket(port)
-    l = s.sink_to_list()
+    out = s.sink_to_list()
     s.start()
 
     try:
@@ -15,23 +15,23 @@ def test_socket():
         sock.connect(("localhost", port))
         sock.send(b'data')
         time.sleep(0.02)
-        assert l == []
+        assert out == []
         sock.send(b'\n')
         time.sleep(0.02)
-        assert l == [b'data\n']
+        assert out == [b'data\n']
         sock.send(b'\nmore\ndata')
         time.sleep(0.02)
     finally:
         s.stop()
         sock.close()  # no error
 
-    assert l == [b'data\n', b'\n', b'more\n']
+    assert out == [b'data\n', b'\n', b'more\n']
 
 
 def test_socket_multiple_connection():
     port = 9876
     s = Source.from_socket(port)
-    l = s.sink_to_list()
+    out = s.sink_to_list()
     s.start()
 
     try:
@@ -55,13 +55,13 @@ def test_socket_multiple_connection():
         sock2.close()
         sock.close()
 
-    assert l == [b'data\n', b'data\n', b'data2\n']
+    assert out == [b'data\n', b'data\n', b'data2\n']
 
 
 def test_tcp():
     port = 9876
     s = Source.from_tcp(port)
-    l = s.sink_to_list()
+    out = s.sink_to_list()
     s.start()
     time.sleep(0.02)
 
@@ -84,20 +84,20 @@ def test_tcp():
     finally:
         s.stop()
 
-    assert l == [b'data\n', b'data\n', b'data2\n']
+    assert out == [b'data\n', b'data\n', b'data2\n']
 
 
 def test_http():
     requests = pytest.importorskip('requests')
     port = 9875
     s = Source.from_http_server(port)
-    l = s.sink_to_list()
+    out = s.sink_to_list()
     s.start()
 
     r = requests.post('http://localhost:%i/' % port, data=b'data')
-    assert l == [b'data']
+    assert out == [b'data']
     assert r.ok
 
     r = requests.post('http://localhost:%i/other' % port, data=b'data2')
-    assert l == [b'data', b'data2']
+    assert out == [b'data', b'data2']
     assert r.ok

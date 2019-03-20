@@ -5,7 +5,7 @@ import time
 import tornado.ioloop
 from tornado import gen
 
-from .core import Stream, convert_interval, get_io_loop
+from .core import Stream, convert_interval
 
 
 def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
