@@ -788,6 +788,25 @@ def test_from_file():
 
 
 @gen_test()
+def test_from_file_end():
+    with tmpfile() as fn:
+        with open(fn, 'wt') as f:
+            f.write('data1\n')
+            f.flush()
+
+            source = Stream.from_textfile(fn, poll_interval=0.010,
+                                          start=False, from_end=True)
+            out = source.sink_to_list()
+            source.start()
+            assert out == []
+            yield gen.sleep(0.01)
+
+            f.write('data2\n')
+            f.flush()
+            yield await_for(lambda: out == ['data2\n'], timeout=5, period=0.1)
+
+
+@gen_test()
 def test_filenames():
     with tmpfile() as fn:
         os.mkdir(fn)
