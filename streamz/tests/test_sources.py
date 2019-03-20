@@ -1,8 +1,6 @@
 import pytest
 from streamz import Source
 import socket
-from tornado import gen
-from streamz.utils_test import gen_test
 import time
 
 
