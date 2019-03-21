@@ -166,15 +166,19 @@ class from_tcp(Source):
     start : bool
         Whether to immediately initiate the source. You probably want to
         set up downstream nodes first.
+    tcp_kwargs : dict or None
+        If given, additional arguments to pass to TCPServer
 
     Example
     -------
 
     >>> source = Source.from_tcp(4567)  # doctest: +SKIP
     """
-    def __init__(self, port, delimiter=b'\n', start=False):
+    def __init__(self, port, delimiter=b'\n', start=False,
+                 tcp_kwargs=None):
         super(from_tcp, self).__init__(ensure_io_loop=True)
         self.stopped = True
+        self.tcp_kwargs = tcp_kwargs or {}
         self.port = port
         self.server = None
         self.delimiter = delimiter
@@ -198,7 +202,7 @@ class from_tcp(Source):
                     except StreamClosedError:
                         break
 
-        self.server = EmitServer()
+        self.server = EmitServer(**self.tcp_kwargs)
         self.server.listen(self.port)
 
     def start(self):
@@ -209,6 +213,7 @@ class from_tcp(Source):
     def stop(self):
         if not self.stopped:
             self.server.stop()
+            self.server = None
             self.stopped = True
 
 
@@ -228,15 +233,18 @@ class from_http_server(Source):
     start : bool
         Whether to immediately startup the server. Usually you want to connect
         downstream nodes first, and then call ``.start()``.
+    server_kwargs : dict or None
+        If given, set of further parameters to pass on to HTTPServer
 
     Example
     -------
     >>> source = Source.from_http_server(4567)  # doctest: +SKIP
     """
 
-    def __init__(self, port, path='/.*', start=False):
+    def __init__(self, port, path='/.*', start=False, server_kwargs=None):
         self.port = port
         self.path = path
+        self.server_kwargs = server_kwargs or {}
         super(from_http_server, self).__init__(ensure_io_loop=True)
         self.stopped = True
         self.server = None
@@ -258,7 +266,7 @@ class from_http_server(Source):
         application = Application([
             (self.path, Handler),
         ])
-        self.server = HTTPServer(application)
+        self.server = HTTPServer(application, **self.server_kwargs)
         self.server.listen(self.port)
 
     def start(self):

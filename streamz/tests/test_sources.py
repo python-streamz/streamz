@@ -11,7 +11,7 @@ def test_tcp():
     s = Source.from_tcp(port)
     out = s.sink_to_list()
     s.start()
-    time.sleep(0.02)
+    wait_for(lambda: s.server is not None, 2, period=0.02)
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -28,6 +28,8 @@ def test_tcp():
         sock2.send(b'data2\n')
     finally:
         s.stop()
+        sock.close()
+        sock2.close()
 
     wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2, period=0.01)
 
@@ -38,7 +40,7 @@ def test_tcp_async():
     s = Source.from_tcp(port)
     out = s.sink_to_list()
     s.start()
-    yield gen.sleep(0.02)
+    yield await_for(lambda: s.server is not None, 2, period=0.02)
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,6 +59,8 @@ def test_tcp_async():
                         period=0.01)
     finally:
         s.stop()
+        sock.close()
+        sock2.close()
 
 
 def test_http():
@@ -65,7 +69,7 @@ def test_http():
     s = Source.from_http_server(port)
     out = s.sink_to_list()
     s.start()
-    time.sleep(0.02)  # allow loop to run
+    wait_for(lambda: s.server is not None, 2, period=0.02)
 
     r = requests.post('http://localhost:%i/' % port, data=b'data')
     wait_for(lambda: out == [b'data'], 2, period=0.01)
