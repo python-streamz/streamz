@@ -307,7 +307,7 @@ def test_tail(stream):
 
 def test_example_type_error_message():
     try:
-        sdf = DataFrame(example=[123])
+        DataFrame(example=[123])
     except Exception as e:
         assert 'DataFrame' in str(e)
         assert '[123]' in str(e)
