@@ -42,13 +42,11 @@ def map_partitions(func, *args, **kwargs):
                      if not isinstance(arg, Streaming)]
             stream = s.stream.map(partial_by_order, function=func, other=other,
                                   **kwargs)
-
-    for typ, s_type in _stream_types[stream_type]:
-        if isinstance(typ, types.FunctionType):
-            if typ(example):
-                return s_type(stream, example)
-        elif isinstance(example, typ):
-            return s_type(stream, example)
+    try:
+        s_type = get_stream_type(example, stream_type)
+        return s_type(stream, example)
+    except TypeError:
+        pass
     return Streaming(stream, example, stream_type=stream_type)
 
 
@@ -208,14 +206,13 @@ class Streaming(OperatorMixin):
         if returns_state:
             _, example = example
         stream = self.stream.accumulate(func, *args, start=start,
-                returns_state=returns_state, **kwargs)
+                                        returns_state=returns_state, **kwargs)
 
-        for typ, s_type in _stream_types[stream_type]:
-            if isinstance(typ, types.FunctionType):
-                if typ(example):
-                    return s_type(stream, example)
-            elif isinstance(example, typ):
-                return s_type(stream, example)
+        try:
+            s_type = get_stream_type(example, stream_type)
+            return s_type(stream, example)
+        except TypeError:
+            pass
         return Streaming(stream, example, stream_type=stream_type)
 
     def __repr__(self):
@@ -249,7 +246,7 @@ class Streaming(OperatorMixin):
                             (self._subtype, type(x)))
 
 
-def stream_type(example, stream_type='streaming'):
+def get_stream_type(example, stream_type='streaming'):
     for typ, s_type in _stream_types[stream_type]:
         if isinstance(typ, types.FunctionType):
             if typ(example):
