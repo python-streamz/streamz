@@ -166,7 +166,7 @@ class from_tcp(Source):
     start : bool
         Whether to immediately initiate the source. You probably want to
         set up downstream nodes first.
-    tcp_kwargs : dict or None
+    server_kwargs : dict or None
         If given, additional arguments to pass to TCPServer
 
     Example
@@ -175,10 +175,10 @@ class from_tcp(Source):
     >>> source = Source.from_tcp(4567)  # doctest: +SKIP
     """
     def __init__(self, port, delimiter=b'\n', start=False,
-                 tcp_kwargs=None):
+                 server_kwargs=None):
         super(from_tcp, self).__init__(ensure_io_loop=True)
         self.stopped = True
-        self.tcp_kwargs = tcp_kwargs or {}
+        self.server_kwargs = server_kwargs or {}
         self.port = port
         self.server = None
         self.delimiter = delimiter
@@ -202,7 +202,7 @@ class from_tcp(Source):
                     except StreamClosedError:
                         break
 
-        self.server = EmitServer(**self.tcp_kwargs)
+        self.server = EmitServer(**self.server_kwargs)
         self.server.listen(self.port)
 
     def start(self):
