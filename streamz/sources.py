@@ -76,11 +76,13 @@ class from_textfile(Source):
         self.poll_interval = poll_interval
         super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
+        self.started = False
         if start:
             self.start()
 
     def start(self):
         self.stopped = False
+        self.started = False
         self.loop.add_callback(self.do_poll)
 
     @gen.coroutine
@@ -89,7 +91,8 @@ class from_textfile(Source):
         if self.from_end:
             # this only happens when we are ready to read
             self.file.seek(0, 2)
-        while True:
+        while not self.stopped:
+            self.started = True
             line = self.file.read()
             if line:
                 buffer = buffer + line
@@ -100,8 +103,6 @@ class from_textfile(Source):
                         yield self._emit(part + self.delimiter)
             else:
                 yield gen.sleep(self.poll_interval)
-            if self.stopped:
-                break
 
 
 @Stream.register_api(staticmethod)

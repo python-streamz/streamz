@@ -799,7 +799,7 @@ def test_from_file_end():
             out = source.sink_to_list()
             source.start()
             assert out == []
-            yield gen.sleep(0.01)
+            yield await_for(lambda: source.started, 2, period=0.02)
 
             f.write('data2\n')
             f.flush()
