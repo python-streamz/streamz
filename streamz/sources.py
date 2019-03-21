@@ -148,6 +148,142 @@ class filenames(Source):
 
 
 @Stream.register_api(staticmethod)
+class from_tcp(Source):
+    """
+    Creates events by reading from a socket using tornado TCPServer
+
+    The stream of incoming bytes is split on a given delimiter, and the parts
+    become the emitted events.
+
+    Parameters
+    ----------
+    port : int
+        The port to open and listen on. It only gets opened when the source
+        is started, and closed upon ``stop()``
+    delimiter : bytes
+        The incoming data will be split on this value. The resulting events
+        will still have the delimiter at the end.
+    start : bool
+        Whether to immediately initiate the source. You probably want to
+        set up downstream nodes first.
+    server_kwargs : dict or None
+        If given, additional arguments to pass to TCPServer
+
+    Example
+    -------
+
+    >>> source = Source.from_tcp(4567)  # doctest: +SKIP
+    """
+    def __init__(self, port, delimiter=b'\n', start=False,
+                 server_kwargs=None):
+        super(from_tcp, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.server_kwargs = server_kwargs or {}
+        self.port = port
+        self.server = None
+        self.delimiter = delimiter
+        if start:  # pragma: no cover
+            self.start()
+
+    @gen.coroutine
+    def _start_server(self):
+        from tornado.tcpserver import TCPServer
+        from tornado.iostream import StreamClosedError
+
+        class EmitServer(TCPServer):
+            source = self
+
+            @gen.coroutine
+            def handle_stream(self, stream, address):
+                while True:
+                    try:
+                        data = yield stream.read_until(self.source.delimiter)
+                        yield self.source._emit(data)
+                    except StreamClosedError:
+                        break
+
+        self.server = EmitServer(**self.server_kwargs)
+        self.server.listen(self.port)
+
+    def start(self):
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        if not self.stopped:
+            self.server.stop()
+            self.server = None
+            self.stopped = True
+
+
+@Stream.register_api(staticmethod)
+class from_http_server(Source):
+    """Listen for HTTP POSTs on given port
+
+    Each connection will emit one event, containing the body data of
+    the request
+
+    Parameters
+    ----------
+    port : int
+        The port to listen on
+    path : str
+        Specific path to listen on. Can be regex, but content is not used.
+    start : bool
+        Whether to immediately startup the server. Usually you want to connect
+        downstream nodes first, and then call ``.start()``.
+    server_kwargs : dict or None
+        If given, set of further parameters to pass on to HTTPServer
+
+    Example
+    -------
+    >>> source = Source.from_http_server(4567)  # doctest: +SKIP
+    """
+
+    def __init__(self, port, path='/.*', start=False, server_kwargs=None):
+        self.port = port
+        self.path = path
+        self.server_kwargs = server_kwargs or {}
+        super(from_http_server, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.server = None
+        if start:  # pragma: no cover
+            self.start()
+
+    def _start_server(self):
+        from tornado.web import Application, RequestHandler
+        from tornado.httpserver import HTTPServer
+
+        class Handler(RequestHandler):
+            source = self
+
+            @gen.coroutine
+            def post(self):
+                yield self.source._emit(self.request.body)
+                self.write('OK')
+
+        application = Application([
+            (self.path, Handler),
+        ])
+        self.server = HTTPServer(application, **self.server_kwargs)
+        self.server.listen(self.port)
+
+    def start(self):
+        """Start HTTP server and listen"""
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        """Shutdown HTTP server"""
+        if not self.stopped:
+            self.server.stop()
+            self.server = None
+            self.stopped = True
+
+
+@Stream.register_api(staticmethod)
 class from_kafka(Source):
     """ Accepts messages from Kafka
 
