@@ -73,8 +73,8 @@ def test_zip(c, s, a, b):
     assert L == [(1, 'a'), (2, 'b')]
 
 
-@pytest.mark.slow  # noqa: F811
-def test_sync(loop):
+@pytest.mark.slow
+def test_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841
             source = Stream()
@@ -90,8 +90,8 @@ def test_sync(loop):
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow  # noqa: F811
-def test_sync_2(loop):
+@pytest.mark.slow
+def test_sync_2(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # noqa: F841
             source = Stream()
@@ -131,8 +131,8 @@ def test_buffer(c, s, a, b):
     assert source.loop == c.loop
 
 
-@pytest.mark.slow  # noqa: F811
-def test_buffer_sync(loop):
+@pytest.mark.slow
+def test_buffer_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # noqa: F841
             source = Stream()
@@ -155,9 +155,9 @@ def test_buffer_sync(loop):
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.xfail(reason='')  # noqa: F811
+@pytest.mark.xfail(reason='')
 @pytest.mark.slow
-def test_stream_shares_client_loop(loop):
+def test_stream_shares_client_loop(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841
             source = Stream()
