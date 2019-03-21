@@ -3,12 +3,6 @@ from __future__ import division, print_function
 import operator
 from collections import OrderedDict
 from time import time
-
-try:
-    import cudf
-except ImportError:
-    cudf = None
-
 import numpy as np
 import pandas as pd
 import toolz
@@ -19,7 +13,7 @@ from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
-from .utils import is_index_like, is_frame_like, FrameType
+from .utils import is_dataframe_like, is_series_like, is_index_like, is_frame_like
 
 
 class BaseFrame(Streaming):
@@ -290,11 +284,12 @@ class DataFrame(Frame, _DataFrameMixin):
                                     for k, v in args[0].items()})
             DataFrame.__init__(self, stream, example)
         else:
-            try:
-                example = kwargs.get('example', None) if "example" in kwargs else args[1]
-            except IndexError:
-                example = None
-            is_frame_like(self, FrameType.DATAFRAME, example)
+            example = None
+            if "example" in kwargs:
+                example = kwargs.get('example')
+            elif len(args) > 1:
+                example = args[1]
+            is_frame_like(self, is_dataframe_like, example)
             super(DataFrame, self).__init__(*args, **kwargs)
 
     def verify(self, x):
@@ -328,14 +323,15 @@ class Series(Frame, _SeriesMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        try:
-            example = kwargs.get('example', None) if "example" in kwargs else args[1]
-        except IndexError:
-            example = None
+        example = None
+        if "example" in kwargs:
+            example = kwargs.get('example')
+        elif len(args) > 1:
+            example = args[1]
         if isinstance(self, Index):
-            is_frame_like(self, FrameType.INDEX, example)
+            is_frame_like(self, is_index_like, example)
         else:
-            is_frame_like(self, FrameType.SERIES, example)
+            is_frame_like(self, is_series_like, example)
         super(Series, self).__init__(*args, **kwargs)
 
     def value_counts(self):
@@ -639,8 +635,8 @@ class GroupBy(object):
                                       start=None,
                                       returns_state=True)
 
-        for typ, s_type in _stream_types[stream_type]:
-            if isinstance(example, typ):
+        for fn, s_type in _stream_types[stream_type]:
+            if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
@@ -724,8 +720,8 @@ class WindowedGroupBy(GroupBy):
                                       diff=diff,
                                       window=window)
 
-        for typ, s_type in _stream_types[stream_type]:
-            if isinstance(example, typ):
+        for fn, s_type in _stream_types[stream_type]:
+            if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
@@ -802,15 +798,8 @@ class Random(DataFrame):
             last = now
 
 
-if cudf:
-    _stream_types['streaming'].append(((pd.DataFrame, cudf.DataFrame), DataFrame))
-    _stream_types['streaming'].append(((pd.Index, cudf.Index), Index))
-    _stream_types['streaming'].append(((pd.Series, cudf.Series), Series))
-    _stream_types['updating'].append(((pd.DataFrame, cudf.DataFrame), DataFrames))
-    _stream_types['updating'].append(((pd.Series, cudf.Series), Seriess))
-else:
-    _stream_types['streaming'].append((pd.DataFrame, DataFrame))
-    _stream_types['streaming'].append((pd.Index, Index))
-    _stream_types['streaming'].append((pd.Series, Series))
-    _stream_types['updating'].append((pd.DataFrame, DataFrames))
-    _stream_types['updating'].append((pd.Series, Seriess))
+_stream_types['streaming'].append((is_dataframe_like, DataFrame))
+_stream_types['streaming'].append((is_index_like, Index))
+_stream_types['streaming'].append((is_series_like, Series))
+_stream_types['updating'].append((is_dataframe_like, DataFrames))
+_stream_types['updating'].append((is_series_like, Seriess))
