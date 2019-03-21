@@ -1,9 +1,7 @@
 import pytest
 from streamz import Source
 from streamz.utils_test import wait_for, await_for, gen_test
-from tornado import gen
 import socket
-import time
 
 
 def test_tcp():
@@ -26,12 +24,12 @@ def test_tcp():
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock2.connect(("localhost", port))
         sock2.send(b'data2\n')
+        wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2,
+                 period=0.01)
     finally:
         s.stop()
         sock.close()
         sock2.close()
-
-    wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2, period=0.01)
 
 
 @gen_test(timeout=60)
