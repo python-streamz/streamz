@@ -48,7 +48,7 @@ def map_partitions(func, *args, **kwargs):
             if typ(example):
                 return s_type(stream, example)
         elif isinstance(example, typ):
-             return s_type(stream, example)
+            return s_type(stream, example)
     return Streaming(stream, example, stream_type=stream_type)
 
 
