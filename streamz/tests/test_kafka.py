@@ -219,3 +219,24 @@ def test_kafka_dask_batch(c, s, w1, w2):
         yield await_for(lambda: any(out), 10, period=0.2)
         assert b'value-1' in out[0]
         stream.upstream.stopped = True
+
+
+def test_consumer_factory():
+    from streamz.sources import ConsumerFactory
+    import pickle
+    j = random.randint(0, 10000)
+    ARGS = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        factory1 = ConsumerFactory(ARGS, TOPIC)
+        consumer1 = factory1.get_consumer(0, 0)
+        factory2 = ConsumerFactory(ARGS, TOPIC)
+        assert factory1.consumers is factory2.consumers
+        factory3 = pickle.loads(pickle.dumps(factory1))
+        assert factory3 is not factory1
+        assert factory1.consumers is factory3.consumers
+        consumer2 = factory1.get_consumer(0, 0)
+        assert consumer1 is consumer2
+        consumer3 = factory1.get_consumer(0, 0)
+        assert consumer1 is consumer3

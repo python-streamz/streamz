@@ -1,5 +1,6 @@
 from glob import glob
 import os
+import threading
 
 import time
 import tornado.ioloop
@@ -228,16 +229,52 @@ class from_kafka(Source):
         self.stopped = True
 
 
+class ConsumerFactory:
+    """Keeps active consumer for a given thread
+
+    This exists so that each tasks in from_kafka_batched does not need to
+    recreate a kafka consumer, which takes some time. In the Dask case, these
+    consumers are created in the workers and will also be reused between tasks
+    and threads in the same worker.
+    """
+    consumers = threading.local()
+
+    def __init__(self, consumer_params, topic):
+        consumer_params['enable.auto.commit'] = 'false'
+        self.consumer_params = consumer_params
+        self.topic = topic
+        self.key = str(sorted(consumer_params.items()))
+        self._init()
+
+    def _init(self):
+        import confluent_kafka as ck
+        if not hasattr(self.consumers, 'map'):
+            # race unlikely here
+            self.consumers.map = {}
+        consumers = self.consumers.map
+        if self.key not in consumers:
+            consumers[self.key] = ck.Consumer(self.consumer_params)
+
+    def get_consumer(self, partition, low):
+        import confluent_kafka as ck
+        consumer = self.consumers.map[self.key]
+        topic_partition = ck.TopicPartition(self.topic, partition, low)
+        consumer.assign([topic_partition])
+        return consumer
+
+
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
                  npartitions=1, **kwargs):
         self.consumer_params = consumer_params
+        self.factory = ConsumerFactory(self.consumer_params, topic)
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
         self.stopped = True
+        self.consumer = None
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
 
@@ -258,8 +295,7 @@ class FromKafkaBatched(Stream):
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
                     if high > lowest:
-                        out.append((self.consumer_params, self.topic, partition,
-                                    lowest, high - 1))
+                        out.append((self.factory, partition, lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
@@ -270,6 +306,7 @@ class FromKafkaBatched(Stream):
         finally:
             self.consumer.unsubscribe()
             self.consumer.close()
+            self.consumer = None
 
     def start(self):
         import confluent_kafka as ck
@@ -336,29 +373,29 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
+def get_message_batch(factory, partition, low, high, timeout=None):
     """Fetch a batch of kafka messages in given topic/partition
 
     This will block until messages are available, or timeout is reached.
     """
-    import confluent_kafka as ck
+    factory._init()
     t0 = time.time()
-    consumer = ck.Consumer(kafka_params)
-    tp = ck.TopicPartition(topic, partition, low)
-    consumer.assign([tp])
+    consumer = factory.get_consumer(partition, low)
     out = []
-    try:
-        while True:
-            msg = consumer.poll(0)
-            if msg and msg.value() and msg.error() is None:
-                if high >= msg.offset():
-                    out.append(msg.value())
-                if high <= msg.offset():
-                    break
-            else:
-                time.sleep(0.1)
-                if timeout is not None and time.time() - t0 > timeout:
-                    break
-    finally:
-        consumer.close()
+    while True:
+        msg = consumer.poll(0)
+        if msg and msg.value() and msg.error() is None:
+            if high >= msg.offset():
+                out.append(msg.value())
+            if high <= msg.offset():
+                break
+        else:
+            time.sleep(0.1)
+            if timeout is not None and time.time() - t0 > timeout:
+                break
+    if low <= high:
+        try:
+            consumer.commit(asynchronous=False)
+        except factory.ck.KafkaError:
+            pass
     return out
