@@ -198,3 +198,8 @@ class filenames(DaskStream, sources.filenames):
 @DaskStream.register_api(staticmethod)
 class from_textfile(DaskStream, sources.from_textfile):
     pass
+
+
+@DaskStream.register_api(staticmethod)
+class from_textfile_batched(DaskStream, sources.from_textfile_batched):
+    pass

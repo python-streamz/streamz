@@ -788,6 +788,47 @@ def test_from_file():
 
 
 @gen_test()
+def test_from_file_batched():
+    with tmpfile() as fn:
+        with open(fn, 'wt') as f:
+            f.write('{"x": 1, "y": 2}\n')
+            f.write('{"x": 2, "y": 2}\n')
+            f.write('{"x": 3, "y": 2}\n')
+            f.write('{"x": 4, "y": 2}\n')
+            f.flush()
+
+            source = Stream.from_textfile_batched(fn, poll_interval=0.010, batchSize=2, delimiter='\n',
+                                          asynchronous=True, start=False)
+            
+            def preprocess(messages):
+                sumx = 0
+                parts = messages.split('\n')[:-1]
+                for part in parts:
+                    message = json.loads(part)
+                    sumx = sumx + message['x']
+                return sumx
+            
+            L = source.map(preprocess).sink_to_list()
+
+            assert L == []
+
+            source.start()
+
+            yield await_for(lambda: len(L) == 2, timeout=5)
+
+            assert L == [3, 7]
+
+            f.write('{"x": 4, "y": 2}\n')
+            f.write('{"x": 5, "y": 2}\n')
+            f.flush()
+
+            start = time()
+            while L != [3, 7, 9]:
+                yield gen.sleep(0.01)
+                assert time() < start + 2  # reads within 2s
+
+
+@gen_test()
 def test_filenames():
     with tmpfile() as fn:
         os.mkdir(fn)

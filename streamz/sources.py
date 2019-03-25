@@ -98,6 +98,52 @@ class from_textfile(Source):
 
 
 @Stream.register_api(staticmethod)
+class from_textfile_batched(Source):
+    
+    """
+    Stream data from a text file in batches. Compatible with DaskStream.
+    """
+    
+    def __init__(self, f, poll_interval=0.100, delimiter='\n', start=False, batchSize=1,
+                 **kwargs):
+        if isinstance(f, str):
+            f = open(f, 'r')
+        self.file = f
+        self.delimiter = delimiter
+        self.poll_interval = poll_interval
+        self.batchSize=batchSize
+        super(from_textfile_batched, self).__init__(ensure_io_loop=True, **kwargs)
+        self.stopped = True
+        if start:
+            self.start()
+
+    def start(self):
+        self.stopped = False
+        self.loop.add_callback(self.do_poll)
+
+    @gen.coroutine
+    def do_poll(self):
+        buffer = ''
+        delim_count = 0
+        while True:
+            line = self.file.read()        
+            if line or buffer:
+                if line:
+                    delim_count = delim_count + line.count(self.delimiter)
+                if self.batchSize >= delim_count:
+                    self.batchSize = delim_count
+                buffer = buffer + line
+                batchToSend = (self.delimiter).join(buffer.split(self.delimiter, self.batchSize)[:self.batchSize])
+                buffer = (self.delimiter).join(buffer.split(self.delimiter, self.batchSize)[self.batchSize:])
+                delim_count = buffer.count(self.delimiter)
+                yield self._emit(batchToSend+self.delimiter)
+            else:
+                yield gen.sleep(self.poll_interval)
+            if self.stopped:
+                break                
+                
+
+@Stream.register_api(staticmethod)
 class filenames(Source):
     """ Stream over filenames in a directory
 
