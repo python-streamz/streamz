@@ -1297,6 +1297,9 @@ class to_kafka(Stream):
 
 @Stream.register_api()
 class to_kafka_batched(Stream):
+
+    Result = namedtuple('Result', ['err', 'msg'])
+
     def __init__(self, upstream, topic, producer_config, n, **kwargs):
         import confluent_kafka as ck
 
@@ -1314,10 +1317,13 @@ class to_kafka_batched(Stream):
 
     def flush(self, producer=True):
         for x in self.buffer:
-            self.producer.produce(self.topic, x)
+            self.producer.produce(self.topic, x, callback = self.cb)
         self.buffer = []
         if producer:
             self.producer.flush()
+
+    def cb(self, err, msg):
+        self._emit(self.Result(err, msg.value() if msg else None))
 
 
 def sync(loop, func, *args, **kwargs):
