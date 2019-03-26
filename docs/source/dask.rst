@@ -122,19 +122,18 @@ did.
 Gotchas
 +++++++
 
-An important gotcha with ``DaskStream`` is that if a ``Stream`` node is
-downstream of a ``DaskStream`` node without a ``gather`` between then the
-``Stream`` node will receive the future not the data itself.
 
-For example
+An important gotcha with ``DaskStream`` is that it is a subclass ``Stream``, and so can be used as an input 
+to any function expecting a ``Stream``. If there is no intervening ``.gather()``, then the downstream node will
+receive Dask futures instead of the data they represent::
 
-.. code-block:: python
+    source = Stream()
+    source2 = Stream()
+    a = source.scatter().map(inc)
+    b = source2.combine_latest(a)
 
-   source = Stream()
-   source2 = Stream()
-   a = source.scatter().map(inc)
-   b = source2.combine_latest(a)
+In this case, the combine operation will get real values from ``source2``, and Dask futures. 
+Downstream nodes would be free to operate on the futures, but more likely, the line should be::
 
-In this case ``b`` is now a ``Stream`` node and does not have access to the actual
-data on the dask cluster.
-Any operations done downstream of ``b`` would be performed on the future.
+    b = source2.combine_latest(a.gather())
+
