@@ -652,13 +652,19 @@ class accumulate(Stream):
     This performs running or cumulative reductions, applying the function
     to the previous total and the new element.  The function should take
     two arguments, the previous accumulated state and the next element and
-    it should return a new accumulated state.
+    it should return a new accumulated state,
+    - ``state = func(previous_state, new_value)`` (returns_state=False)
+    - ``state, result = func(previous_state, new_value)`` (returns_state=True)
+
+    where the new_state is passed to the next invocation. The state or result
+    is emitted downstream for the two cases.
 
     Parameters
     ----------
     func: callable
     start: object
-        Initial value.  Defaults to the first submitted element
+        Initial value, passed as the value of ``previous_state`` on the first
+        invocation. Defaults to the first submitted element
     returns_state: boolean
         If true then func should return both the state and the value to emit
         If false then both values are the same, and func returns one value
@@ -667,14 +673,41 @@ class accumulate(Stream):
 
     Examples
     --------
+    A running total, producing triangular numbers
+
     >>> source = Stream()
     >>> source.accumulate(lambda acc, x: acc + x).sink(print)
     >>> for i in range(5):
     ...     source.emit(i)
+    0
     1
     3
     6
     10
+
+    A count of number of events (including the current one)
+
+    >>> source = Stream()
+    >>> source.accumulate(lambda acc, x: acc + 1, start=0).sink(print)
+    >>> for _ in range(5):
+    ...     source.emit(0)
+    1
+    2
+    3
+    4
+    5
+
+    Like the builtin "enumerate".
+
+    >>> source = Stream()
+    >>> source.accumulate(lambda acc, x: ((acc[0] + 1, x), (acc[0], x)),
+    ...                   start=(0, 0), returns_state=True
+    ...                   ).sink(print)
+    >>> for i in range(3):
+    ...     source.emit(0)
+    (0, 0)
+    (1, 0)
+    (2, 0)
     """
     _graphviz_shape = 'box'
 
@@ -704,6 +737,46 @@ class accumulate(Stream):
                 state = result
             self.state = state
             return self._emit(result)
+
+
+@Stream.register_api()
+class slice(Stream):
+    """
+    Get only some events in a stream by position. Works like list[] syntax.
+
+    Parameters
+    ----------
+    start : int
+        First event to use. If None, start from the beginnning
+    end : int
+        Last event to use (non-inclusive). If None, continue without stopping.
+    step : int
+        Pass on every Nth event. If None, pass every one.
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> source.slice(2, 6, 2).sink(print)
+    >>> for i in range(5):
+    ...     source.emit(0)
+    2
+    4
+    """
+
+    def __init__(self, upstream, start=None, end=None, step=None, **kwargs):
+        self.state = start or 0
+        self.end = end
+        self.step = step or 1
+        stream_name = kwargs.pop('stream_name', None)
+        Stream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        if self.state % self.step == 0:
+            self.emit(x)
+        self.state += 1
+        if self.state >= self.end:
+            # we're done
+            self.upstream.downstreams.remove(self)
 
 
 @Stream.register_api()
@@ -755,14 +828,15 @@ class sliding_window(Stream):
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, upstream, n, **kwargs):
+    def __init__(self, upstream, n, return_partial=True, **kwargs):
         self.n = n
         self.buffer = deque(maxlen=n)
+        self.partial = return_partial
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         self.buffer.append(x)
-        if len(self.buffer) == self.n:
+        if self.partial or len(self.buffer) == self.n:
             return self._emit(tuple(self.buffer))
         else:
             return []

@@ -229,7 +229,8 @@ class Streaming(OperatorMixin):
         return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
 
     def _ipython_display_(self, **kwargs):
-        return self.stream.latest().rate_limit(0.5).gather()._ipython_display_(**kwargs)
+        return self.stream.latest().rate_limit(
+            0.5).gather()._ipython_display_(**kwargs)
 
     def emit(self, x):
         self.verify(x)
