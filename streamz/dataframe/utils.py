@@ -1,17 +1,26 @@
 def is_dataframe_like(df):
-    """ Looks like a Pandas/cudf DataFrame """
-    return set(dir(df)) > {'dtypes', 'columns', 'groupby', 'head'} and not isinstance(df, type)
+    """ Looks like a Pandas DataFrame. ** Borrowed from dask.dataframe.utils ** """
+    typ = type(df)
+    return (all(hasattr(typ, name)
+                for name in ('groupby', 'head', 'merge', 'mean')) and
+            all(hasattr(df, name) for name in ('dtypes',)) and not
+            any(hasattr(typ, name)
+                for name in ('value_counts', 'dtype')))
 
 
 def is_series_like(s):
-    """ Looks like a Pandas/cudf Series """
-    return set(dir(s)) > {'index', 'dtype', 'take', 'head'} and not isinstance(s, type)
+    """ Looks like a Pandas Series. ** Borrowed from dask.dataframe.utils ** """
+    typ = type(s)
+    return (all(hasattr(typ, name) for name in ('groupby', 'head', 'mean')) and
+            all(hasattr(s, name) for name in ('dtype', 'name')) and
+            'index' not in typ.__name__.lower())
 
 
 def is_index_like(s):
-    """ Looks like a Pandas/cudf Index """
-    attrs = set(dir(s))
-    return attrs > {'take', 'values'} and 'head' not in attrs and not isinstance(s, type)
+    """ Looks like a Pandas Index. ** Borrowed from dask.dataframe.utils ** """
+    typ = type(s)
+    return (all(hasattr(s, name) for name in ('name', 'dtype'))
+            and 'index' in typ.__name__.lower())
 
 
 def is_frame_like(frame, method, example=None):
