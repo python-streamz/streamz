@@ -42,11 +42,9 @@ def map_partitions(func, *args, **kwargs):
                      if not isinstance(arg, Streaming)]
             stream = s.stream.map(partial_by_order, function=func, other=other,
                                   **kwargs)
-    try:
-        s_type = get_stream_type(example, stream_type)
+    s_type = get_stream_type(example, stream_type)
+    if s_type:
         return s_type(stream, example)
-    except TypeError:
-        pass
     return Streaming(stream, example, stream_type=stream_type)
 
 
@@ -208,11 +206,9 @@ class Streaming(OperatorMixin):
         stream = self.stream.accumulate(func, *args, start=start,
                                         returns_state=returns_state, **kwargs)
 
-        try:
-            s_type = get_stream_type(example, stream_type)
+        s_type = get_stream_type(example, stream_type)
+        if s_type:
             return s_type(stream, example)
-        except TypeError:
-            pass
         return Streaming(stream, example, stream_type=stream_type)
 
     def __repr__(self):
@@ -249,12 +245,13 @@ class Streaming(OperatorMixin):
 def get_stream_type(example, stream_type='streaming'):
     for typ, s_type in _stream_types[stream_type]:
         if isinstance(typ, types.FunctionType):
+            """For Frame like objects we use utility functions to check type.
+               i.e, DataFrame like objects are checked using is_dataframe_like."""
             if typ(example):
                 return s_type
         elif isinstance(example, typ):
             return s_type
-    raise TypeError("No streaming equivalent found for type %s" %
-                    type(example).__name__)
+    return None
 
 
 def partial_by_order(*args, **kwargs):
