@@ -1,3 +1,10 @@
+"""
+Tests for cudf DataFrame
+All these tests are taken from test_dataframes module in the same folder.
+Some of these tests pass with cudf as they are, and others are marked xfail
+where a pandas like method is not implemented yet in cudf.
+But these tests should pass as cudf implement more pandas like methods.
+"""
 from __future__ import division, print_function
 
 import numpy as np
