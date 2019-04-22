@@ -13,7 +13,7 @@ from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
-from .utils import is_dataframe_like, is_series_like, is_index_like, is_frame_like
+from .utils import is_dataframe_like, is_series_like, is_index_like, get_base_frame_type
 
 
 class BaseFrame(Streaming):
@@ -289,7 +289,8 @@ class DataFrame(Frame, _DataFrameMixin):
                 example = kwargs.get('example')
             elif len(args) > 1:
                 example = args[1]
-            is_frame_like(self, is_dataframe_like, example)
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_dataframe_like, example)
             super(DataFrame, self).__init__(*args, **kwargs)
 
     def verify(self, x):
@@ -329,9 +330,11 @@ class Series(Frame, _SeriesMixin):
         elif len(args) > 1:
             example = args[1]
         if isinstance(self, Index):
-            is_frame_like(self, is_index_like, example)
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_index_like, example)
         else:
-            is_frame_like(self, is_series_like, example)
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_series_like, example)
         super(Series, self).__init__(*args, **kwargs)
 
     def value_counts(self):
@@ -636,6 +639,7 @@ class GroupBy(object):
                                       returns_state=True)
 
         for fn, s_type in _stream_types[stream_type]:
+            """Function checks if example is of a specific frame type"""
             if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
@@ -721,6 +725,7 @@ class WindowedGroupBy(GroupBy):
                                       window=window)
 
         for fn, s_type in _stream_types[stream_type]:
+            """Function checks if example is of a specific frame type"""
             if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)

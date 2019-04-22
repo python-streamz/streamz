@@ -23,12 +23,13 @@ def is_index_like(s):
             and 'index' in typ.__name__.lower())
 
 
-def is_frame_like(frame, method, example=None):
-    """Handles type check for input example for DataFrame/Series/Index initialization"""
+def get_base_frame_type(frame_name, is_frame_like, example=None):
+    """Handles type check for input example for DataFrame/Series/Index initialization.
+       Returns the base type of streaming objects if type checks pass."""
     if example is None:
         raise TypeError("Missing required argument:'example'")
-    if not method(example):
+    if not is_frame_like(example):
         msg = "Streaming {0} expects an example of {0} like objects. Got: {1}."\
-                                             .format(frame.__class__.__name__, example)
+                                             .format(frame_name, example)
         raise TypeError(msg)
-    frame._subtype = type(example)
+    return type(example)
