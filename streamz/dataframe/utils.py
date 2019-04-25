@@ -2,18 +2,18 @@ def is_dataframe_like(df):
     """ Looks like a Pandas DataFrame. ** Borrowed from dask.dataframe.utils ** """
     typ = type(df)
     return (all(hasattr(typ, name)
-                for name in ('groupby', 'head', 'merge', 'mean')) and
-            all(hasattr(df, name) for name in ('dtypes',)) and not
-            any(hasattr(typ, name)
-                for name in ('value_counts', 'dtype')))
+                for name in ('groupby', 'head', 'merge', 'mean')
+            and all(hasattr(df, name) for name in ('dtypes',))
+            and not any(hasattr(typ, name)
+                for name in ('value_counts', 'dtype'))))
 
 
 def is_series_like(s):
     """ Looks like a Pandas Series. ** Borrowed from dask.dataframe.utils ** """
     typ = type(s)
-    return (all(hasattr(typ, name) for name in ('groupby', 'head', 'mean')) and
-            all(hasattr(s, name) for name in ('dtype', 'name')) and
-            'index' not in typ.__name__.lower())
+    return (all(hasattr(typ, name) for name in ('groupby', 'head', 'mean'))
+            and all(hasattr(s, name) for name in ('dtype', 'name'))
+            and 'index' not in typ.__name__.lower())
 
 
 def is_index_like(s):
