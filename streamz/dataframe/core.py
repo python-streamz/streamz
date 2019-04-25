@@ -1,9 +1,8 @@
 from __future__ import division, print_function
 
-from collections import OrderedDict
 import operator
+from collections import OrderedDict
 from time import time
-
 import numpy as np
 import pandas as pd
 import toolz
@@ -14,6 +13,7 @@ from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
+from .utils import is_dataframe_like, is_series_like, is_index_like, get_base_frame_type
 
 
 class BaseFrame(Streaming):
@@ -245,14 +245,16 @@ class _DataFrameMixin(object):
         else:
             example = self.example.copy()
             example[key] = value
-            result = self.map_partitions(pd.DataFrame.assign, self, **{key: value})
+            df_type = type(self.example)
+            result = self.map_partitions(df_type.assign, self, **{key: value})
 
         self.stream = result.stream
         self.example = result.example
         return self
 
     def query(self, expr, **kwargs):
-        return self.map_partitions(pd.DataFrame.query, self, expr, **kwargs)
+        df_type = type(self.example)
+        return self.map_partitions(df_type.query, self, expr, **kwargs)
 
 
 class DataFrame(Frame, _DataFrameMixin):
@@ -266,10 +268,9 @@ class DataFrame(Frame, _DataFrameMixin):
     --------
     Series
     """
-    _subtype = pd.DataFrame
 
     def __init__(self, *args, **kwargs):
-        # {'x': sdf.x + 1, 'y': sdf.y - 1}
+        # {'x': sdf.x + 1, 'y': sdf.y - 1} - works only with pandas
         if len(args) == 1 and not kwargs and isinstance(args[0], dict):
             def concat(tup, columns=None):
                 result = pd.concat(tup, axis=1)
@@ -283,7 +284,14 @@ class DataFrame(Frame, _DataFrameMixin):
                                     for k, v in args[0].items()})
             DataFrame.__init__(self, stream, example)
         else:
-            return super(DataFrame, self).__init__(*args, **kwargs)
+            example = None
+            if "example" in kwargs:
+                example = kwargs.get('example')
+            elif len(args) > 1:
+                example = args[1]
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_dataframe_like, example)
+            super(DataFrame, self).__init__(*args, **kwargs)
 
     def verify(self, x):
         """ Verify consistency of elements that pass through this stream """
@@ -314,7 +322,20 @@ class Series(Frame, _SeriesMixin):
     --------
     DataFrame
     """
-    _subtype = pd.Series
+
+    def __init__(self, *args, **kwargs):
+        example = None
+        if "example" in kwargs:
+            example = kwargs.get('example')
+        elif len(args) > 1:
+            example = args[1]
+        if isinstance(self, Index):
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_index_like, example)
+        else:
+            self._subtype = get_base_frame_type(self.__class__.__name__,
+                                                is_series_like, example)
+        super(Series, self).__init__(*args, **kwargs)
 
     def value_counts(self):
         return self.accumulate_partitions(aggregations.accumulator,
@@ -324,7 +345,7 @@ class Series(Frame, _SeriesMixin):
 
 
 class Index(Series):
-    _subtype = pd.Index
+    pass
 
 
 class DataFrames(Frames, _DataFrameMixin):
@@ -362,6 +383,7 @@ class Rolling(object):
     >>> sdf.rolling(10).x.mean()  # doctest: +SKIP
     >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
     """
+
     def __init__(self, sdf, window, min_periods):
         self.root = sdf
         if not isinstance(window, int):
@@ -382,12 +404,12 @@ class Rolling(object):
 
     def _known_aggregation(self, op, *args, **kwargs):
         return self.root.accumulate_partitions(rolling_accumulator,
-                                              window=self.window,
-                                              op=op,
-                                              args=args,
-                                              kwargs=kwargs,
-                                              start=(),
-                                              returns_state=True)
+                                               window=self.window,
+                                               op=op,
+                                               args=args,
+                                               kwargs=kwargs,
+                                               start=(),
+                                               returns_state=True)
 
     def sum(self):
         """ Rolling sum """
@@ -440,6 +462,7 @@ class Window(OperatorMixin):
     --------
     DataFrame.window: contains full docstring
     """
+
     def __init__(self, sdf, n=None, value=None):
         if value is None and isinstance(n, (str, pd.Timedelta)):
             value = n
@@ -492,12 +515,12 @@ class Window(OperatorMixin):
             diff = aggregations.diff_loc
             window = self.value
         return self.root.accumulate_partitions(aggregations.window_accumulator,
-                                              diff=diff,
-                                              window=window,
-                                              agg=agg,
-                                              start=None,
-                                              returns_state=True,
-                                              stream_type='updating')
+                                               diff=diff,
+                                               window=window,
+                                               agg=agg,
+                                               start=None,
+                                               returns_state=True,
+                                               stream_type='updating')
 
     def full(self):
         return self.aggregate(aggregations.Full())
@@ -573,6 +596,7 @@ def _accumulate_size(accumulator, new):
 
 class GroupBy(object):
     """ Groupby aggregations on streaming dataframes """
+
     def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
@@ -603,7 +627,7 @@ class GroupBy(object):
         state = agg.initial(self.root.example, grouper=grouper_example)
         if hasattr(grouper_example, 'iloc'):
             grouper_example = grouper_example.iloc[:0]
-        elif isinstance(grouper_example, (np.ndarray, pd.Index)):
+        elif isinstance(grouper_example, np.ndarray) or is_index_like(grouper_example):
             grouper_example = grouper_example[:0]
         _, example = agg.on_new(state,
                                 self.root.example.iloc[:0],
@@ -614,8 +638,9 @@ class GroupBy(object):
                                       start=None,
                                       returns_state=True)
 
-        for typ, s_type in _stream_types[stream_type]:
-            if isinstance(example, typ):
+        for fn, s_type in _stream_types[stream_type]:
+            """Function checks if example is of a specific frame type"""
+            if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
@@ -646,6 +671,7 @@ class GroupBy(object):
 
 class WindowedGroupBy(GroupBy):
     """ Groupby aggregations over a window of data """
+
     def __init__(self, root, grouper, index=None, n=None, value=None):
         self.root = root
         self.grouper = grouper
@@ -678,7 +704,7 @@ class WindowedGroupBy(GroupBy):
         state = agg.initial(self.root.example, grouper=grouper_example)
         if hasattr(grouper_example, 'iloc'):
             grouper_example = grouper_example.iloc[:0]
-        elif isinstance(grouper_example, (np.ndarray, pd.Index)):
+        elif isinstance(grouper_example, np.ndarray) or is_index_like(grouper_example):
             grouper_example = grouper_example[:0]
         _, example = agg.on_new(state,
                                 self.root.example.iloc[:0],
@@ -698,8 +724,9 @@ class WindowedGroupBy(GroupBy):
                                       diff=diff,
                                       window=window)
 
-        for typ, s_type in _stream_types[stream_type]:
-            if isinstance(example, typ):
+        for fn, s_type in _stream_types[stream_type]:
+            """Function checks if example is of a specific frame type"""
+            if fn(example):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
@@ -712,7 +739,7 @@ def _random_df(tup):
     df = pd.DataFrame({'x': np.random.random(len(index)),
                        'y': np.random.poisson(size=len(index)),
                        'z': np.random.normal(0, 1, size=len(index))},
-                       index=index)
+                      index=index)
     return df
 
 
@@ -737,6 +764,7 @@ class Random(DataFrame):
     -------
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
+
     def __init__(self, freq='100ms', interval='500ms', dask=False):
         if dask:
             from streamz.dask import DaskStream
@@ -775,8 +803,8 @@ class Random(DataFrame):
             last = now
 
 
-_stream_types['streaming'].append((pd.DataFrame, DataFrame))
-_stream_types['streaming'].append((pd.Index, Index))
-_stream_types['streaming'].append((pd.Series, Series))
-_stream_types['updating'].append((pd.DataFrame, DataFrames))
-_stream_types['updating'].append((pd.Series, Seriess))
+_stream_types['streaming'].append((is_dataframe_like, DataFrame))
+_stream_types['streaming'].append((is_index_like, Index))
+_stream_types['streaming'].append((is_series_like, Series))
+_stream_types['updating'].append((is_dataframe_like, DataFrames))
+_stream_types['updating'].append((is_series_like, Seriess))
