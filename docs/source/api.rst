@@ -41,6 +41,7 @@ Sources
    filenames
    from_kafka
    from_textfile
+   from_socket
 
 DaskStream
 ----------
