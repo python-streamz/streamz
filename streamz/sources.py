@@ -51,6 +51,9 @@ class from_textfile(Source):
     start: bool (False)
         Whether to start running immediately; otherwise call stream.start()
         explicitly.
+    from_end: bool (False)
+        Whether to begin streaming from the end of the file (i.e., only emit
+        lines appended after the stream starts).
 
     Example
     -------
@@ -64,26 +67,33 @@ class from_textfile(Source):
     Stream
     """
     def __init__(self, f, poll_interval=0.100, delimiter='\n', start=False,
-                 **kwargs):
+                 from_end=False, **kwargs):
         if isinstance(f, str):
             f = open(f)
         self.file = f
+        self.from_end = from_end
         self.delimiter = delimiter
 
         self.poll_interval = poll_interval
         super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
         self.stopped = True
+        self.started = False
         if start:
             self.start()
 
     def start(self):
         self.stopped = False
+        self.started = False
         self.loop.add_callback(self.do_poll)
 
     @gen.coroutine
     def do_poll(self):
         buffer = ''
-        while True:
+        if self.from_end:
+            # this only happens when we are ready to read
+            self.file.seek(0, 2)
+        while not self.stopped:
+            self.started = True
             line = self.file.read()
             if line:
                 buffer = buffer + line
@@ -94,8 +104,6 @@ class from_textfile(Source):
                         yield self._emit(part + self.delimiter)
             else:
                 yield gen.sleep(self.poll_interval)
-            if self.stopped:
-                break
 
 
 @Stream.register_api(staticmethod)
@@ -146,6 +154,142 @@ class filenames(Source):
             yield gen.sleep(self.poll_interval)  # TODO: remove poll if delayed
             if self.stopped:
                 break
+
+
+@Stream.register_api(staticmethod)
+class from_tcp(Source):
+    """
+    Creates events by reading from a socket using tornado TCPServer
+
+    The stream of incoming bytes is split on a given delimiter, and the parts
+    become the emitted events.
+
+    Parameters
+    ----------
+    port : int
+        The port to open and listen on. It only gets opened when the source
+        is started, and closed upon ``stop()``
+    delimiter : bytes
+        The incoming data will be split on this value. The resulting events
+        will still have the delimiter at the end.
+    start : bool
+        Whether to immediately initiate the source. You probably want to
+        set up downstream nodes first.
+    server_kwargs : dict or None
+        If given, additional arguments to pass to TCPServer
+
+    Example
+    -------
+
+    >>> source = Source.from_tcp(4567)  # doctest: +SKIP
+    """
+    def __init__(self, port, delimiter=b'\n', start=False,
+                 server_kwargs=None):
+        super(from_tcp, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.server_kwargs = server_kwargs or {}
+        self.port = port
+        self.server = None
+        self.delimiter = delimiter
+        if start:  # pragma: no cover
+            self.start()
+
+    @gen.coroutine
+    def _start_server(self):
+        from tornado.tcpserver import TCPServer
+        from tornado.iostream import StreamClosedError
+
+        class EmitServer(TCPServer):
+            source = self
+
+            @gen.coroutine
+            def handle_stream(self, stream, address):
+                while True:
+                    try:
+                        data = yield stream.read_until(self.source.delimiter)
+                        yield self.source._emit(data)
+                    except StreamClosedError:
+                        break
+
+        self.server = EmitServer(**self.server_kwargs)
+        self.server.listen(self.port)
+
+    def start(self):
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        if not self.stopped:
+            self.server.stop()
+            self.server = None
+            self.stopped = True
+
+
+@Stream.register_api(staticmethod)
+class from_http_server(Source):
+    """Listen for HTTP POSTs on given port
+
+    Each connection will emit one event, containing the body data of
+    the request
+
+    Parameters
+    ----------
+    port : int
+        The port to listen on
+    path : str
+        Specific path to listen on. Can be regex, but content is not used.
+    start : bool
+        Whether to immediately startup the server. Usually you want to connect
+        downstream nodes first, and then call ``.start()``.
+    server_kwargs : dict or None
+        If given, set of further parameters to pass on to HTTPServer
+
+    Example
+    -------
+    >>> source = Source.from_http_server(4567)  # doctest: +SKIP
+    """
+
+    def __init__(self, port, path='/.*', start=False, server_kwargs=None):
+        self.port = port
+        self.path = path
+        self.server_kwargs = server_kwargs or {}
+        super(from_http_server, self).__init__(ensure_io_loop=True)
+        self.stopped = True
+        self.server = None
+        if start:  # pragma: no cover
+            self.start()
+
+    def _start_server(self):
+        from tornado.web import Application, RequestHandler
+        from tornado.httpserver import HTTPServer
+
+        class Handler(RequestHandler):
+            source = self
+
+            @gen.coroutine
+            def post(self):
+                yield self.source._emit(self.request.body)
+                self.write('OK')
+
+        application = Application([
+            (self.path, Handler),
+        ])
+        self.server = HTTPServer(application, **self.server_kwargs)
+        self.server.listen(self.port)
+
+    def start(self):
+        """Start HTTP server and listen"""
+        if self.stopped:
+            self.loop.add_callback(self._start_server)
+            self.stopped = False
+
+    def stop(self):
+        """Shutdown HTTP server"""
+        if not self.stopped:
+            self.server.stop()
+            self.server = None
+            self.stopped = True
 
 
 @Stream.register_api(staticmethod)
