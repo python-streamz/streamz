@@ -540,6 +540,6 @@ def get_message_batch(factory, partition, low, high, timeout=None):
     if low <= high:
         try:
             consumer.commit(asynchronous=False)
-        except factory.ck.KafkaError:
+        except factory.ck.KafkaError:   # pragma: no cover
             pass
     return out
