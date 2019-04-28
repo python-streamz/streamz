@@ -39,7 +39,8 @@ class Source(Stream):
         self.stopped = True
         super(Source, self).__init__(**kwargs)
 
-    def stop(self):
+    def stop(self):  # pragma: no cover
+        # fallback stop method - for poll functions with while not self.stopped
         if not self.stopped:
             self.stopped = True
 
