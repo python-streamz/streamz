@@ -813,10 +813,17 @@ class partition(Stream):
 class sliding_window(Stream):
     """ Produce overlapping tuples of size n
 
+    Parameters
+    ----------
+    return_partial : bool
+        If True, yield tuples as soon as any events come in, each tuple being
+        smaller or equal to the window size. If False, only start yielding
+        tuples once a full window has accrued.
+
     Examples
     --------
     >>> source = Stream()
-    >>> source.sliding_window(3).sink(print)
+    >>> source.sliding_window(3, return_partial=False).sink(print)
     >>> for i in range(8):
     ...     source.emit(i)
     (0, 1, 2)

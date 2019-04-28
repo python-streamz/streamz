@@ -151,6 +151,14 @@ def test_sliding_window():
     for i in range(10):
         source.emit(i)
 
+    assert L == [(0, ), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
+                 (5, 6), (6, 7), (7, 8), (8, 9)]
+
+    L = source.sliding_window(2, return_partial=False).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
     assert L == [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
                  (5, 6), (6, 7), (7, 8), (8, 9)]
 
