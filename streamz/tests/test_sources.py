@@ -34,7 +34,7 @@ def test_tcp():
 
 @gen_test(timeout=60)
 def test_tcp_async():
-    port = 9876
+    port = 9877
     s = Source.from_tcp(port)
     out = s.sink_to_list()
     s.start()
