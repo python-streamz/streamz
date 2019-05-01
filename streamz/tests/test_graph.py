@@ -24,6 +24,21 @@ def test_create_graph():
         assert t in g
 
 
+def test_create_cyclic_graph():
+    source1 = Stream(stream_name='source1')
+    source2 = Stream(stream_name='source2')
+
+    n1 = source1.zip(source2)
+    n2 = n1.map(add)
+    n2.connect(source1)
+
+    g = nx.DiGraph()
+    create_graph(n2, g)
+    for t in [hash(a) for a in [source1, source2, n1, n2]]:
+        assert t in g
+    assert nx.find_cycle(g)
+
+
 def test_create_file():
     source1 = Stream(stream_name='source1')
     source2 = Stream(stream_name='source2')
