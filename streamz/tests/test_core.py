@@ -83,6 +83,26 @@ def test_filter():
     assert L == [0, 2, 4, 6, 8]
 
 
+def test_filter_args():
+    source = Stream()
+    L = source.filter(lambda x, n: x % n == 0, 2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [0, 2, 4, 6, 8]
+
+
+def test_filter_kwargs():
+    source = Stream()
+    L = source.filter(lambda x, n=1: x % n == 0, n=2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [0, 2, 4, 6, 8]
+
+
 def test_filter_none():
     source = Stream()
     L = source.filter(None).sink_to_list()

@@ -622,6 +622,10 @@ class filter(Stream):
     predicate : function
         The predicate. Should return True or False, where
         True means that the predicate is satisfied.
+    *args :
+        The arguments to pass to the predicate.
+    **kwargs:
+        Keyword arguments to pass to predicate
 
     Examples
     --------
@@ -647,7 +651,6 @@ class filter(Stream):
     def update(self, x, who=None):
         if self.predicate(x, *self.args, **self.kwargs):
             return self._emit(x)
-
 
 
 @Stream.register_api()
