@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque
+from collections import deque, Hashable
 from datetime import timedelta
 import functools
 import logging
@@ -1035,6 +1035,15 @@ class unique(Stream):
     parameter.  For example setting ``history=1`` avoids sending through
     elements when one is repeated right after the other.
 
+    Parameters
+    ----------
+    history : int or None, optional
+        number of stored unique values to check against
+    key : function, optional
+        Function which returns a representation of the incoming data.
+        For example ``key=lambda x: x['a']`` could be used to allow only
+        pieces of data with unique ``'a'`` values to pass through.
+
     Examples
     --------
     >>> source = Stream()
@@ -1047,18 +1056,33 @@ class unique(Stream):
     3
     """
     def __init__(self, upstream, history=None, key=identity, **kwargs):
-        self.seen = dict()
+        self.seen = None
         self.key = key
-        if history:
-            from zict import LRU
-            self.seen = LRU(history, self.seen)
+        self.history = history
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
+        # If this is the first piece of data make the cache
+        if self.seen is None:
+            if isinstance(y, Hashable):
+                self.seen = dict()
+                if self.history:
+                    # if it is hashable use LRU cache
+                    if isinstance(y, Hashable):
+                        from zict import LRU
+                        self.seen = LRU(self.history, self.seen)
+            # if not hashable use deque (since it doesn't need a hash)
+            else:
+                self.seen = deque(maxlen=self.history)
+
         if y not in self.seen:
-            self.seen[y] = 1
+            # LRU and deque have slightly different syntax
+            if isinstance(self.seen, deque):
+                self.seen.append(y)
+            else:
+                self.seen[y] = 1
             return self._emit(x)
 
 

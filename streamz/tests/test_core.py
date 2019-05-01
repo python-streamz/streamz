@@ -522,6 +522,34 @@ def test_unique_history():
     assert L == [1, 2, 3, 1]
 
 
+def test_unique_history_dict():
+    source = Stream()
+    s = source.unique(history=2)
+    L = s.sink_to_list()
+
+    a = {'hi': 'world'}
+    b = {'hi': 'bar'}
+    c = {'foo': 'bar'}
+
+    source.emit(a)
+    source.emit(b)
+    source.emit(a)
+    source.emit(b)
+    source.emit(a)
+    source.emit(b)
+
+    assert L == [a, b]
+
+    source.emit(c)
+    source.emit(b)
+
+    assert L == [a, b, c]
+
+    source.emit(a)
+
+    assert L == [a, b, c, a]
+
+
 def test_union():
     a = Stream()
     b = Stream()
