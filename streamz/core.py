@@ -622,6 +622,10 @@ class filter(Stream):
     predicate : function
         The predicate. Should return True or False, where
         True means that the predicate is satisfied.
+    *args :
+        The arguments to pass to the predicate.
+    **kwargs:
+        Keyword arguments to pass to predicate
 
     Examples
     --------
@@ -633,15 +637,19 @@ class filter(Stream):
     2
     4
     """
-    def __init__(self, upstream, predicate, **kwargs):
+
+    def __init__(self, upstream, predicate, *args, **kwargs):
         if predicate is None:
             predicate = _truthy
         self.predicate = predicate
+        stream_name = kwargs.pop("stream_name", None)
+        self.kwargs = kwargs
+        self.args = args
 
-        Stream.__init__(self, upstream, **kwargs)
+        Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        if self.predicate(x):
+        if self.predicate(x, *self.args, **self.kwargs):
             return self._emit(x)
 
 
