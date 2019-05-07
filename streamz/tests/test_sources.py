@@ -81,3 +81,13 @@ def test_http():
 
     with pytest.raises(requests.exceptions.RequestException):
         requests.post('http://localhost:%i/other' % port, data=b'data2')
+
+
+@gen_test(timeout=60)
+def test_process():
+    cmd = ["python", "-c", "for i in range(4): print(i)"]
+    s = Source.from_process(cmd)
+    out = s.sink_to_list()
+    s.start()
+    yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)
+    s.stop()
