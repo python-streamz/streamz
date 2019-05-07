@@ -1216,7 +1216,7 @@ def test_connect_zip():
     c.connect(x)
     a.emit(1)
     b.emit(1)
-    assert not l
+    assert not L
     c.emit(1)
     assert L == [(1, 1, 1)]
 
@@ -1230,7 +1230,7 @@ def test_disconnect_zip():
     b.disconnect(x)
     a.emit(1)
     b.emit(1)
-    assert not l
+    assert not L
     c.emit(1)
     assert L == [(1, 1)]
 
