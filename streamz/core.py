@@ -809,7 +809,8 @@ class slice(Stream):
     def _check_end(self):
         if self.end and self.state >= self.end:
             # we're done
-            self.upstream.downstreams.remove(self)
+            for upstream in self.upstreams:
+                upstream._remove_downstream(self)
 
 
 @Stream.register_api()
