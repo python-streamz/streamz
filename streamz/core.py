@@ -181,6 +181,24 @@ class Stream(object):
                 if downstream:
                     downstream._inform_asynchronous(asynchronous)
 
+    def _add_upstream(self, upstream):
+        if self.upstreams == [None]:
+            self.upstreams = [upstream]
+        else:
+            self.upstreams.append(upstream)
+
+    def _add_downstream(self, downstream):
+        self.downstreams.add(downstream)
+
+    def _remove_downstream(self, downstream):
+        self.downstreams.remove(downstream)
+
+    def _remove_upstream(self, upstream):
+        if len(self.upstreams) == 1:
+            self.upstreams = [None]
+        else:
+            self.upstreams.pop(self.upstreams.index(upstream))
+
     @classmethod
     def register_api(cls, modifier=identity):
         """ Add callable to Stream API
@@ -349,12 +367,8 @@ class Stream(object):
         downstream: Stream
             The downstream stream to connect to
         '''
-        self.downstreams.add(downstream)
-
-        if downstream.upstreams == [None]:
-            downstream.upstreams = [self]
-        else:
-            downstream.upstreams.append(self)
+        self._add_downstream(downstream)
+        downstream._add_upstream(self)
 
     def disconnect(self, downstream):
         ''' Disconnect this stream to a downstream element.
@@ -364,9 +378,9 @@ class Stream(object):
         downstream: Stream
             The downstream stream to disconnect from
         '''
-        self.downstreams.remove(downstream)
+        self._remove_downstream(downstream)
 
-        downstream.upstreams.remove(self)
+        downstream._remove_upstream(self)
 
     @property
     def upstream(self):
@@ -1013,6 +1027,14 @@ class zip(Stream):
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
+    def _add_upstream(self, upstream):
+        self.buffers[upstream] = deque()
+        super()._add_upstream(upstream)
+
+    def _remove_upstream(self, upstream):
+        self.buffers.pop(upstream)
+        super()._remove_upstream(upstream)
+
     def pack_literals(self, tup):
         """ Fill buffers for literals whenever we empty them """
         inp = list(tup)[::-1]
@@ -1076,6 +1098,27 @@ class combine_latest(Stream):
         else:
             self.emit_on = upstreams
         Stream.__init__(self, upstreams=upstreams, **kwargs)
+
+    def _add_upstream(self, upstream):
+        self.last.append(None)
+        self.missing.update([upstream])
+        if self.emit_on != self.upstreams:
+            super()._add_upstream(upstream)
+        else:
+            super()._add_upstream(upstream)
+            self.emit_on = self.upstreams
+
+    def _remove_upstream(self, upstream):
+        if self.emit_on == upstream:
+            raise RuntimeError("Can't remove the emit on upstream, consider"
+                               "adding an emit on first")
+        self.last.pop(self.upstreams.index(upstream))
+        self.missing.remove(upstream)
+        if self.emit_on == self.upstreams:
+            super()._remove_upstream(upstream)
+            self.emit_on = self.upstreams
+        else:
+            super()._remove_upstream(upstream)
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
