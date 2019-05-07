@@ -524,7 +524,7 @@ def test_unique_history():
 
 def test_unique_history_dict():
     source = Stream()
-    s = source.unique(history=2)
+    s = source.unique(history=2, hashable=False)
     L = s.sink_to_list()
 
     a = {'hi': 'world'}

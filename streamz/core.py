@@ -1043,6 +1043,11 @@ class unique(Stream):
         Function which returns a representation of the incoming data.
         For example ``key=lambda x: x['a']`` could be used to allow only
         pieces of data with unique ``'a'`` values to pass through.
+    hashable : bool, optional
+        If True then data is assumed to be hashable, else it is not. This is
+        used for determining how to cache the history, if hashable then
+        either dicts or LRU caches are used, otherwise a deque is used.
+        Defaults to True.
 
     Examples
     --------
@@ -1055,30 +1060,24 @@ class unique(Stream):
     1
     3
     """
-    def __init__(self, upstream, history=None, key=identity, **kwargs):
-        self.seen = None
+    def __init__(self, upstream, history=None, key=identity, hashable=True,
+                 **kwargs):
         self.key = key
         self.history = history
+        if hashable:
+            self.seen = dict()
+            if self.history:
+                from zict import LRU
+                self.seen = LRU(self.history, self.seen)
+        else:
+            self.seen = deque(maxlen=history)
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
-        # If this is the first piece of data make the cache
-        if self.seen is None:
-            if isinstance(y, Hashable):
-                self.seen = dict()
-                if self.history:
-                    # if it is hashable use LRU cache
-                    if isinstance(y, Hashable):
-                        from zict import LRU
-                        self.seen = LRU(self.history, self.seen)
-            # if not hashable use deque (since it doesn't need a hash)
-            else:
-                self.seen = deque(maxlen=self.history)
-
         if y not in self.seen:
-            # LRU and deque have slightly different syntax
+            # LRU/dict and deque have slightly different syntax
             if isinstance(self.seen, deque):
                 self.seen.append(y)
             else:
