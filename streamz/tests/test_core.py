@@ -1212,13 +1212,13 @@ def test_connect_zip():
     b = Stream()
     c = Stream()
     x = a.zip(b)
-    l = x.sink_to_list()
+    L = x.sink_to_list()
     c.connect(x)
     a.emit(1)
     b.emit(1)
     assert not l
     c.emit(1)
-    assert l == [(1, 1, 1)]
+    assert L == [(1, 1, 1)]
 
 
 def test_disconnect_zip():
@@ -1226,13 +1226,13 @@ def test_disconnect_zip():
     b = Stream()
     c = Stream()
     x = a.zip(b, c)
-    l = x.sink_to_list()
+    L = x.sink_to_list()
     b.disconnect(x)
     a.emit(1)
     b.emit(1)
     assert not l
     c.emit(1)
-    assert l == [(1, 1)]
+    assert L == [(1, 1)]
 
 
 def test_connect_combine_latest():
@@ -1240,12 +1240,12 @@ def test_connect_combine_latest():
     b = Stream()
     c = Stream()
     x = a.combine_latest(b, emit_on=a)
-    l = x.sink_to_list()
+    L = x.sink_to_list()
     c.connect(x)
     b.emit(1)
     c.emit(1)
     a.emit(1)
-    assert l == [(1, 1, 1)]
+    assert L == [(1, 1, 1)]
 
 
 def test_connect_discombine_latest():
@@ -1253,12 +1253,12 @@ def test_connect_discombine_latest():
     b = Stream()
     c = Stream()
     x = a.combine_latest(b, c, emit_on=a)
-    l = x.sink_to_list()
+    L = x.sink_to_list()
     c.disconnect(x)
     b.emit(1)
     c.emit(1)
     a.emit(1)
-    assert l == [(1, 1)]
+    assert L == [(1, 1)]
 
 
 if sys.version_info >= (3, 5):
