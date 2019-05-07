@@ -41,9 +41,11 @@ Sources
 .. autosummary::
    filenames
    from_kafka
+   from_kafka_batched
    from_process
    from_textfile
-   from_socket
+   from_tcp
+   from_http_server
 
 DaskStream
 ----------

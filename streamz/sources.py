@@ -52,22 +52,22 @@ class from_textfile(Source):
     Parameters
     ----------
     f: file or string
+        Source of the data. If string, will be opened.
     poll_interval: Number
         Interval to poll file for new data in seconds
-    delimiter: str ("\n")
+    delimiter: str
         Character(s) to use to split the data into parts
-    start: bool (False)
+    start: bool
         Whether to start running immediately; otherwise call stream.start()
         explicitly.
-    from_end: bool (False)
+    from_end: bool
         Whether to begin streaming from the end of the file (i.e., only emit
         lines appended after the stream starts).
 
-    Example
-    -------
+    Examples
+    --------
     >>> source = Stream.from_textfile('myfile.json')  # doctest: +SKIP
     >>> js.map(json.loads).pluck('value').sum().sink(print)  # doctest: +SKIP
-
     >>> source.start()  # doctest: +SKIP
 
     Returns
@@ -186,8 +186,8 @@ class from_tcp(Source):
     server_kwargs : dict or None
         If given, additional arguments to pass to TCPServer
 
-    Example
-    -------
+    Examples
+    --------
 
     >>> source = Source.from_tcp(4567)  # doctest: +SKIP
     """
@@ -253,9 +253,11 @@ class from_http_server(Source):
     server_kwargs : dict or None
         If given, set of further parameters to pass on to HTTPServer
 
-    Example
-    -------
+    Examples
+    --------
+
     >>> source = Source.from_http_server(4567)  # doctest: +SKIP
+
     """
 
     def __init__(self, port, path='/.*', start=False, server_kwargs=None):
@@ -382,20 +384,22 @@ class from_kafka(Source):
         https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
         https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
         Examples:
-        bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
-        group.id: Identity of the consumer. If multiple sources share the same
-            group, each message will be passed to only one of them.
+        bootstrap.servers, Connection string(s) (host:port) by which to reach
+        Kafka;
+        group.id, Identity of the consumer. If multiple sources share the same
+        group, each message will be passed to only one of them.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
     start: bool (False)
         Whether to start polling upon instantiation
 
-    Example
-    -------
+    Examples
+    --------
 
     >>> source = Stream.from_kafka(['mytopic'],
     ...           {'bootstrap.servers': 'localhost:9092',
     ...            'group.id': 'streamz'})  # doctest: +SKIP
+
     """
     def __init__(self, topics, consumer_params, poll_interval=0.1, start=False, **kwargs):
         self.cpars = consumer_params
@@ -532,12 +536,13 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     start: bool (False)
         Whether to start polling upon instantiation
 
-    Example
-    -------
+    Examples
+    --------
 
     >>> source = Stream.from_kafka_batched('mytopic',
     ...           {'bootstrap.servers': 'localhost:9092',
     ...            'group.id': 'streamz'}, npartitions=4)  # doctest: +SKIP
+
     """
     if dask:
         from distributed.client import default_client
