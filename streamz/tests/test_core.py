@@ -83,6 +83,26 @@ def test_filter():
     assert L == [0, 2, 4, 6, 8]
 
 
+def test_filter_args():
+    source = Stream()
+    L = source.filter(lambda x, n: x % n == 0, 2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [0, 2, 4, 6, 8]
+
+
+def test_filter_kwargs():
+    source = Stream()
+    L = source.filter(lambda x, n=1: x % n == 0, n=2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [0, 2, 4, 6, 8]
+
+
 def test_filter_none():
     source = Stream()
     L = source.filter(None).sink_to_list()
@@ -147,6 +167,14 @@ def test_partition():
 def test_sliding_window():
     source = Stream()
     L = source.sliding_window(2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [(0, ), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
+                 (5, 6), (6, 7), (7, 8), (8, 9)]
+
+    L = source.sliding_window(2, return_partial=False).sink_to_list()
 
     for i in range(10):
         source.emit(i)
@@ -1097,6 +1125,31 @@ def test_share_common_ioloop(clean):  # noqa: F811
     aa = a.timed_window(0.01)
     bb = b.timed_window(0.01)
     assert aa.loop is bb.loop
+
+
+@pytest.mark.parametrize('data', [
+    [[], [0, 1, 2, 3, 4, 5]],
+    [[None, None, None], [0, 1, 2, 3, 4, 5]],
+    [[1, None, None], [1, 2, 3, 4, 5]],
+    [[None, 4, None], [0, 1, 2, 3]],
+    [[None, 4, 2], [0, 2]],
+    [[3, 1, None], []]
+
+])
+def test_slice(data):
+    pars, expected = data
+    a = Stream()
+    b = a.slice(*pars)
+    out = b.sink_to_list()
+    for i in range(6):
+        a.emit(i)
+    assert out == expected
+
+
+def test_slice_err():
+    a = Stream()
+    with pytest.raises(ValueError):
+        a.slice(end=-1)
 
 
 def test_start():

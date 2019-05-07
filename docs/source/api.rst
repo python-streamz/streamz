@@ -25,6 +25,7 @@ Stream
    rate_limit
    scatter
    sink
+   slice
    sliding_window
    starmap
    timed_window
@@ -41,6 +42,7 @@ Sources
    filenames
    from_kafka
    from_kafka_batched
+   from_process
    from_textfile
    from_tcp
    from_http_server
