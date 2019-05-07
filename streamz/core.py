@@ -750,6 +750,7 @@ class slice(Stream):
         First event to use. If None, start from the beginnning
     end : int
         Last event to use (non-inclusive). If None, continue without stopping.
+        Does not support negative indexing.
     step : int
         Pass on every Nth event. If None, pass every one.
 
@@ -764,17 +765,24 @@ class slice(Stream):
     """
 
     def __init__(self, upstream, start=None, end=None, step=None, **kwargs):
-        self.state = start or 0
+        self.state = 0
+        self.star = start or 0
         self.end = end
         self.step = step or 1
+        if any((_ or 0) < 0 for _ in [start, end, step]):
+            raise ValueError("Negative indices not supported by slice")
         stream_name = kwargs.pop('stream_name', None)
         Stream.__init__(self, upstream, stream_name=stream_name)
+        self._check_end()
 
     def update(self, x, who=None):
-        if self.state % self.step == 0:
+        if self.state >= self.star and self.state % self.step == 0:
             self.emit(x)
         self.state += 1
-        if self.state >= self.end:
+        self._check_end()
+
+    def _check_end(self):
+        if self.end and self.state >= self.end:
             # we're done
             self.upstream.downstreams.remove(self)
 

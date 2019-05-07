@@ -1107,6 +1107,31 @@ def test_share_common_ioloop(clean):  # noqa: F811
     assert aa.loop is bb.loop
 
 
+@pytest.mark.parametrize('data', [
+    [[], [0, 1, 2, 3, 4, 5]],
+    [[None, None, None], [0, 1, 2, 3, 4, 5]],
+    [[1, None, None], [1, 2, 3, 4, 5]],
+    [[None, 4, None], [0, 1, 2, 3]],
+    [[None, 4, 2], [0, 2]],
+    [[3, 1, None], []]
+
+])
+def test_slice(data):
+    pars, expected = data
+    a = Stream()
+    b = a.slice(*pars)
+    out = b.sink_to_list()
+    for i in range(6):
+        a.emit(i)
+    assert out == expected
+
+
+def test_slice_err():
+    a = Stream()
+    with pytest.raises(ValueError):
+        a.slice(end=-1)
+
+
 def test_start():
     flag = []
 
