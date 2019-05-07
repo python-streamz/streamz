@@ -1029,11 +1029,11 @@ class zip(Stream):
 
     def _add_upstream(self, upstream):
         self.buffers[upstream] = deque()
-        super()._add_upstream(upstream)
+        super(zip, self)._add_upstream(upstream)
 
     def _remove_upstream(self, upstream):
         self.buffers.pop(upstream)
-        super()._remove_upstream(upstream)
+        super(zip, self)._remove_upstream(upstream)
 
     def pack_literals(self, tup):
         """ Fill buffers for literals whenever we empty them """
@@ -1103,9 +1103,9 @@ class combine_latest(Stream):
         self.last.append(None)
         self.missing.update([upstream])
         if self.emit_on != self.upstreams:
-            super()._add_upstream(upstream)
+            super(combine_latest, self)._add_upstream(upstream)
         else:
-            super()._add_upstream(upstream)
+            super(combine_latest, self)._add_upstream(upstream)
             self.emit_on = self.upstreams
 
     def _remove_upstream(self, upstream):
@@ -1115,10 +1115,10 @@ class combine_latest(Stream):
         self.last.pop(self.upstreams.index(upstream))
         self.missing.remove(upstream)
         if self.emit_on == self.upstreams:
-            super()._remove_upstream(upstream)
+            super(combine_latest, self)._remove_upstream(upstream)
             self.emit_on = self.upstreams
         else:
-            super()._remove_upstream(upstream)
+            super(combine_latest, self)._remove_upstream(upstream)
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
