@@ -10,14 +10,15 @@ Stream
    Stream
 
 .. autosummary::
+   Stream.connect
+   Stream.destroy
+   Stream.disconnect
+   Stream.visualize
    accumulate
    buffer
    collect
    combine_latest
-   Stream.connect
    delay
-   Stream.destroy
-   Stream.disconnect
    filter
    flatten
    map
@@ -34,6 +35,16 @@ Stream
    pluck
    zip
    zip_latest
+
+.. automethod:: Stream.connect
+.. automethod:: Stream.disconnect
+.. automethod:: Stream.destroy
+.. automethod:: Stream.emit
+.. automethod:: Stream.frequencies
+.. automethod:: Stream.register_api
+.. automethod:: Stream.sink_to_list
+.. automethod:: Stream.update
+.. automethod:: Stream.visualize
 
 Sources
 -------
