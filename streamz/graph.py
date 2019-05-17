@@ -21,107 +21,116 @@ def _clean_text(text, match=None):
     return text
 
 
-def create_graph(node, graph, prior_node=None, pc=None):
-    """Create graph from a single node, searching up and down the chain
+def build_node_set(node, s=None):
+    """Build a set of all the nodes in a streamz graph
 
     Parameters
     ----------
-    node: Stream instance
-    graph: networkx.DiGraph instance
+    node : Stream
+        The node to use as a starting point for building the set
+    s : set or None
+        The set to put the nodes into. If None return a new set full of nodes
+
+    Returns
+    -------
+    s : set
+        The set of nodes in the graph
+
     """
-    if node is None:
+    if s is None:
+        s = set()
+    if node is None or (
+        node in s
+        and all(n in s for n in node.upstreams)
+        and all(n in s for n in node.downstreams)
+    ):
         return
-    t = hash(node)
-    graph.add_node(t,
-                   label=_clean_text(str(node)),
-                   shape=node._graphviz_shape,
-                   orientation=str(node._graphviz_orientation),
-                   style=node._graphviz_style,
-                   fillcolor=node._graphviz_fillcolor)
-    if prior_node:
-        tt = hash(prior_node)
-        if graph.has_edge(t, tt):
-            return
-        if pc == 'downstream':
+    new_nodes = {n for n in node.downstreams}
+    new_nodes.update(node.upstreams)
+    new_nodes.add(node)
+    s.update(new_nodes)
+    [build_node_set(n, s) for n in list(new_nodes)]
+    return s
+
+
+def create_graph(node, graph):
+    """Create networkx graph of the pipeline
+
+    Parameters
+    ----------
+    node : Stream
+        The node to start from
+    graph : networkx.DiGraph
+        The graph to fill with nodes
+
+    Returns
+    -------
+
+    """
+    # Step 1 build a set of all the nodes
+    node_set = build_node_set(node)
+    if None in node_set:
+        node_set.remove(None)
+
+    # Step 2 for each node in the set add to the graph
+    for n in node_set:
+        t = hash(n)
+        graph.add_node(
+            t,
+            label=_clean_text(str(n)),
+            shape=n._graphviz_shape,
+            orientation=str(n._graphviz_orientation),
+            style=n._graphviz_style,
+            fillcolor=n._graphviz_fillcolor,
+        )
+
+    # Step 3 for each node establish its edges
+    for n in node_set:
+        t = hash(n)
+        upstreams = [_ for _ in n.upstreams if _ is not None]
+        for nn in upstreams:
+            tt = hash(nn)
             graph.add_edge(tt, t)
-        else:
-            graph.add_edge(t, tt)
 
-    for nodes, pc in zip([list(node.downstreams), list(node.upstreams)],
-                         ['downstream', 'upstreams']):
-        for node2 in nodes:
-            if node2 is not None:
-                create_graph(node2, graph, node, pc=pc)
+        downstreams = n.downstreams
+        for i, nn in enumerate(downstreams):
+            tt = hash(nn)
+            if len(downstreams) > 1:
+                graph.add_edge(t, tt, label=str(i))
+            else:
+                graph.add_edge(t, tt)
 
-
-def create_edge_label_graph(node, graph, prior_node=None, pc=None, i=None):
-    """Create graph from a single node, searching up and down the chain
-
-    Parameters
-    ----------
-    node: Stream instance
-    graph: networkx.DiGraph instance
-    """
-    if node is None:
-        return
-    t = hash(node)
-    graph.add_node(t,
-                   label=_clean_text(str(node)),
-                   shape=node._graphviz_shape,
-                   orientation=str(node._graphviz_orientation),
-                   style=node._graphviz_style,
-                   fillcolor=node._graphviz_fillcolor)
-    if prior_node:
-        tt = hash(prior_node)
-        if graph.has_edge(t, tt):
-            return
-        if i is None:
-            i = ''
-        if pc == 'downstream':
-            graph.add_edge(tt, t, label=str(i))
-        else:
-            graph.add_edge(t, tt)
-
-    for nodes, pc in zip([list(node.downstreams), list(node.upstreams)],
-                         ['downstream', 'upstreams']):
-        for i, node2 in enumerate(nodes):
-            if node2 is not None:
-                if len(nodes) > 1:
-                    create_edge_label_graph(node2, graph, node, pc=pc, i=i)
-                else:
-                    create_edge_label_graph(node2, graph, node, pc=pc)
+    # Step 4 destroy set
+    del node_set
 
 
-def readable_graph(node, source_node=False):
+def readable_graph(graph):
     """Create human readable version of this object's task graph.
 
     Parameters
     ----------
-    node: Stream instance
-        A node in the task graph
+    graph: nx.DiGraph instance
+        The networkx graph representing the pipeline
     """
     import networkx as nx
-    g = nx.DiGraph()
-    if source_node:
-        create_edge_label_graph(node, g)
-    else:
-        create_graph(node, g)
-    mapping = {k: '{}'.format(g.node[k]['label']) for k in g}
+
+    mapping = {k: "{}".format(graph.node[k]["label"]) for k in graph}
     idx_mapping = {}
     for k, v in mapping.items():
         if v in idx_mapping.keys():
             idx_mapping[v] += 1
-            mapping[k] += '-{}'.format(idx_mapping[v])
+            mapping[k] += "-{}".format(idx_mapping[v])
         else:
             idx_mapping[v] = 0
 
     gg = {k: v for k, v in mapping.items()}
-    rg = nx.relabel_nodes(g, gg, copy=True)
+    rg = nx.relabel_nodes(graph, gg, copy=True)
     return rg
 
 
 def to_graphviz(graph, **graph_attr):
     import graphviz
+
     gvz = graphviz.Digraph(graph_attr=graph_attr)
     for node, attrs in graph.node.items():
         gvz.node(node, **attrs)
@@ -130,7 +139,7 @@ def to_graphviz(graph, **graph_attr):
     return gvz
 
 
-def visualize(node, filename='mystream.png', source_node=False, **kwargs):
+def visualize(node, filename="mystream.png", **kwargs):
     """
     Render a task graph using dot.
 
@@ -165,42 +174,48 @@ def visualize(node, filename='mystream.png', source_node=False, **kwargs):
     --------
     streams.graph.readable_graph
     """
-    rg = readable_graph(node, source_node=source_node)
+    import networkx as nx
+
+    nx_g = nx.DiGraph()
+    create_graph(node, nx_g)
+    rg = readable_graph(nx_g)
     g = to_graphviz(rg, **kwargs)
 
-    fmts = ['.png', '.pdf', '.dot', '.svg', '.jpeg', '.jpg']
+    fmts = [".png", ".pdf", ".dot", ".svg", ".jpeg", ".jpg"]
     if filename is None:
-        format = 'png'
+        format = "png"
 
     elif any(filename.lower().endswith(fmt) for fmt in fmts):
         filename, format = os.path.splitext(filename)
         format = format[1:].lower()
 
     else:
-        format = 'png'
+        format = "png"
 
     data = g.pipe(format=format)
     if not data:
-        raise RuntimeError("Graphviz failed to properly produce an image. "
-                           "This probably means your installation of graphviz "
-                           "is missing png support. See: "
-                           "https://github.com/ContinuumIO/anaconda-issues/"
-                           "issues/485 for more information.")
+        raise RuntimeError(
+            "Graphviz failed to properly produce an image. "
+            "This probably means your installation of graphviz "
+            "is missing png support. See: "
+            "https://github.com/ContinuumIO/anaconda-issues/"
+            "issues/485 for more information."
+        )
 
     display_cls = _get_display_cls(format)
 
     if not filename:
         return display_cls(data=data)
 
-    full_filename = '.'.join([filename, format])
-    with open(full_filename, 'wb') as f:
+    full_filename = ".".join([filename, format])
+    with open(full_filename, "wb") as f:
         f.write(data)
 
     return display_cls(filename=full_filename)
 
 
-IPYTHON_IMAGE_FORMATS = frozenset(['jpeg', 'png'])
-IPYTHON_NO_DISPLAY_FORMATS = frozenset(['dot', 'pdf'])
+IPYTHON_IMAGE_FORMATS = frozenset(["jpeg", "png"])
+IPYTHON_NO_DISPLAY_FORMATS = frozenset(["dot", "pdf"])
 
 
 def _get_display_cls(format):
@@ -227,7 +242,7 @@ def _get_display_cls(format):
         # Partially apply `format` so that `Image` and `SVG` supply a uniform
         # interface to the caller.
         return partial(display.Image, format=format)
-    elif format == 'svg':
+    elif format == "svg":
         return display.SVG
     else:
         raise ValueError("Unknown format '%s' passed to `dot_graph`" % format)
