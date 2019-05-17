@@ -45,10 +45,11 @@ def build_node_set(node, s=None):
         and all(n in s for n in node.downstreams)
     ):
         return
-    s.add(node)
-    s.update(node.upstreams)
-    s.update({n for n in node.downstreams})
-    [build_node_set(n, s) for n in list(s)]
+    new_nodes = {n for n in node.downstreams}
+    new_nodes.update(node.upstreams)
+    new_nodes.add(node)
+    s.update(new_nodes)
+    [build_node_set(n, s) for n in list(new_nodes)]
     return s
 
 

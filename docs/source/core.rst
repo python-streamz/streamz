@@ -313,11 +313,12 @@ As an example, here is a tiny web crawler:
    source = Stream()
 
    pages = source.unique()
+   pages.sink(print)
+
    content = pages.map(requests.get).map(lambda x: x.content)
    links = content.map(get_list_of_links).flatten()
-   links.sink(source.emit)  # pipe new links back into pages
+   links.connect(source)  # pipe new links back into pages
 
-   pages.sink(print)
 
    >>> source.emit('http://github.com')
    http://github.com
@@ -327,6 +328,11 @@ As an example, here is a tiny web crawler:
    http://github.com/pricing
    ...
 
+.. image:: images/cyclic.svg
+   :alt: the graph of the cyclic web crawler
+
+.. note:: Execution order is important here, as if the print was ordered after
+          the ``map; get`` node then the print would never run.
 
 Performance
 -----------
