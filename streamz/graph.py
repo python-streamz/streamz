@@ -22,7 +22,7 @@ def _clean_text(text, match=None):
 
 
 def build_node_set(node, s=None):
-    """Build a set of all the nodes in a rapidz graph
+    """Build a set of all the nodes in a streamz graph
 
     Parameters
     ----------
@@ -72,7 +72,7 @@ def create_graph(node, graph):
     if None in node_set:
         node_set.remove(None)
 
-    # Step 2 for each node in the set add do the graph
+    # Step 2 for each node in the set add to the graph
     for n in node_set:
         t = hash(n)
         graph.add_node(
