@@ -6,7 +6,8 @@ bring special consideration to certain types of data:
 
 1.  ``streamz.batch``: supports streams of lists of Python objects like tuples
     or dictionaries
-2.  ``streamz.dataframe``: supports streams of Pandas dataframes or Pandas series
+2.  ``streamz.dataframe``: supports streams of Pandas/cudf dataframes or Pandas/cudf series.
+    cudf support is in beta phase and has limited functionality as of cudf version ``0.8``
 
 These high-level APIs help us handle common situations in data processing.
 They help us implement complex algorithms and also improve efficiency.
