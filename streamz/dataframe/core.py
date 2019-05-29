@@ -13,7 +13,8 @@ from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
 from . import aggregations
-from .utils import is_dataframe_like, is_series_like, is_index_like, get_base_frame_type
+from .utils import is_dataframe_like, is_series_like, is_index_like, \
+                    get_base_frame_type, get_dataframe_package
 
 
 class BaseFrame(Streaming):
@@ -270,17 +271,19 @@ class DataFrame(Frame, _DataFrameMixin):
     """
 
     def __init__(self, *args, **kwargs):
-        # {'x': sdf.x + 1, 'y': sdf.y - 1} - works only with pandas
+        # {'x': sdf.x + 1, 'y': sdf.y - 1}
         if len(args) == 1 and not kwargs and isinstance(args[0], dict):
-            def concat(tup, columns=None):
-                result = pd.concat(tup, axis=1)
+            def concat(tup, module=None, columns=None):
+                result = module.concat(tup, axis=1)
                 result.columns = columns
                 return result
 
             columns, values = zip(*args[0].items())
+            base_frame_type = values[0]._subtype
+            df_package = get_dataframe_package(base_frame_type)
             stream = type(values[0].stream).zip(*[v.stream for v in values])
-            stream = stream.map(concat, columns=list(columns))
-            example = pd.DataFrame({k: getattr(v, 'example', v)
+            stream = stream.map(concat, module=df_package, columns=list(columns))
+            example = df_package.DataFrame({k: getattr(v, 'example', v)
                                     for k, v in args[0].items()})
             DataFrame.__init__(self, stream, example)
         else:
@@ -363,7 +366,8 @@ def _cumulative_accumulator(state, new, op=None):
     if not len(state):
         df = new
     else:
-        df = pd.concat([state, new])  # ouch, full copy
+        df_package = get_dataframe_package(new)
+        df = df_package.concat([state, new])  # ouch, full copy
 
     result = getattr(df, op)()
     new_state = result.iloc[-1:]
@@ -566,7 +570,8 @@ class Window(OperatorMixin):
 
 def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
     if len(acc):
-        df = pd.concat([acc, new])
+        df_package = get_dataframe_package(new)
+        df = df_package.concat([acc, new])
     else:
         df = new
     result = getattr(df.rolling(window), op)(*args, **kwargs)

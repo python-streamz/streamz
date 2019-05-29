@@ -4,8 +4,7 @@ from collections import deque
 from numbers import Number
 
 import numpy as np
-import pandas as pd
-from .utils import is_series_like, is_index_like
+from .utils import is_series_like, is_index_like, get_dataframe_package
 
 
 class Aggregation(object):
@@ -136,7 +135,8 @@ class Full(Aggregation):
     possible
     """
     def on_new(self, acc, new):
-        result = pd.concat([acc, new])
+        df_package = get_dataframe_package(new)
+        result = df_package.concat([acc, new])
         return result, result
 
     def on_old(self, acc, old):

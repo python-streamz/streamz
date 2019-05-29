@@ -1,3 +1,9 @@
+from __future__ import division, print_function
+
+import inspect
+import sys
+
+
 def is_dataframe_like(df):
     """ Looks like a Pandas DataFrame. ** Borrowed from dask.dataframe.utils ** """
     typ = type(df)
@@ -5,7 +11,7 @@ def is_dataframe_like(df):
                 for name in ('groupby', 'head', 'merge', 'mean'))
             and all(hasattr(df, name) for name in ('dtypes',))
             and not any(hasattr(typ, name)
-                for name in ('value_counts', 'dtype')))
+                        for name in ('value_counts', 'dtype')))
 
 
 def is_series_like(s):
@@ -33,3 +39,11 @@ def get_base_frame_type(frame_name, is_frame_like, example=None):
                                              .format(frame_name, example)
         raise TypeError(msg)
     return type(example)
+
+
+def get_dataframe_package(df):
+    """ Utility function to return the top level package (pandas/cudf)
+     of DataFrame/Series/Index objects """
+    module = inspect.getmodule(df)
+    package, _, _ = module.__name__.partition('.')
+    return sys.modules[package]
