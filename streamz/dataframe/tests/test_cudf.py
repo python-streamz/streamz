@@ -9,6 +9,7 @@ from __future__ import division, print_function
 
 import numpy as np
 import pytest
+import operator
 from dask.dataframe.utils import assert_eq
 from distributed import Client
 
@@ -87,7 +88,78 @@ def test_exceptions(stream):
         sdf.emit(cudf.DataFrame())
 
 
+@pytest.mark.parametrize('func', [
+    pytest.param(lambda x: x.sum(),
+                 marks=pytest.mark.xfail(
+                     reason="'Series' object does not support item assignment")),
+    pytest.param(lambda x: x.mean(),
+                 marks=pytest.mark.xfail(
+                     reason="'Series' object does not support item assignment")),
+    lambda x: x.count(),
+    pytest.param(lambda x: x.size,
+                 marks=pytest.mark.xfail(reason="Not implemented"))
+])
+def test_reductions(stream, func):
+    df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    for example in [df, df.iloc[:0]]:
+        sdf = DataFrame(example=example, stream=stream)
+
+        df_out = func(sdf).stream.gather().sink_to_list()
+
+        x = sdf.x
+        x_out = func(x).stream.gather().sink_to_list()
+
+        sdf.emit(df)
+        sdf.emit(df)
+
+        assert_eq(df_out[-1], func(cudf.concat([df, df])))
+        assert_eq(x_out[-1], func(cudf.concat([df, df]).x))
+
+
 @pytest.mark.parametrize('op', [
+    operator.add,
+    operator.and_,
+    operator.eq,
+    operator.floordiv,
+    operator.ge,
+    operator.gt,
+    operator.le,
+    operator.lshift,
+    operator.lt,
+    operator.mod,
+    operator.mul,
+    operator.ne,
+    operator.or_,
+    operator.pow,
+    operator.rshift,
+    operator.sub,
+    operator.truediv,
+    operator.xor,
+])
+@pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
+def test_binary_operators(op, getter, stream):
+    df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    try:
+        left = op(getter(df), 2)
+        right = op(2, getter(df))
+    except Exception:
+        return
+
+    a = DataFrame(example=df, stream=stream)
+    li = op(getter(a), 2).stream.gather().sink_to_list()
+    r = op(2, getter(a)).stream.gather().sink_to_list()
+
+    a.emit(df)
+
+    assert_eq(li[0], left)
+    assert_eq(r[0], right)
+
+
+@pytest.mark.parametrize('op', [
+    operator.abs,
+    operator.inv,
+    operator.invert,
+    operator.neg,
     lambda x: x.map(lambda x: x + 1),
     lambda x: x.reset_index(),
     lambda x: x.astype(float),
@@ -111,7 +183,7 @@ def test_unary_operators(op, getter):
 @pytest.mark.parametrize('func', [
     lambda df: df.query('x > 1 and x < 4'),
     pytest.param(lambda df: df.x.value_counts().nlargest(2),
-                 marks=pytest.mark.xfail(reason="value_counts misbehaves with empty series"))
+                 marks=pytest.mark.xfail(reason="`cudf.Series.add` is'nt implemented"))
 ])
 def test_dataframe_simple(func):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
@@ -152,7 +224,6 @@ def test_binary_stream_operators(stream):
     assert_eq(b[0], expected)
 
 
-@pytest.mark.xfail(reason="index does not support int add")
 def test_index(stream):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     a = DataFrame(example=df, stream=stream)
@@ -192,7 +263,47 @@ def test_getitem(stream):
     assert_eq(cudf.concat(L), df[df.x > 4])
 
 
-@pytest.mark.xfail(reason="value_counts misbehaves with empty series")
+@pytest.mark.xfail(reason="`cudf.DataFrame.add` is not implemented")
+@pytest.mark.parametrize('agg', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
+    lambda x: x.std(),
+    pytest.param(lambda x: x.var(ddof=0),
+                 marks=pytest.mark.xfail(reason="unknown"))
+])
+@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
+                                     lambda a: 'x',
+                                     lambda a: a.index % 2,
+                                     lambda a: ['x']])
+@pytest.mark.parametrize('indexer', [lambda g: g.y,
+                                     lambda g: g,
+                                     lambda g: g[['y']],
+                                     pytest.param(lambda g: g[['x', 'y']],
+                                                  marks=pytest.mark.xfail(
+                                                        reason="Indexer column matches grouper"))
+                                     ])
+def test_groupby_aggregate(agg, grouper, indexer, stream):
+    df = cudf.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
+
+    a = DataFrame(example=df.iloc[:0], stream=stream)
+
+    def f(x):
+        return agg(indexer(x.groupby(grouper(x))))
+
+    L = f(a).stream.gather().sink_to_list()
+
+    a.emit(df.iloc[:3])
+    a.emit(df.iloc[3:7])
+    a.emit(df.iloc[7:])
+
+    first = df.iloc[:3]
+    assert assert_eq(L[0], f(first))
+    assert assert_eq(L[-1], f(df))
+
+
+@pytest.mark.xfail(reason="`cudf.Series.add` is not implemented")
 def test_value_counts(stream):
     s = cudf.Series([1, 2, 1])
 
@@ -208,6 +319,7 @@ def test_value_counts(stream):
     assert_eq(result[-1], cudf.concat([s, s]).value_counts())
 
 
+@pytest.mark.xfail(reason="'Series' object does not support item assignment")
 def test_setitem(stream):
     df = cudf.DataFrame({'x': list(range(10)), 'y': [1] * 10})
 
@@ -216,11 +328,9 @@ def test_setitem(stream):
 
     sdf['z'] = sdf['x'] * 2
     sdf['a'] = 10
-    sdf['c'] = sdf['x']
+    sdf[['c', 'd']] = sdf[['x', 'y']]
 
-    L1 = sdf.z.mean().stream.gather().sink_to_list()
-    L2 = sdf.a.mean().stream.gather().sink_to_list()
-    L3 = sdf.c.mean().stream.gather().sink_to_list()
+    L = sdf.mean().stream.gather().sink_to_list()
 
     stream.emit(df.iloc[:3])
     stream.emit(df.iloc[3:7])
@@ -228,11 +338,9 @@ def test_setitem(stream):
 
     df['z'] = df['x'] * 2
     df['a'] = 10
-    df['c'] = df['x']
+    df[['c', 'd']] = df[['x', 'y']]
 
-    assert_eq(L1[-1], df.z.mean())
-    assert_eq(L2[-1], df.a.mean())
-    assert_eq(L3[-1], df.c.mean())
+    assert_eq(L[-1], df.mean())
 
 
 def test_setitem_overwrites(stream):
@@ -248,13 +356,21 @@ def test_setitem_overwrites(stream):
     stream.emit(df.iloc[3:7])
     stream.emit(df.iloc[7:])
 
-    expected = cudf.DataFrame()
-    expected['x'] = df.x.iloc[7:] * 2
-
-    assert_eq(L[-1], expected)
+    assert_eq(L[-1], df.iloc[7:] * 2)
 
 
-@pytest.mark.xfail(reason="to_frame is not implemented")
+def test_stream_to_dataframe(stream):
+    df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    source = stream
+    L = source.to_dataframe(example=df).x.sum().stream.gather().sink_to_list()
+
+    source.emit(df)
+    source.emit(df)
+    source.emit(df)
+
+    assert L == [6, 12, 18]
+
+
 def test_to_frame(stream):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = DataFrame(example=df, stream=stream)
@@ -266,7 +382,24 @@ def test_to_frame(stream):
     assert list(a.columns) == ['x']
 
 
-@pytest.mark.xfail(reason="Not implemented")
+def test_instantiate_with_dict(stream):
+    df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrame(example=df, stream=stream)
+
+    sdf2 = DataFrame({'a': sdf.x, 'b': sdf.x * 2,
+                      'c': sdf.y % 2})
+    L = sdf2.stream.gather().sink_to_list()
+    assert len(sdf2.columns) == 3
+
+    sdf.emit(df)
+    sdf.emit(df)
+
+    assert len(L) == 2
+    for x in L:
+        assert_eq(x[['a', 'b', 'c']],
+                  cudf.DataFrame({'a': df.x, 'b': df.x * 2, 'c': df.y % 2}))
+
+
 @pytest.mark.parametrize('op', ['cumsum', 'cummax', 'cumprod', 'cummin'])
 @pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
 def test_cumulative_aggregations(op, getter, stream):
@@ -298,7 +431,6 @@ def test_display(stream):
     s._ipython_display_()
 
 
-@pytest.mark.xfail(reason="Not implemented")
 def test_tail(stream):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     sdf = DataFrame(example=df, stream=stream)
@@ -352,6 +484,23 @@ def test_window_sum(stream):
     assert L == [6, 9, 9]
 
 
+@pytest.mark.xfail(reason="'Series' object does not support item assignment")
+def test_window_sum_dataframe(stream):
+    df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
+    sdf = DataFrame(example=df, stream=stream)
+    L = sdf.window(n=4).sum().stream.gather().sink_to_list()
+
+    sdf.emit(df)
+    assert_eq(L[0], cudf.Series([6, 15], index=['x', 'y']))
+    sdf.emit(df)
+    assert_eq(L[0], cudf.Series([6, 15], index=['x', 'y']))
+    assert_eq(L[1], cudf.Series([9, 21], index=['x', 'y']))
+    sdf.emit(df)
+    assert_eq(L[0], cudf.Series([6, 15], index=['x', 'y']))
+    assert_eq(L[1], cudf.Series([9, 21], index=['x', 'y']))
+    assert_eq(L[2], cudf.Series([9, 21], index=['x', 'y']))
+
+
 @pytest.mark.parametrize('func', [
     lambda x: x.sum(),
     lambda x: x.mean(),
@@ -378,6 +527,22 @@ def test_windowing_n(func, n, getter):
 
     assert_eq(L[0], func(getter(df).iloc[max(0, 3 - n): 3]))
     assert_eq(L[-1], func(getter(df).iloc[len(df) - n:]))
+
+
+def test_window_full():
+    df = cudf.DataFrame({'x': np.arange(10, dtype=float), 'y': [1.0, 2.0] * 5})
+
+    sdf = DataFrame(example=df)
+
+    L = sdf.window(n=4).apply(lambda x: x).stream.sink_to_list()
+
+    sdf.emit(df.iloc[:3])
+    sdf.emit(df.iloc[3:8])
+    sdf.emit(df.iloc[8:])
+
+    assert_eq(L[0], df.iloc[:3])
+    assert_eq(L[1], df.iloc[4:8])
+    assert_eq(L[2], df.iloc[-4:])
 
 
 def test_custom_aggregation():
