@@ -1154,17 +1154,17 @@ class unique(Stream):
     1
     3
     """
-    def __init__(self, upstream, history=None, key=identity, hashable=True,
+    def __init__(self, upstream, maxsize=None, key=identity, hashable=True,
                  **kwargs):
         self.key = key
-        self.history = history
+        self.maxsize = maxsize
         if hashable:
             self.seen = dict()
-            if self.history:
+            if self.maxsize:
                 from zict import LRU
-                self.seen = LRU(self.history, self.seen)
+                self.seen = LRU(self.maxsize, self.seen)
         else:
-            self.seen = deque(maxlen=history)
+            self.seen = deque(maxlen=maxsize)
 
         Stream.__init__(self, upstream, **kwargs)
 
@@ -1173,7 +1173,7 @@ class unique(Stream):
         if y not in self.seen:
             # LRU/dict and deque have slightly different syntax
             if isinstance(self.seen, deque):
-                self.seen.append(y)
+                self.seen.appendleft(y)
             else:
                 self.seen[y] = 1
             return self._emit(x)
