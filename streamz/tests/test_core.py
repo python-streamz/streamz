@@ -487,7 +487,7 @@ def test_unique():
 
 def test_unique_key():
     source = Stream()
-    L = source.unique(key=lambda x: x % 2, history=1).sink_to_list()
+    L = source.unique(key=lambda x: x % 2, maxsize=1).sink_to_list()
 
     source.emit(1)
     source.emit(2)
@@ -500,31 +500,44 @@ def test_unique_key():
 
 def test_unique_history():
     source = Stream()
-    s = source.unique(history=2)
+    s = source.unique(maxsize=2)
+    s2 = source.unique(maxsize=2, hashable=False)
     L = s.sink_to_list()
+    L2 = s2.sink_to_list()
 
     source.emit(1)
     source.emit(2)
+    source.emit(1)
+    source.emit(1)
     source.emit(1)
     source.emit(2)
     source.emit(1)
     source.emit(2)
 
     assert L == [1, 2]
+    assert L == L2
 
     source.emit(3)
     source.emit(2)
 
     assert L == [1, 2, 3]
+    assert L == L2
 
     source.emit(1)
 
     assert L == [1, 2, 3, 1]
+    assert L == L2
+
+    source.emit(3)
+    source.emit(2)
+    source.emit(3)
+
+    assert L == L2
 
 
 def test_unique_history_dict():
     source = Stream()
-    s = source.unique(history=2, hashable=False)
+    s = source.unique(maxsize=2, hashable=False)
     L = s.sink_to_list()
 
     a = {'hi': 'world'}
