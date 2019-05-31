@@ -1129,6 +1129,20 @@ class unique(Stream):
     parameter.  For example setting ``history=1`` avoids sending through
     elements when one is repeated right after the other.
 
+    Parameters
+    ----------
+    history : int or None, optional
+        number of stored unique values to check against
+    key : function, optional
+        Function which returns a representation of the incoming data.
+        For example ``key=lambda x: x['a']`` could be used to allow only
+        pieces of data with unique ``'a'`` values to pass through.
+    hashable : bool, optional
+        If True then data is assumed to be hashable, else it is not. This is
+        used for determining how to cache the history, if hashable then
+        either dicts or LRU caches are used, otherwise a deque is used.
+        Defaults to True.
+
     Examples
     --------
     >>> source = Stream()
@@ -1140,20 +1154,36 @@ class unique(Stream):
     1
     3
     """
-    def __init__(self, upstream, history=None, key=identity, **kwargs):
-        self.seen = dict()
+    def __init__(self, upstream, maxsize=None, key=identity, hashable=True,
+                 **kwargs):
         self.key = key
-        if history:
-            from zict import LRU
-            self.seen = LRU(history, self.seen)
+        self.maxsize = maxsize
+        if hashable:
+            self.seen = dict()
+            if self.maxsize:
+                from zict import LRU
+                self.seen = LRU(self.maxsize, self.seen)
+        else:
+            self.seen = []
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
-        if y not in self.seen:
-            self.seen[y] = 1
-            return self._emit(x)
+        emit = True
+        if isinstance(self.seen, list):
+            if y in self.seen:
+                self.seen.remove(y)
+                emit = False
+            self.seen.insert(0, y)
+            if self.maxsize:
+                del self.seen[self.maxsize:]
+            if emit:
+                return self._emit(x)
+        else:
+            if self.seen.get(y, '~~not_seen~~') == '~~not_seen~~':
+                self.seen[y] = 1
+                return self._emit(x)
 
 
 @Stream.register_api()
