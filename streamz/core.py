@@ -1164,19 +1164,26 @@ class unique(Stream):
                 from zict import LRU
                 self.seen = LRU(self.maxsize, self.seen)
         else:
-            self.seen = deque(maxlen=maxsize)
+            self.seen = []
 
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None):
         y = self.key(x)
-        if y not in self.seen:
-            # LRU/dict and deque have slightly different syntax
-            if isinstance(self.seen, deque):
-                self.seen.appendleft(y)
-            else:
+        emit = True
+        if isinstance(self.seen, list):
+            if y in self.seen:
+                self.seen.remove(y)
+                emit = False
+            self.seen.insert(0, y)
+            if self.maxsize:
+                del self.seen[self.maxsize:]
+            if emit:
+                return self._emit(x)
+        else:
+            if self.seen.get(y, '~~not_seen~~') == '~~not_seen~~':
                 self.seen[y] = 1
-            return self._emit(x)
+                return self._emit(x)
 
 
 @Stream.register_api()
