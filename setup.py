@@ -17,6 +17,7 @@ setup(name='streamz',
       license='BSD',
       keywords='streams',
       packages=packages + tests,
+      python_requires='>=3.5',
       long_description=(open('README.rst').read() if exists('README.rst')
                         else ''),
       install_requires=list(open('requirements.txt').read().strip().split('\n')),
