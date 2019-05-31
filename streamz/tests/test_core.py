@@ -508,8 +508,6 @@ def test_unique_history():
     source.emit(1)
     source.emit(2)
     source.emit(1)
-    source.emit(1)
-    source.emit(1)
     source.emit(2)
     source.emit(1)
     source.emit(2)
@@ -528,10 +526,14 @@ def test_unique_history():
     assert L == [1, 2, 3, 1]
     assert L == L2
 
-    source.emit(3)
+    # update 2 position
     source.emit(2)
+    # knock out 1
     source.emit(3)
+    # update 2 position
+    source.emit(2)
 
+    assert L == [1, 2, 3, 1, 3]
     assert L == L2
 
 
