@@ -74,7 +74,7 @@ Streamz is similar to reactive
 programming systems like `RxPY <https://github.com/ReactiveX/RxPY>`_ or big
 data streaming systems like `Apache Flink <https://flink.apache.org/>`_,
 `Apache Beam <https://beam.apache.org/get-started/quickstart-py/>`_ or
-`Apache Spark Streaming <https://beam.apache.org/get-started/quickstart-py/>`_.
+`Apache Spark Streaming <https://spark.apache.org/streaming/>`_.
 
 
 .. toctree::
