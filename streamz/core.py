@@ -260,7 +260,10 @@ class Stream(object):
             from ipywidgets import Output
             import IPython
         except ImportError:
-            return self._repr_html_()
+            if hasattr(self, '_repr_html_'):
+                return self._repr_html_()
+            else:
+                return self.__repr__()
         output = Output(_view_count=0)
         output_ref = weakref.ref(output)
 
