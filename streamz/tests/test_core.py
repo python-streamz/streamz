@@ -1207,5 +1207,40 @@ def test_start():
     assert flag == [True]
 
 
+def test_accumulate():
+    a = Stream()
+    b = a.accumulate(lambda x, y: x + y)
+    L = b.sink_to_list()
+    LL = []
+
+    for i in range(10):
+        a.emit(i)
+        if len(LL) == 0:
+            LL.append(i)
+        else:
+            LL.append(i + LL[-1])
+
+    assert L == LL
+
+
+def test_accumulate_reset():
+    a = Stream()
+    rn = Stream()
+    b = a.accumulate(lambda x, y: x + y, reset_stream=rn)
+    L = b.sink_to_list()
+    LL = []
+
+    for i in range(10):
+        if i == 5:
+            rn.emit('hi')
+        a.emit(i)
+        if len(LL) == 0 or i == 5:
+            LL.append(i)
+        else:
+            LL.append(i + LL[-1])
+
+    assert L == LL
+
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
