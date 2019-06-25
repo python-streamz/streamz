@@ -1207,5 +1207,59 @@ def test_start():
     assert flag == [True]
 
 
+def test_connect_zip():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+    x = a.zip(b)
+    L = x.sink_to_list()
+    c.connect(x)
+    a.emit(1)
+    b.emit(1)
+    assert not L
+    c.emit(1)
+    assert L == [(1, 1, 1)]
+
+
+def test_disconnect_zip():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+    x = a.zip(b, c)
+    L = x.sink_to_list()
+    b.disconnect(x)
+    a.emit(1)
+    b.emit(1)
+    assert not L
+    c.emit(1)
+    assert L == [(1, 1)]
+
+
+def test_connect_combine_latest():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+    x = a.combine_latest(b, emit_on=a)
+    L = x.sink_to_list()
+    c.connect(x)
+    b.emit(1)
+    c.emit(1)
+    a.emit(1)
+    assert L == [(1, 1, 1)]
+
+
+def test_connect_discombine_latest():
+    a = Stream()
+    b = Stream()
+    c = Stream()
+    x = a.combine_latest(b, c, emit_on=a)
+    L = x.sink_to_list()
+    c.disconnect(x)
+    b.emit(1)
+    c.emit(1)
+    a.emit(1)
+    assert L == [(1, 1)]
+
+
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa

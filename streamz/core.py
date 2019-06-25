@@ -181,6 +181,30 @@ class Stream(object):
                 if downstream:
                     downstream._inform_asynchronous(asynchronous)
 
+    def _add_upstream(self, upstream):
+        """Add upstream to current upstreams, this method is overridden for
+        classes which handle stream specific buffers/caches"""
+        if self.upstreams == [None]:
+            self.upstreams[0] = upstream
+        else:
+            self.upstreams.append(upstream)
+
+    def _add_downstream(self, downstream):
+        """Add downstream to current downstreams"""
+        self.downstreams.add(downstream)
+
+    def _remove_downstream(self, downstream):
+        """Remove downstream from current downstreams"""
+        self.downstreams.remove(downstream)
+
+    def _remove_upstream(self, upstream):
+        """Remove upstream from current upstreams, this method is overridden for
+        classes which handle stream specific buffers/caches"""
+        if len(self.upstreams) == 1:
+            self.upstreams[0] = [None]
+        else:
+            self.upstreams.remove(upstream)
+
     @classmethod
     def register_api(cls, modifier=identity):
         """ Add callable to Stream API
@@ -352,12 +376,8 @@ class Stream(object):
         downstream: Stream
             The downstream stream to connect to
         '''
-        self.downstreams.add(downstream)
-
-        if downstream.upstreams == [None]:
-            downstream.upstreams = [self]
-        else:
-            downstream.upstreams.append(self)
+        self._add_downstream(downstream)
+        downstream._add_upstream(self)
 
     def disconnect(self, downstream):
         ''' Disconnect this stream to a downstream element.
@@ -367,9 +387,9 @@ class Stream(object):
         downstream: Stream
             The downstream stream to disconnect from
         '''
-        self.downstreams.remove(downstream)
+        self._remove_downstream(downstream)
 
-        downstream.upstreams.remove(self)
+        downstream._remove_upstream(self)
 
     @property
     def upstream(self):
@@ -792,7 +812,8 @@ class slice(Stream):
     def _check_end(self):
         if self.end and self.state >= self.end:
             # we're done
-            self.upstream.downstreams.remove(self)
+            for upstream in self.upstreams:
+                upstream._remove_downstream(self)
 
 
 @Stream.register_api()
@@ -1016,6 +1037,16 @@ class zip(Stream):
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
 
+    def _add_upstream(self, upstream):
+        # Override method to handle setup of buffer for new stream
+        self.buffers[upstream] = deque()
+        super(zip, self)._add_upstream(upstream)
+
+    def _remove_upstream(self, upstream):
+        # Override method to handle removal of buffer for stream
+        self.buffers.pop(upstream)
+        super(zip, self)._remove_upstream(upstream)
+
     def pack_literals(self, tup):
         """ Fill buffers for literals whenever we empty them """
         inp = list(tup)[::-1]
@@ -1067,6 +1098,7 @@ class combine_latest(Stream):
 
     def __init__(self, *upstreams, **kwargs):
         emit_on = kwargs.pop('emit_on', None)
+        self._initial_emit_on = emit_on
 
         self.last = [None for _ in upstreams]
         self.missing = set(upstreams)
@@ -1079,6 +1111,30 @@ class combine_latest(Stream):
         else:
             self.emit_on = upstreams
         Stream.__init__(self, upstreams=upstreams, **kwargs)
+
+    def _add_upstream(self, upstream):
+        # Override method to handle setup of last and missing for new stream
+        self.last.append(None)
+        self.missing.update([upstream])
+        super(combine_latest, self)._add_upstream(upstream)
+        if self._initial_emit_on is None:
+            self.emit_on = self.upstreams
+
+    def _remove_upstream(self, upstream):
+        # Override method to handle removal of last and missing for stream
+        if self.emit_on == upstream:
+            raise RuntimeError("Can't remove the ``emit_on`` stream since that"
+                               "would cause no data to be emitted. "
+                               "Consider adding an ``emit_on`` first by "
+                               "running ``node.emit_on=(upstream,)`` to add "
+                               "a new ``emit_on`` or running "
+                               "``node.emit_on=tuple(node.upstreams)`` to "
+                               "emit on all incoming data")
+        self.last.pop(self.upstreams.index(upstream))
+        self.missing.remove(upstream)
+        super(combine_latest, self)._remove_upstream(upstream)
+        if self._initial_emit_on is None:
+            self.emit_on = self.upstreams
 
     def update(self, x, who=None):
         if self.missing and who in self.missing:
