@@ -135,7 +135,7 @@ operations like ``partition``, ``buffer``, and ``sliding_window``
 .. code-block:: python
 
    source = Stream()
-   source.sliding_window(3).sink(print)
+   source.sliding_window(3, return_partial=False).sink(print)
 
    >>> source.emit(1)
    >>> source.emit(2)
