@@ -7,15 +7,24 @@ But these tests should pass as cudf implement more pandas like methods.
 """
 from __future__ import division, print_function
 
-import numpy as np
-import pytest
+import json
 import operator
+from time import sleep
+
+import pytest
 from dask.dataframe.utils import assert_eq
-from distributed import Client
+import numpy as np
+import pandas as pd
+from tornado import gen
 
 from streamz import Stream
-from streamz.dask import DaskStream
+from streamz.utils_test import gen_test
 from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
+import streamz.dataframe as sd
+from streamz.dask import DaskStream
+
+from distributed import Client
+
 
 cudf = pytest.importorskip("cudf")
 
@@ -358,7 +367,54 @@ def test_setitem_overwrites(stream):
 
     assert_eq(L[-1], df.iloc[7:] * 2)
 
+    
+@pytest.mark.parametrize('kwargs,op', [
+    ({}, 'sum'),
+    ({}, 'mean'),
+    pytest.param({}, 'min'),
+    pytest.param({}, 'median', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
+    pytest.param({}, 'max'),
+    pytest.param({}, 'var', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
+    pytest.param({}, 'count'),
+    pytest.param({'ddof': 0}, 'std', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
+    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
+    pytest.param({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate', marks=pytest.mark.xfail(reason="Not implemented for rolling objects"))
+])
+@pytest.mark.parametrize('window', [
+    pytest.param(2),
+    7,
+    pytest.param('3h'),
+    pd.Timedelta('200 minutes')
+])
+@pytest.mark.parametrize('m', [
+    2,
+    pytest.param(5)
+])
+@pytest.mark.parametrize('pre_get,post_get', [
+    (lambda df: df, lambda df: df),
+    (lambda df: df.x, lambda x: x),
+    pytest.param(lambda df: df, lambda df: df.x, marks=pytest.mark.xfail(reason="Cannot select columns for rolling over time objects"))
+])
+def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
+        stream):
+    index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
+    df = cudf.DataFrame({'x': np.arange(len(index))}, index=index)
 
+    expected = getattr(post_get(pre_get(df).rolling(window)), op)(**kwargs)
+
+    sdf = DataFrame(example=df, stream=stream)
+    roll = getattr(post_get(pre_get(sdf).rolling(window)), op)(**kwargs)
+    L = roll.stream.gather().sink_to_list()
+    assert len(L) == 0
+
+    for i in range(0, len(df), m):
+        sdf.emit(df.iloc[i: i + m])
+
+    assert len(L) > 1
+
+    assert_eq(cudf.concat(L), expected)
+    
+    
 def test_stream_to_dataframe(stream):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     source = stream
