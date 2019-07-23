@@ -1,9 +1,9 @@
 """
-Tests for cudf DataFrame
-All these tests are taken from test_dataframes module in the same folder.
-Some of these tests pass with cudf as they are, and others are marked xfail
-where a pandas like method is not implemented yet in cudf.
-But these tests should pass as cudf implement more pandas like methods.
+Tests for cudf DataFrames: 
+All tests have been cloned from the test_dataframes module in the same folder.
+Some of these tests pass with cudf, and others are marked with xfail
+where a pandas-like method is not yet implemented in cudf.
+But these tests should pass as and when cudf rolls out more pandas-like methods.
 """
 from __future__ import division, print_function
 
