@@ -1,5 +1,5 @@
 """
-Tests for cudf DataFrames: 
+Tests for cudf DataFrames:
 All tests have been cloned from the test_dataframes module in the same folder.
 Some of these tests pass with cudf, and others are marked with xfail
 where a pandas-like method is not yet implemented in cudf.
@@ -7,20 +7,15 @@ But these tests should pass as and when cudf rolls out more pandas-like methods.
 """
 from __future__ import division, print_function
 
-import json
 import operator
-from time import sleep
 
 import pytest
 from dask.dataframe.utils import assert_eq
 import numpy as np
 import pandas as pd
-from tornado import gen
 
 from streamz import Stream
-from streamz.utils_test import gen_test
 from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
-import streamz.dataframe as sd
 from streamz.dask import DaskStream
 
 from distributed import Client
@@ -81,7 +76,7 @@ def test_attributes():
 
     assert getattr(sdf,'x',-1) != -1
     assert getattr(sdf,'z',-1) == -1
-    
+
     sdf.x
     with pytest.raises(AttributeError):
         sdf.z
@@ -367,7 +362,7 @@ def test_setitem_overwrites(stream):
 
     assert_eq(L[-1], df.iloc[7:] * 2)
 
-    
+
 @pytest.mark.parametrize('kwargs,op', [
     ({}, 'sum'),
     ({}, 'mean'),
@@ -378,7 +373,7 @@ def test_setitem_overwrites(stream):
     pytest.param({}, 'count'),
     pytest.param({'ddof': 0}, 'std', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
     pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.xfail(reason="Not implemented for rolling objects")),
-    pytest.param({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate', marks=pytest.mark.xfail(reason="Not implemented for rolling objects"))
+    pytest.param({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate', marks=pytest.mark.xfail(reason="Not implemented"))
 ])
 @pytest.mark.parametrize('window', [
     pytest.param(2),
@@ -393,7 +388,7 @@ def test_setitem_overwrites(stream):
 @pytest.mark.parametrize('pre_get,post_get', [
     (lambda df: df, lambda df: df),
     (lambda df: df.x, lambda x: x),
-    pytest.param(lambda df: df, lambda df: df.x, marks=pytest.mark.xfail(reason="Cannot select columns for rolling over time objects"))
+    (lambda df: df, lambda df: df.x)
 ])
 def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
         stream):
@@ -413,8 +408,8 @@ def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
     assert len(L) > 1
 
     assert_eq(cudf.concat(L), expected)
-    
-    
+
+
 def test_stream_to_dataframe(stream):
     df = cudf.DataFrame({'x': [1, 2, 3], 'y': [4, 5, 6]})
     source = stream
@@ -436,6 +431,7 @@ def test_to_frame(stream):
     a = sdf.x.to_frame()
     assert isinstance(a, DataFrame)
     assert list(a.columns) == ['x']
+
 
 @pytest.mark.parametrize('op', ['cumsum', 'cummax', 'cumprod', 'cummin'])
 @pytest.mark.parametrize('getter', [lambda df: df, lambda df: df.x])
