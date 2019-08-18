@@ -14,7 +14,7 @@ LICENSE
 
 BSD-3 Clause
 
-.. |Build Status| image:: https://travis-ci.org/mrocklin/streamz.svg?branch=master
+.. |Build Status| image:: https://travis-ci.org/python-streamz/streamz.svg?branch=master
    :target: https://travis-ci.org/python-streamz/streamz
 .. |Doc Status| image:: http://readthedocs.org/projects/streamz/badge/?version=latest
    :target: http://streamz.readthedocs.org/en/latest/
