@@ -34,7 +34,7 @@ def client():
 
 @pytest.fixture(params=['core', 'dask'])
 def stream(request, client):  # flake8: noqa
-    if request.param == "core":
+    if request.param == 'core':
         return Stream()
     else:
         return DaskStream()
