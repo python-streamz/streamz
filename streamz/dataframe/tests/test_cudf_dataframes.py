@@ -32,7 +32,7 @@ def client():
         client.close()
 
 
-@pytest.fixture(params=["core", "dask"])
+@pytest.fixture(params=['core', 'dask'])
 def stream(request, client):  # flake8: noqa
     if request.param == "core":
         return Stream()

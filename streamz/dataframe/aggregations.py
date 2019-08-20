@@ -204,7 +204,7 @@ def diff_loc(dfs, new, window=None):
     dfs = deque(dfs)
     dfs.append(new)
     mx = pd.Timestamp(max(df.index.max() for df in dfs))
-    mn = pd.Timestamp(mx) - window
+    mn = mx - window
     old = []
     while pd.Timestamp(dfs[0].index.min()) < mn:
         o = dfs[0].loc[:mn]
@@ -348,8 +348,6 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     for o, og in zip(old, old_groupers):
         if 'groupers' in acc:
             assert len(o) == len(og)
-#             if hasattr(og, 'index'):
-#                 assert (o.index == og.index).all()
         if len(o):
             state, result = agg.on_old(state, o, grouper=og)
             size_state, _ = size.on_old(size_state, o, grouper=og)
