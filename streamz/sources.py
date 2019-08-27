@@ -475,8 +475,12 @@ class FromKafkaBatched(Stream):
 
                 latest_checkpoint = {}
                 if self.checkpointing is not None:
-                    if os.path.exists(self.checkpointing):
-                        with open(self.checkpointing, 'r') as fr:
+                    if not os.path.exists(self.checkpointing):
+                        os.makedirs(self.checkpointing)
+                    checkpoints_list = os.listdir(self.checkpointing)
+                    if len(checkpoints_list) > 0:
+                        previous_checkpoint = max(checkpoints_list)
+                        with open(self.checkpointing + '/' + previous_checkpoint, 'r') as fr:
                             latest_checkpoint = json.loads(fr.readlines()[-1])
                         fr.close()
 
@@ -584,9 +588,14 @@ def add_checkpoint(group, checkpoint, path):
     partition = checkpoint.partition
     offset = checkpoint.offset
     latest_checkpoint = {}
-    if os.path.exists(path):
-        with open(path, 'r') as fr:
-            latest_checkpoint = json.loads(fr.readlines()[-1])
+    previous_checkpoint = None
+    if not os.path.exists(path):
+        os.makedirs(path)
+    checkpoints_list = os.listdir(path)
+    if len(checkpoints_list) > 0:
+        previous_checkpoint = max(checkpoints_list)
+        with open(path + '/' + previous_checkpoint, 'r') as fr:
+            latest_checkpoint = json.loads(fr.readlines()[0])
         fr.close()
     if group not in latest_checkpoint.keys():
         latest_checkpoint[group] = {}
@@ -594,7 +603,12 @@ def add_checkpoint(group, checkpoint, path):
         latest_checkpoint[group][topic] = {}
     latest_checkpoint[group][topic][partition] = offset
     print(latest_checkpoint)
-    with open(path, 'a+') as fw:
+    if previous_checkpoint is None:
+        new_checkpoint = '1.txt'
+    else:
+        previous_batch = int(previous_checkpoint.split('.')[0])
+        new_checkpoint = str(previous_batch + 1) + '.txt'
+    with open(path + '/' + new_checkpoint, 'a+') as fw:
         fw.write(json.dumps(latest_checkpoint) + '\n')
     fw.close()
 
