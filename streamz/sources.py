@@ -597,6 +597,8 @@ def add_checkpoint(group, checkpoint, path):
         with open(path + '/' + previous_checkpoint, 'r') as fr:
             latest_checkpoint = json.loads(fr.readlines()[0])
         fr.close()
+    if len(checkpoints_list) == 5:
+        os.system('rm -rf ' + path + '/' + min(checkpoints_list))
     if group not in latest_checkpoint.keys():
         latest_checkpoint[group] = {}
     if topic not in latest_checkpoint[group].keys():
