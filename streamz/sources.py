@@ -477,10 +477,13 @@ class FromKafkaBatched(Stream):
                 if self.checkpointing is not None:
                     if not os.path.exists(self.checkpointing):
                         os.makedirs(self.checkpointing)
-                    checkpoints_list = os.listdir(self.checkpointing)
+                    topic_path = self.checkpointing + '/' + self.topic
+                    if not os.path.exists(topic_path):
+                        os.makedirs(topic_path)
+                    checkpoints_list = os.listdir(topic_path)
                     if len(checkpoints_list) > 0:
                         previous_checkpoint = max(checkpoints_list)
-                        with open(self.checkpointing + '/' + previous_checkpoint, 'r') as fr:
+                        with open(topic_path + '/' + previous_checkpoint, 'r') as fr:
                             latest_checkpoint = json.loads(fr.readlines()[-1])
                         fr.close()
 
@@ -496,9 +499,8 @@ class FromKafkaBatched(Stream):
                     group = self.consumer_params['group.id']
 
                     if group in latest_checkpoint.keys():
-                        if self.topic in latest_checkpoint[group].keys():
-                            if str(partition) in latest_checkpoint[group][self.topic].keys():
-                                current_position = latest_checkpoint[group][self.topic][str(partition)]
+                        if str(partition) in latest_checkpoint[group].keys():
+                            current_position = latest_checkpoint[group][str(partition)]
 
                     lowest = max(current_position, low)
                     if high > lowest:
@@ -591,6 +593,9 @@ def add_checkpoint(group, checkpoint, path):
     previous_checkpoint = None
     if not os.path.exists(path):
         os.makedirs(path)
+    path = path + '/' + topic
+    if not os.path.exists(path):
+        os.makedirs(path)
     checkpoints_list = os.listdir(path)
     if len(checkpoints_list) > 0:
         previous_checkpoint = max(checkpoints_list)
@@ -601,9 +606,7 @@ def add_checkpoint(group, checkpoint, path):
         os.system('rm -rf ' + path + '/' + min(checkpoints_list))
     if group not in latest_checkpoint.keys():
         latest_checkpoint[group] = {}
-    if topic not in latest_checkpoint[group].keys():
-        latest_checkpoint[group][topic] = {}
-    latest_checkpoint[group][topic][partition] = offset
+    latest_checkpoint[group][partition] = offset
     print(latest_checkpoint)
     if previous_checkpoint is None:
         new_checkpoint = '1.txt'
