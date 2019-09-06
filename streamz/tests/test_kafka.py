@@ -237,12 +237,14 @@ def test_kafka_batch_checkpointing():
         assert out[-1][-1] == b'value-9'
         stream2.upstream.stopped = True
 
+        for i in range(10, 20):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS3, checkpointing='custreamz_checkpoints')
         out3 = stream3.sink_to_list()
         stream3.start()
-        import time
-        time.sleep(5)
-        assert len(out3) == 0
+        wait_for(lambda: any(out3) and out3[-1][0] == b'value-10' and out3[-1][-1] == b'value-19', 10, period=0.2)
         stream3.upstream.stopped = True
 
 
