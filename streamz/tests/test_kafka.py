@@ -6,6 +6,7 @@ import random
 import requests
 import shlex
 import subprocess
+import time
 from tornado import gen
 
 from ..core import Stream
@@ -245,7 +246,41 @@ def test_kafka_batch_checkpointing():
         out3 = stream3.sink_to_list()
         stream3.start()
         wait_for(lambda: any(out3) and out3[-1][0] == b'value-10' and out3[-1][-1] == b'value-19', 10, period=0.2)
-        stream3.upstream.stopped = True
+
+        for i in range(20, 25):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+        checkpoints_list = os.listdir('custreamz_checkpoints/' + TOPIC)
+        assert len(checkpoints_list) == 3
+
+        for i in range(25, 30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+        checkpoints_list = os.listdir('custreamz_checkpoints/' + TOPIC)
+        assert len(checkpoints_list) == 4
+
+        for i in range(30, 35):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+        checkpoints_list = os.listdir('custreamz_checkpoints/' + TOPIC)
+        assert len(checkpoints_list) == 5
+
+        for i in range(35, 40):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+        checkpoints_list = os.listdir('custreamz_checkpoints/' + TOPIC)
+        assert len(checkpoints_list) == 5
+
+        for i in range(40, 45):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+        checkpoints_list = os.listdir('custreamz_checkpoints/' + TOPIC)
+        assert len(checkpoints_list) == 5
 
 
 @gen_cluster(client=True, timeout=60)
