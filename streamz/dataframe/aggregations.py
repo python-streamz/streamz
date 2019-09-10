@@ -4,6 +4,7 @@ from collections import deque
 from numbers import Number
 
 import numpy as np
+import pandas as pd
 from .utils import is_series_like, is_index_like, get_dataframe_package
 
 
@@ -202,10 +203,10 @@ def diff_loc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
-    mx = max(df.index.max() for df in dfs)
+    mx = pd.Timestamp(max(df.index.max() for df in dfs))
     mn = mx - window
     old = []
-    while dfs[0].index.min() < mn:
+    while pd.Timestamp(dfs[0].index.min()) < mn:
         o = dfs[0].loc[:mn]
         old.append(o)  # TODO: avoid copy if fully lost
         dfs[0] = dfs[0].iloc[len(o):]
@@ -347,8 +348,6 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     for o, og in zip(old, old_groupers):
         if 'groupers' in acc:
             assert len(o) == len(og)
-            if hasattr(og, 'index'):
-                assert (o.index == og.index).all()
         if len(o):
             state, result = agg.on_old(state, o, grouper=og)
             size_state, _ = size.on_old(size_state, o, grouper=og)
@@ -407,11 +406,13 @@ class GroupbySum(GroupbyAggregation):
     def on_new(self, acc, new, grouper=None):
         g = self.grouped(new, grouper=grouper)
         result = acc.add(g.sum(), fill_value=0)
+        result.index.name = acc.index.name
         return result, result
 
     def on_old(self, acc, old, grouper=None):
         g = self.grouped(old, grouper=grouper)
         result = acc.sub(g.sum(), fill_value=0)
+        result.index.name = acc.index.name
         return result, result
 
     def initial(self, new, grouper=None):
@@ -427,12 +428,14 @@ class GroupbyCount(GroupbyAggregation):
         g = self.grouped(new, grouper=grouper)
         result = acc.add(g.count(), fill_value=0)
         result = result.astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def on_old(self, acc, old, grouper=None):
         g = self.grouped(old, grouper=grouper)
         result = acc.sub(g.count(), fill_value=0)
         result = result.astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def initial(self, new, grouper=None):
@@ -448,12 +451,14 @@ class GroupbySize(GroupbyAggregation):
         g = self.grouped(new, grouper=grouper)
         result = acc.add(g.size(), fill_value=0)
         result = result.astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def on_old(self, acc, old, grouper=None):
         g = self.grouped(old, grouper=grouper)
         result = acc.sub(g.size(), fill_value=0)
         result = result.astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def initial(self, new, grouper=None):
@@ -467,10 +472,12 @@ class GroupbySize(GroupbyAggregation):
 class ValueCounts(Aggregation):
     def on_new(self, acc, new, grouper=None):
         result = acc.add(new.value_counts(), fill_value=0).astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def on_old(self, acc, new, grouper=None):
         result = acc.sub(new.value_counts(), fill_value=0).astype(int)
+        result.index.name = acc.index.name
         return result, result
 
     def initial(self, new, grouper=None):
@@ -483,7 +490,8 @@ class GroupbyMean(GroupbyAggregation):
         g = self.grouped(new, grouper=grouper)
         totals = totals.add(g.sum(), fill_value=0)
         counts = counts.add(g.count(), fill_value=0)
-
+        totals.index.name = acc[0].index.name
+        counts.index.name = acc[1].index.name
         return (totals, counts), totals / counts
 
     def on_old(self, acc, old, grouper=None):
@@ -491,7 +499,8 @@ class GroupbyMean(GroupbyAggregation):
         g = self.grouped(old, grouper=grouper)
         totals = totals.sub(g.sum(), fill_value=0)
         counts = counts.sub(g.count(), fill_value=0)
-
+        totals.index.name = acc[0].index.name
+        counts.index.name = acc[1].index.name
         return (totals, counts), totals / counts
 
     def initial(self, new, grouper=None):

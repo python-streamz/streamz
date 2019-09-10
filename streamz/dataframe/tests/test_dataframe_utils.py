@@ -6,11 +6,6 @@ import pandas as pd
 import numpy as np
 
 
-def test_utils_is_dataframe_like():
-    test_utils_dataframe = pytest.importorskip('dask.dataframe.tests.test_utils_dataframe')
-    test_utils_dataframe.test_is_dataframe_like()
-
-
 def test_utils_get_base_frame_type_pandas():
     with pytest.raises(TypeError):
         get_base_frame_type("DataFrame", is_dataframe_like, None)
