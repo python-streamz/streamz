@@ -17,6 +17,7 @@ from streamz import Stream
 from streamz.dask import DaskStream
 from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
 
+# pragma: no cover
 cudf = pytest.importorskip("cudf")
 
 
