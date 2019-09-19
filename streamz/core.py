@@ -1184,13 +1184,13 @@ class unique(Stream):
     """ Avoid sending through repeated elements
 
     This deduplicates a stream so that only new elements pass through.
-    You can control how much of a history is stored with the ``history=``
-    parameter.  For example setting ``history=1`` avoids sending through
+    You can control how much of a history is stored with the ``maxsize=``
+    parameter.  For example setting ``maxsize=1`` avoids sending through
     elements when one is repeated right after the other.
 
     Parameters
     ----------
-    history : int or None, optional
+    maxsize: int or None, optional
         number of stored unique values to check against
     key : function, optional
         Function which returns a representation of the incoming data.
@@ -1205,7 +1205,7 @@ class unique(Stream):
     Examples
     --------
     >>> source = Stream()
-    >>> source.unique(history=1).sink(print)
+    >>> source.unique(maxsize=1).sink(print)
     >>> for x in [1, 1, 2, 2, 2, 1, 3]:
     ...     source.emit(x)
     1
