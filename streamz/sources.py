@@ -1,5 +1,4 @@
 from glob import glob
-import json
 import os
 
 import time
@@ -454,12 +453,11 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, checkpointing=None, **kwargs):
+                 npartitions=1, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
-        self.checkpointing = checkpointing
         self.poll_interval = convert_interval(poll_interval)
         self.stopped = True
 
@@ -472,21 +470,6 @@ class FromKafkaBatched(Stream):
         try:
             while not self.stopped:
                 out = []
-
-                latest_checkpoint = {}
-                if self.checkpointing is not None:
-                    if not os.path.exists(self.checkpointing):
-                        os.makedirs(self.checkpointing)
-                    topic_path = self.checkpointing + '/' + self.topic
-                    if not os.path.exists(topic_path):
-                        os.makedirs(topic_path)
-                    checkpoints_list = os.listdir(topic_path)
-                    if len(checkpoints_list) > 0:
-                        previous_checkpoint = max(checkpoints_list)
-                        with open(topic_path + '/' + previous_checkpoint, 'r') as fr:
-                            latest_checkpoint = json.loads(fr.readlines()[-1])
-                        fr.close()
-
                 for partition in range(self.npartitions):
                     tp = ck.TopicPartition(self.topic, partition, 0)
                     try:
@@ -494,18 +477,11 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
-
                     current_position = self.positions[partition]
-                    group = self.consumer_params['group.id']
-
-                    if group in latest_checkpoint.keys():
-                        if str(partition) in latest_checkpoint[group].keys():
-                            current_position = latest_checkpoint[group][str(partition)]
-
                     lowest = max(current_position, low)
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    lowest, high - 1, self.checkpointing))
+                                    lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
@@ -531,8 +507,7 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False,
-                       checkpointing=None, **kwargs):
+                       npartitions=1, start=False, dask=False, **kwargs):
     """ Get messages from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -574,8 +549,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions,
-                              checkpointing=checkpointing, **kwargs)
+                              npartitions=npartitions, **kwargs)
     if dask:
         source = source.scatter()
 
@@ -585,41 +559,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     return source.starmap(get_message_batch)
 
 
-def add_checkpoint(group, checkpoint, path):
-    topic = checkpoint.topic
-    partition = checkpoint.partition
-    offset = checkpoint.offset
-    latest_checkpoint = {}
-    previous_checkpoint = None
-    if not os.path.exists(path):
-        os.makedirs(path)
-    path = path + '/' + topic
-    if not os.path.exists(path):
-        os.makedirs(path)
-    checkpoints_list = os.listdir(path)
-    if len(checkpoints_list) > 0:
-        previous_checkpoint = max(checkpoints_list)
-        with open(path + '/' + previous_checkpoint, 'r') as fr:
-            latest_checkpoint = json.loads(fr.readlines()[0])
-        fr.close()
-    #Only maintain the last 5 checkpoints
-    if len(checkpoints_list) == 5:
-        os.system('rm -rf ' + path + '/' + min(checkpoints_list))
-    if group not in latest_checkpoint.keys():
-        latest_checkpoint[group] = {}
-    latest_checkpoint[group][partition] = offset
-    print(latest_checkpoint)
-    if previous_checkpoint is None:
-        new_checkpoint = '1.txt'
-    else:
-        previous_batch = int(previous_checkpoint.split('.')[0])
-        new_checkpoint = str(previous_batch + 1) + '.txt'
-    with open(path + '/' + new_checkpoint, 'a+') as fw:
-        fw.write(json.dumps(latest_checkpoint) + '\n')
-    fw.close()
-
-
-def get_message_batch(kafka_params, topic, partition, low, high, checkpointing, timeout=None):
+def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
     """Fetch a batch of kafka messages in given topic/partition
 
     This will block until messages are available, or timeout is reached.
@@ -643,8 +583,5 @@ def get_message_batch(kafka_params, topic, partition, low, high, checkpointing, 
                 if timeout is not None and time.time() - t0 > timeout:
                     break
     finally:
-        if checkpointing is not None:
-            checkpoint = consumer.commit(asynchronous=False)
-            add_checkpoint(kafka_params['group.id'], checkpoint[0], checkpointing)
         consumer.close()
     return out
