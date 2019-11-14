@@ -66,6 +66,14 @@ flow of data.  Typically people rely on tools like ``itertools.tee``, and
 However this quickly become cumbersome, especially when building complex
 pipelines.
 
+Installation
+------------
+
+To install either use:
+
+- conda-forge: ``conda install streamz -c conda-forge``
+- pip: ``python -m pip install streazm``
+- local pip: ``git clone git@github.com:python-streamz/streamz.git; python -m pip install -e streamz``
 
 Related Work
 ------------
