@@ -114,7 +114,7 @@ def readable_graph(graph):
     """
     import networkx as nx
 
-    mapping = {k: "{}".format(graph.node[k]["label"]) for k in graph}
+    mapping = {k: "{}".format(graph.nodes[k]["label"]) for k in graph}
     idx_mapping = {}
     for k, v in mapping.items():
         if v in idx_mapping.keys():
