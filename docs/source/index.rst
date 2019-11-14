@@ -73,8 +73,7 @@ To install either use:
 
 - conda-forge: ``conda install streamz -c conda-forge``
 - pip: ``pip install streamz``
-- dev: ``git clone https://github.com/python-streamz/streamz``
-       ``pip install -e streamz/``
+- dev: ``git clone https://github.com/python-streamz/streamz`` followed by ``pip install -e streamz/``
 
 Related Work
 ------------
