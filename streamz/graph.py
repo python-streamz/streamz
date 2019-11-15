@@ -132,7 +132,7 @@ def to_graphviz(graph, **graph_attr):
     import graphviz
 
     gvz = graphviz.Digraph(graph_attr=graph_attr)
-    for node, attrs in graph.node.items():
+    for node, attrs in graph.nodes.items():
         gvz.node(node, **attrs)
     for edge, attrs in graph.edges().items():
         gvz.edge(edge[0], edge[1], **attrs)
