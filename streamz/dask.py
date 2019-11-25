@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
+from functools import wraps
 
+from .core import _truthy
 from operator import getitem
 
 from tornado import gen
@@ -9,6 +11,21 @@ from distributed.client import default_client
 
 from .core import Stream
 from . import core, sources
+
+
+NULL_COMPUTE = "~~NULL_COMPUTE~~"
+
+
+def return_null(func):
+    @wraps(func)
+    def inner(x, *args, **kwargs):
+        tv = func(x, *args, **kwargs)
+        if tv:
+            return x
+        else:
+            return NULL_COMPUTE
+
+    return inner
 
 
 class DaskStream(Stream):
@@ -137,6 +154,24 @@ class starmap(DaskStream):
     def update(self, x, who=None):
         client = default_client()
         result = client.submit(apply, self.func, x, self.kwargs)
+        return self._emit(result)
+
+
+@DaskStream.register_api()
+class filter(DaskStream):
+    def __init__(self, upstream, predicate, *args, **kwargs):
+        if predicate is None:
+            predicate = _truthy
+        self.predicate = return_null(predicate)
+        stream_name = kwargs.pop("stream_name", None)
+        self.kwargs = kwargs
+        self.args = args
+
+        DaskStream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        client = self.default_client()
+        result = client.submit(self.predicate, x, *self.args, **self.kwargs)
         return self._emit(result)
 
 
