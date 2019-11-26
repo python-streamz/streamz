@@ -2,8 +2,6 @@ from __future__ import absolute_import, division, print_function
 from functools import wraps
 
 from .core import _truthy
-from .core import get_io_loop
-from .clients import DEFAULT_BACKENDS
 from operator import getitem
 
 from tornado import gen
@@ -28,6 +26,19 @@ def return_null(func):
             return x
         else:
             return NULL_COMPUTE
+
+    return inner
+
+
+def filter_null_wrapper(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        if any(a == NULL_COMPUTE for a in args) or any(
+            v == NULL_COMPUTE for v in kwargs.values()
+        ):
+            return NULL_COMPUTE
+        else:
+            return func(*args, **kwargs)
 
     return inner
 
@@ -67,7 +78,7 @@ class DaskStream(Stream):
 @DaskStream.register_api()
 class map(DaskStream):
     def __init__(self, upstream, func, *args, **kwargs):
-        self.func = func
+        self.func = filter_null_wrapper(func)
         self.kwargs = kwargs
         self.args = args
 
@@ -139,32 +150,9 @@ class gather(core.Stream):
     scatter
     """
 
-    def __init__(self, *args, backend="dask", **kwargs):
-        super().__init__(*args, **kwargs)
-        upstream_backends = set(
-            [getattr(u, "default_client", None) for u in self.upstreams]
-        )
-        if None in upstream_backends:
-            upstream_backends.remove(None)
-        if len(upstream_backends) > 1:
-            raise RuntimeError("Mixing backends is not supported")
-        elif upstream_backends:
-            self.default_client = upstream_backends.pop()
-        else:
-            self.default_client = DEFAULT_BACKENDS.get(backend, backend)
-        if "loop" not in kwargs and getattr(
-            self.default_client(), "loop", None
-        ):
-            loop = self.default_client().loop
-            self._set_loop(loop)
-            if kwargs.get("ensure_io_loop", False) and not self.loop:
-                self._set_asynchronous(False)
-            if self.loop is None and self.asynchronous is not None:
-                self._set_loop(get_io_loop(self.asynchronous))
-
     @gen.coroutine
     def update(self, x, who=None):
-        client = self.default_client()
+        client = default_client()
         result = yield client.gather(x, asynchronous=True)
         if (
             not (
@@ -205,7 +193,7 @@ class filter(DaskStream):
         DaskStream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None):
-        client = self.default_client()
+        client = default_client()
         result = client.submit(self.predicate, x, *self.args, **self.kwargs)
         return self._emit(result)
 
