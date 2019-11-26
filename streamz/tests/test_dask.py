@@ -146,9 +146,9 @@ def test_filter():
 
 
 @pytest.mark.slow
-def test_filter_buffer(backend):
+def test_filter_buffer():
     source = Stream(asynchronous=True)
-    futures = scatter(source, backend=backend).filter(lambda x: x % 2 == 0)
+    futures = scatter(source).filter(lambda x: x % 2 == 0)
     futures_L = futures.sink_to_list()
     L = futures.buffer(10).gather().sink_to_list()
 
@@ -162,10 +162,10 @@ def test_filter_buffer(backend):
 
 
 @pytest.mark.slow
-def test_filter_map(backend):
+def test_filter_map():
     source = Stream(asynchronous=True)
     futures = (
-        scatter(source, backend=backend).filter(lambda x: x % 2 == 0).map(inc)
+        scatter(source).filter(lambda x: x % 2 == 0).map(inc)
     )
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
@@ -178,9 +178,9 @@ def test_filter_map(backend):
 
 
 @pytest.mark.slow
-def test_filter_starmap(backend):
+def test_filter_starmap():
     source = Stream(asynchronous=True)
-    futures1 = scatter(source, backend=backend).filter(lambda x: x[1] % 2 == 0)
+    futures1 = scatter(source).filter(lambda x: x[1] % 2 == 0)
     futures = futures1.starmap(add)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
