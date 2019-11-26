@@ -2,6 +2,8 @@ from __future__ import absolute_import, division, print_function
 from functools import wraps
 
 from .core import _truthy
+from .core import get_io_loop
+from .clients import DEFAULT_BACKENDS
 from operator import getitem
 
 from tornado import gen
@@ -11,6 +13,8 @@ from distributed.client import default_client
 
 from .core import Stream
 from . import core, sources
+
+from collections import Sequence
 
 
 NULL_COMPUTE = "~~NULL_COMPUTE~~"
@@ -134,12 +138,43 @@ class gather(core.Stream):
     buffer
     scatter
     """
+
+    def __init__(self, *args, backend="dask", **kwargs):
+        super().__init__(*args, **kwargs)
+        upstream_backends = set(
+            [getattr(u, "default_client", None) for u in self.upstreams]
+        )
+        if None in upstream_backends:
+            upstream_backends.remove(None)
+        if len(upstream_backends) > 1:
+            raise RuntimeError("Mixing backends is not supported")
+        elif upstream_backends:
+            self.default_client = upstream_backends.pop()
+        else:
+            self.default_client = DEFAULT_BACKENDS.get(backend, backend)
+        if "loop" not in kwargs and getattr(
+            self.default_client(), "loop", None
+        ):
+            loop = self.default_client().loop
+            self._set_loop(loop)
+            if kwargs.get("ensure_io_loop", False) and not self.loop:
+                self._set_asynchronous(False)
+            if self.loop is None and self.asynchronous is not None:
+                self._set_loop(get_io_loop(self.asynchronous))
+
     @gen.coroutine
     def update(self, x, who=None):
-        client = default_client()
+        client = self.default_client()
         result = yield client.gather(x, asynchronous=True)
-        result2 = yield self._emit(result)
-        raise gen.Return(result2)
+        if (
+            not (
+                isinstance(result, Sequence)
+                and any(r == NULL_COMPUTE for r in result)
+            )
+            and result != NULL_COMPUTE
+        ):
+            result2 = yield self._emit(result)
+            raise gen.Return(result2)
 
 
 @DaskStream.register_api()

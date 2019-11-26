@@ -132,9 +132,9 @@ def test_buffer(c, s, a, b):
 
 
 @pytest.mark.slow
-def test_filter(backend):
+def test_filter():
     source = Stream(asynchronous=True)
-    futures = scatter(source, backend=backend).filter(lambda x: x % 2 == 0)
+    futures = scatter(source).filter(lambda x: x % 2 == 0)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
 
