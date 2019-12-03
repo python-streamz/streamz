@@ -4,7 +4,6 @@ channels:
   - defaults
 dependencies:
   - python>=3.7
-  - cython>=0.29,<0.30
   - pytest
   - flake8
   - black
