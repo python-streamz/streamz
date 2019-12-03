@@ -1,0 +1,16 @@
+# Common IDE configuration directories and files that should be ignored
+*.vscode
+*.idea
+
+# Previous build output that should not be included
+build
+directories
+
+# Ignore the Dockerfile itself
+Dockerfile
+
+# Ignore CI related files are we don't need those in the container
+.codecov.yml
+.coveragerc
+.gitignore
+.travis.yml
