@@ -35,6 +35,6 @@ EXPOSE 2181
 EXPOSE 9092
 
 # Install Jupyter-lab so that users can quickly interact with the streamz examples
-RUN pip install jupyterlab
+RUN pip install jupyterlab numpy pandas
 
 CMD ["/streamz/docker/scripts/entry.sh"]

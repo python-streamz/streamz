@@ -2,5 +2,3 @@ tornado
 toolz
 zict
 six
-numpy
-pandas
