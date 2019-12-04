@@ -1,6 +1,7 @@
 name: streamz_dev
 channels:
   - conda-forge
+  - bokeh
   - defaults
 dependencies:
   - python>=3.7
@@ -20,3 +21,12 @@ dependencies:
   - numpydoc
   - sphinx
   - sphinx_rtd_theme
+  - codecov
+  - coverage
+  - networkx
+  - graphviz
+  - python-graphviz
+  - bokeh
+  - ipython
+  - ipykernel
+  - ipywidgets
