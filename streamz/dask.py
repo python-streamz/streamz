@@ -33,8 +33,8 @@ def return_null(func):
 def filter_null_wrapper(func):
     @wraps(func)
     def inner(*args, **kwargs):
-        if any(a == NULL_COMPUTE for a in args) or any(
-            v == NULL_COMPUTE for v in kwargs.values()
+        if any(a is NULL_COMPUTE for a in args) or any(
+            v is NULL_COMPUTE for v in kwargs.values()
         ):
             return NULL_COMPUTE
         else:
@@ -157,9 +157,9 @@ class gather(core.Stream):
         if (
             not (
                 isinstance(result, Sequence)
-                and any(r == NULL_COMPUTE for r in result)
+                and any(r is NULL_COMPUTE for r in result)
             )
-            and result != NULL_COMPUTE
+            and result is not NULL_COMPUTE
         ):
             result2 = yield self._emit(result)
             raise gen.Return(result2)
