@@ -1,0 +1,32 @@
+name: streamz_dev
+channels:
+  - conda-forge
+  - bokeh
+  - defaults
+dependencies:
+  - python>=3.7
+  - pytest
+  - flake8
+  - black
+  - isort
+  - tornado
+  - toolz
+  - zict
+  - six
+  - librdkafka=1.2.2
+  - dask
+  - distributed
+  - pandas
+  - python-confluent-kafka=1.1.0
+  - numpydoc
+  - sphinx
+  - sphinx_rtd_theme
+  - codecov
+  - coverage
+  - networkx
+  - graphviz
+  - python-graphviz
+  - bokeh
+  - ipython
+  - ipykernel
+  - ipywidgets
