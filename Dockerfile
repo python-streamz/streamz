@@ -21,9 +21,19 @@ SHELL ["/bin/bash", "-c"]
 # Add Streamz source code to the build context
 ADD . /streamz/.
 
+# Create the conda environment
+RUN conda env create --name streamz-dev -f /streamz/conda/environments/streamz_dev.yml
+
 # Build streamz from source
-RUN cd /streamz && \
+RUN source activate streamz-dev && \
+    cd /streamz && \
     python setup.py install
+
+# Install optional dependencies in the conda environment
+RUN source activate streamz-dev && \
+    conda install -c conda-forge jupyterlab \
+                                 numpy \
+                                 pandas
 
 # Install Kafka
 RUN wget -q http://www.gtlib.gatech.edu/pub/apache/kafka/2.3.0/kafka_2.11-2.3.0.tgz -O /tmp/kafka_"$SCALA_VERSION"-"$KAFKA_VERSION".tgz && \
@@ -33,8 +43,5 @@ RUN wget -q http://www.gtlib.gatech.edu/pub/apache/kafka/2.3.0/kafka_2.11-2.3.0.
 # Zookeeper & Kafa ports
 EXPOSE 2181
 EXPOSE 9092
-
-# Install Jupyter-lab so that users can quickly interact with the streamz examples
-RUN pip install jupyterlab numpy pandas
 
 CMD ["/streamz/docker/scripts/entry.sh"]
