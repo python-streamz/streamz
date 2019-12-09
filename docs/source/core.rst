@@ -156,7 +156,8 @@ Branching and Joining
    zip_latest
 
 You can branch multiple streams off of a single stream.  Elements that go into
-the input will pass through to both output streams.
+the input will pass through to both output streams.  Note: ``graphviz`` and
+``networkx`` need to be installed to visualize the stream graph.
 
 .. code-block:: python
 
