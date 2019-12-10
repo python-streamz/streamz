@@ -450,7 +450,7 @@ class Stream(object):
     def visualize(self, filename='mystream.png', **kwargs):
         """Render the computation of this object's task graph using graphviz.
 
-        Requires ``graphviz`` to be installed.
+        Requires ``graphviz`` and ``networkx`` to be installed.
 
         Parameters
         ----------
