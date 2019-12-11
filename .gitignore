@@ -12,3 +12,4 @@ log
 *.swo
 .cache/
 .ipynb_checkpoints/
+.vscode
