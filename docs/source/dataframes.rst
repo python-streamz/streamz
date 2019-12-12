@@ -103,8 +103,8 @@ following:
 
        def on_old(self, state, old):
            total, count = state
-           total = total - new.sum()   # switch + for - here
-           count = count - new.count() # switch + for - here
+           total = total - old.sum()   # switch + for - here
+           count = count - old.count() # switch + for - here
            new_state = (total, count)
            new_value = total / count
            return new_state, new_value
