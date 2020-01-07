@@ -67,7 +67,7 @@ class from_textfile(Source):
     Examples
     --------
     >>> source = Stream.from_textfile('myfile.json')  # doctest: +SKIP
-    >>> js.map(json.loads).pluck('value').sum().sink(print)  # doctest: +SKIP
+    >>> source.map(json.loads).pluck('value').sum().sink(print)  # doctest: +SKIP
     >>> source.start()  # doctest: +SKIP
 
     Returns
