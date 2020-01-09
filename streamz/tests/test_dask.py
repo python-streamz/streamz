@@ -132,6 +132,67 @@ def test_buffer(c, s, a, b):
 
 
 @pytest.mark.slow
+def test_filter():
+    source = Stream(asynchronous=True)
+    futures = scatter(source).filter(lambda x: x % 2 == 0)
+    futures_L = futures.sink_to_list()
+    L = futures.gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit(i)
+
+    assert L == [0, 2, 4]
+    assert all(isinstance(f, Future) for f in futures_L)
+
+
+@pytest.mark.slow
+def test_filter_buffer():
+    source = Stream(asynchronous=True)
+    futures = scatter(source).filter(lambda x: x % 2 == 0)
+    futures_L = futures.sink_to_list()
+    L = futures.buffer(10).gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit(i)
+    while len(L) < 3:
+        yield gen.sleep(.01)
+
+    assert L == [0, 2, 4]
+    assert all(isinstance(f, Future) for f in futures_L)
+
+
+@pytest.mark.slow
+def test_filter_map():
+    source = Stream(asynchronous=True)
+    futures = (
+        scatter(source).filter(lambda x: x % 2 == 0).map(inc)
+    )
+    futures_L = futures.sink_to_list()
+    L = futures.gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit(i)
+
+    assert L == [1, 3, 5]
+    assert all(isinstance(f, Future) for f in futures_L)
+
+
+@pytest.mark.slow
+def test_filter_starmap():
+    source = Stream(asynchronous=True)
+    futures1 = scatter(source).filter(lambda x: x[1] % 2 == 0)
+    futures = futures1.starmap(add)
+    futures_L = futures.sink_to_list()
+    L = futures.gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit((i, i))
+
+    assert L == [0, 4, 8]
+    assert all(isinstance(f, Future) for f in futures_L)
+
+
+@pytest.mark.slow
 def test_buffer_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # noqa: F841

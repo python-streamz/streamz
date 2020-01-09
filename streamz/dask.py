@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
+from functools import wraps
 
+from .core import _truthy
 from operator import getitem
 
 from tornado import gen
@@ -9,6 +11,36 @@ from distributed.client import default_client
 
 from .core import Stream
 from . import core, sources
+
+from collections import Sequence
+
+
+NULL_COMPUTE = "~~NULL_COMPUTE~~"
+
+
+def return_null(func):
+    @wraps(func)
+    def inner(x, *args, **kwargs):
+        tv = func(x, *args, **kwargs)
+        if tv:
+            return x
+        else:
+            return NULL_COMPUTE
+
+    return inner
+
+
+def filter_null_wrapper(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        if any(a is NULL_COMPUTE for a in args) or any(
+            v is NULL_COMPUTE for v in kwargs.values()
+        ):
+            return NULL_COMPUTE
+        else:
+            return func(*args, **kwargs)
+
+    return inner
 
 
 class DaskStream(Stream):
@@ -46,7 +78,7 @@ class DaskStream(Stream):
 @DaskStream.register_api()
 class map(DaskStream):
     def __init__(self, upstream, func, *args, **kwargs):
-        self.func = func
+        self.func = filter_null_wrapper(func)
         self.kwargs = kwargs
         self.args = args
 
@@ -117,12 +149,20 @@ class gather(core.Stream):
     buffer
     scatter
     """
+
     @gen.coroutine
     def update(self, x, who=None):
         client = default_client()
         result = yield client.gather(x, asynchronous=True)
-        result2 = yield self._emit(result)
-        raise gen.Return(result2)
+        if (
+            not (
+                isinstance(result, Sequence)
+                and any(r is NULL_COMPUTE for r in result)
+            )
+            and result is not NULL_COMPUTE
+        ):
+            result2 = yield self._emit(result)
+            raise gen.Return(result2)
 
 
 @DaskStream.register_api()
@@ -137,6 +177,24 @@ class starmap(DaskStream):
     def update(self, x, who=None):
         client = default_client()
         result = client.submit(apply, self.func, x, self.kwargs)
+        return self._emit(result)
+
+
+@DaskStream.register_api()
+class filter(DaskStream):
+    def __init__(self, upstream, predicate, *args, **kwargs):
+        if predicate is None:
+            predicate = _truthy
+        self.predicate = return_null(predicate)
+        stream_name = kwargs.pop("stream_name", None)
+        self.kwargs = kwargs
+        self.args = args
+
+        DaskStream.__init__(self, upstream, stream_name=stream_name)
+
+    def update(self, x, who=None):
+        client = default_client()
+        result = client.submit(self.predicate, x, *self.args, **self.kwargs)
         return self._emit(result)
 
 
