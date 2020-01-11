@@ -275,7 +275,7 @@ def test_kafka_dask_batch_checkpointing(c, s, w1, w2):
         out1 = stream1.gather().sink_to_list()
         stream1.start()
         yield await_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10,
-                 period=0.2)
+                        period=0.2)
         stream1.upstream.stopped = True
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
                                             dask=True)
@@ -289,5 +289,5 @@ def test_kafka_dask_batch_checkpointing(c, s, w1, w2):
         out3 = stream3.gather().sink_to_list()
         stream3.start()
         yield await_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10,
-                 period=0.2)
+                        period=0.2)
         stream3.upstream.stopped = True
