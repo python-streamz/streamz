@@ -78,7 +78,21 @@ def test_filter():
     L = source.filter(lambda x: x % 2 == 0).sink_to_list()
 
     for i in range(10):
-        source.emit(i)
+        f = gen.Future()
+        source.emit(i, f)
+        assert f.done()
+
+    assert L == [0, 2, 4, 6, 8]
+
+
+def test_filter_futures():
+    source = Stream()
+    L = source.filter(lambda x: x % 2 == 0).sink_to_list()
+
+    for i in range(10):
+        f = gen.Future()
+        source.emit(i, f)
+        assert f.done()
 
     assert L == [0, 2, 4, 6, 8]
 
@@ -125,6 +139,24 @@ def test_map():
     assert L[0] == 11
 
 
+def test_map_futures():
+    class foo(Stream):
+        def __init__(self):
+            self.futures = None
+            Stream.__init__(self)
+
+        def update(self, x, futures=None, who=None):
+            self.futures = futures
+
+    downstream = foo()
+    source = Stream()
+    source.map(len).connect(downstream)
+    fut = gen.Future()
+    source.emit('test', fut)
+
+    assert downstream.futures[0] == fut
+
+
 def test_map_args():
     source = Stream()
     L = source.map(operator.add, 10).sink_to_list()
@@ -144,6 +176,24 @@ def test_starmap():
     assert L[0] == 11
 
 
+def test_starmap_futures():
+    class foo(Stream):
+        def __init__(self):
+            self.futures = None
+            Stream.__init__(self)
+
+        def update(self, x, futures=None, who=None):
+            self.futures = futures
+
+    downstream = foo()
+    source = Stream()
+    source.starmap(len).connect(downstream)
+    fut = gen.Future()
+    source.emit(('test',), fut)
+
+    assert downstream.futures[0] == fut
+
+
 def test_remove():
     source = Stream()
     L = source.remove(lambda x: x % 2 == 0).sink_to_list()
@@ -155,21 +205,43 @@ def test_remove():
 
 
 def test_partition():
+    class foo(Stream):
+        def __init__(self):
+            Stream.__init__(self)
+
+        def update(self, x, futures=None, who=None):
+            assert not futures[0].done()
+            self._emit(x, futures)
+
+    size = 2
     source = Stream()
-    L = source.partition(2).sink_to_list()
+    downstream = foo()
+    partition = source.partition(size)
+    partition.connect(downstream)
+    L = downstream.sink_to_list()
 
     for i in range(10):
-        source.emit(i)
+        fut = gen.Future()
+        source.emit(i, fut)
+        if (i + 1) % size > 0:
+            assert fut.result() == 'drop'
+        else:
+            assert fut.done()
+            assert fut.result() is None
 
     assert L == [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]
 
 
 def test_sliding_window():
+    size = 2
     source = Stream()
-    L = source.sliding_window(2).sink_to_list()
+    L = source.sliding_window(size).sink_to_list()
 
     for i in range(10):
-        source.emit(i)
+        f = gen.Future()
+        source.emit(i, f)
+        assert f.done()
+        assert f.result() is None
 
     assert L == [(0, ), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
                  (5, 6), (6, 7), (7, 8), (8, 9)]
@@ -177,7 +249,10 @@ def test_sliding_window():
     L = source.sliding_window(2, return_partial=False).sink_to_list()
 
     for i in range(10):
-        source.emit(i)
+        f = gen.Future()
+        source.emit(i, f)
+        assert f.done()
+        assert f.result() is None
 
     assert L == [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5),
                  (5, 6), (6, 7), (7, 8), (8, 9)]
@@ -209,14 +284,14 @@ def test_backpressure():
 @gen_test()
 def test_timed_window():
     source = Stream(asynchronous=True)
-    a = source.timed_window(0.01)
+    a = source.timed_window(0.1)
 
     assert a.loop is IOLoop.current()
     L = a.sink_to_list()
 
     for i in range(10):
         yield source.emit(i)
-        yield gen.sleep(0.004)
+        yield gen.sleep(0.04)
 
     yield gen.sleep(a.interval)
     assert L
@@ -306,7 +381,9 @@ def test_rate_limit():
 
     start = time()
     for i in range(5):
-        yield source.emit(i)
+        f = gen.Future()
+        yield source.emit(i, f)
+        assert f.done()
     stop = time()
     assert stop - start > 0.2
     assert len(L) == 5
@@ -317,18 +394,24 @@ def test_delay():
     source = Stream(asynchronous=True)
     L = source.delay(0.02).sink_to_list()
 
+    futures = []
     for i in range(5):
-        yield source.emit(i)
+        f = gen.Future()
+        futures.append(f)
+        yield source.emit(i, f)
 
     assert not L
 
     yield gen.sleep(0.04)
 
     assert len(L) < 5
+    assert futures[0].done()
+    assert not all(f.done() for f in futures)
 
     yield gen.sleep(0.1)
 
     assert len(L) == 5
+    assert all(f.done() for f in futures)
 
 
 @gen_test()
@@ -338,7 +421,9 @@ def test_buffer():
 
     start = time()
     for i in range(10):
-        yield source.emit(i)
+        f = gen.Future()
+        yield source.emit(i, f)
+        assert not f.done()
     stop = time()
 
     assert stop - start < 0.01
@@ -346,7 +431,9 @@ def test_buffer():
 
     start = time()
     for i in range(5):
-        yield source.emit(i)
+        f = gen.Future()
+        yield source.emit(i, f)
+        assert not f.done()
     stop = time()
 
     assert L
@@ -360,12 +447,20 @@ def test_zip():
 
     L = c.sink_to_list()
 
-    a.emit(1)
-    b.emit('a')
-    a.emit(2)
-    b.emit('b')
+    f1 = gen.Future()
+    f2 = gen.Future()
+    f3 = gen.Future()
+    f4 = gen.Future()
+    a.emit(1, f1)
+    b.emit('a', f2)
+    a.emit(2, f3)
+    b.emit('b', f4)
 
     assert L == [(1, 'a'), (2, 'b')]
+    assert f1.done()
+    assert f2.done()
+    assert f3.done()
+    assert f4.done()
     d = Stream()
     # test zip from the object itself
     # zip 3 streams together
@@ -415,14 +510,23 @@ def test_combine_latest():
     L = c.sink_to_list()
     L2 = d.sink_to_list()
 
-    a.emit(1)
-    a.emit(2)
-    b.emit('a')
+    f1 = gen.Future()
+    f2 = gen.Future()
+    f3 = gen.Future()
+    a.emit(1, f1)
+    a.emit(2, f2)
+    b.emit('a', f3)
     a.emit(3)
     b.emit('b')
 
     assert L == [(2, 'a'), (3, 'a'), (3, 'b')]
     assert L2 == [(2, 'a'), (3, 'a'), (3, 'b')]
+    assert f1.done()
+    assert f1.result() == 'drop'
+    assert f2.done()
+    assert f2.result() == 'drop'
+    assert f3.done()
+    assert f3.result() is None
 
 
 def test_combine_latest_emit_on():
@@ -495,22 +599,31 @@ def test_flatten():
     source = Stream()
     L = source.flatten().sink_to_list()
 
-    source.emit([1, 2, 3])
+    f = gen.Future()
+    source.emit([1, 2, 3], f)
     source.emit([4, 5])
     source.emit([6, 7, 8])
 
     assert L == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert f.done()
 
 
 def test_unique():
     source = Stream()
     L = source.unique().sink_to_list()
 
-    source.emit(1)
+    f_keep = gen.Future()
+    source.emit(1, f_keep)
     source.emit(2)
-    source.emit(1)
+
+    f_drop = gen.Future()
+    source.emit(1, f_drop)
 
     assert L == [1, 2]
+    assert f_keep.done()
+    assert f_keep.result() is None
+    assert f_drop.done()
+    assert f_drop.result() == 'drop'
 
 
 def test_unique_key():
@@ -600,14 +713,25 @@ def test_union():
 
     L = a.union(b, c).sink_to_list()
 
-    a.emit(1)
+    f = gen.Future()
+    a.emit(1, f)
     assert L == [1]
-    b.emit(2)
+    assert f.done()
+
+    f = gen.Future()
+    b.emit(2, f)
     assert L == [1, 2]
-    a.emit(3)
+    assert f.done()
+
+    f = gen.Future()
+    a.emit(3, f)
     assert L == [1, 2, 3]
-    c.emit(4)
+    assert f.done()
+
+    f = gen.Future()
+    c.emit(4, f)
     assert L == [1, 2, 3, 4]
+    assert f.done()
 
 
 def test_pluck():
@@ -625,10 +749,16 @@ def test_pluck_list():
     a = Stream()
     L = a.pluck([0, 2]).sink_to_list()
 
-    a.emit([1, 2, 3])
+    f = gen.Future()
+    a.emit([1, 2, 3], f)
     assert L == [(1, 3)]
-    a.emit([4, 5, 6, 7, 8, 9])
+    assert f.done()
+
+    f = gen.Future()
+    a.emit([4, 5, 6, 7, 8, 9], f)
     assert L == [(1, 3), (4, 6)]
+    assert f.done()
+
     with pytest.raises(IndexError):
         a.emit([1])
 
@@ -640,12 +770,18 @@ def test_collect():
     L = collector.sink_to_list()
     source2.sink(collector.flush)
 
-    source1.emit(1)
-    source1.emit(2)
+    f1 = gen.Future()
+    f2 = gen.Future()
+    source1.emit(1, f1)
+    source1.emit(2, f2)
     assert L == []
 
     source2.emit('anything')  # flushes collector
     assert L == [(1, 2)]
+    assert f1.done()
+    assert f1.result() == 'drop'
+    assert f2.done()
+    assert f2.result() is None
 
     source2.emit('anything')
     assert L == [(1, 2), ()]
@@ -701,14 +837,20 @@ def test_zip_latest():
     L = c.sink_to_list()
     L2 = d.sink_to_list()
 
-    a.emit(1)
-    a.emit(2)
+    f1 = gen.Future()
+    f2 = gen.Future()
+    f3 = gen.Future()
+    a.emit(1, f1)
+    a.emit(2, f2)
     b.emit('a')
     b.emit('b')
-    a.emit(3)
+    a.emit(3, f3)
 
     assert L == [(1, 'a'), (2, 'a'), (3, 'b')]
     assert L2 == [(3, 'b')]
+    assert f1.done()
+    assert f2.done()
+    assert f3.done()
 
 
 def test_zip_latest_reverse():
@@ -941,9 +1083,11 @@ def test_latest():
 
     s = source.map(inc).latest().map(slow_write)  # noqa: F841
 
-    source.emit(1)
-    yield gen.sleep(0.010)
-    source.emit(2)
+    f_pass = gen.Future()
+    f_drop = gen.Future()
+    source.emit(1, f_pass)
+    yield gen.sleep(0.020)
+    source.emit(2, f_drop)
     source.emit(3)
 
     start = time()
@@ -954,6 +1098,10 @@ def test_latest():
 
     yield gen.sleep(0.060)
     assert L == [2, 4]
+    assert f_pass.done()
+    assert f_drop.done()
+    assert f_pass.result() is None
+    assert f_drop.result() == 'drop'
 
 
 def test_destroy():
@@ -1177,7 +1325,6 @@ def test_share_common_ioloop(clean):  # noqa: F811
     [[None, 4, None], [0, 1, 2, 3]],
     [[None, 4, 2], [0, 2]],
     [[3, 1, None], []]
-
 ])
 def test_slice(data):
     pars, expected = data
@@ -1185,7 +1332,9 @@ def test_slice(data):
     b = a.slice(*pars)
     out = b.sink_to_list()
     for i in range(6):
-        a.emit(i)
+        f = gen.Future()
+        a.emit(i, f)
+        assert f.done()
     assert out == expected
 
 

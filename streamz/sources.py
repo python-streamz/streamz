@@ -1,9 +1,11 @@
+import logging
 from glob import glob
 import os
 
 import time
 import tornado.ioloop
 from tornado import gen
+from tornado.queues import Queue
 
 from .core import Stream, convert_interval
 
@@ -453,19 +455,53 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, **kwargs):
+                 npartitions=1, max_batch_size=10000, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.max_batch_size = max_batch_size
         self.stopped = True
+        self.consumer = None
+        self.logger = logging.getLogger(__name__)
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
 
     @gen.coroutine
     def poll_kafka(self):
         import confluent_kafka as ck
+
+        tps = []
+        for partition in range(self.npartitions):
+            tps.append(ck.TopicPartition(self.topic, partition))
+
+        while True:
+            try:
+                committed = self.consumer.committed(tps, timeout=1)
+            except ck.KafkaException as e:
+                self.logger.exception(e)
+            else:
+                for tp in committed:
+                    self.positions[tp.partition] = tp.offset
+                break
+
+        queue = Queue(maxsize=200)
+
+        @gen.coroutine
+        def _(p):
+            future = gen.Future()
+            yield self.emit(p, [future], asynchronous=True)
+            result = yield future
+
+            if result == 'drop':
+                pass
+            else:
+                topic, partition_no, _, offset = p[1:]
+                tp = ck.TopicPartition(topic, partition_no, offset + 1)
+                self.consumer.commit(offsets=[tp], asynchronous=False)
+
+            queue.get_nowait()
 
         try:
             while not self.stopped:
@@ -479,14 +515,16 @@ class FromKafkaBatched(Stream):
                         continue
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
+                    if high > lowest + self.max_batch_size:
+                        high = lowest + self.max_batch_size
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
                                     lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
-                    yield self._emit(part)
-
+                    yield queue.put(None)
+                    self.loop.add_callback(_, part)
                 else:
                     yield gen.sleep(self.poll_interval)
         finally:
@@ -507,7 +545,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, **kwargs):
+                       npartitions=1, start=False, dask=False,
+                       max_batch_size=10000, **kwargs):
     """ Get messages from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -535,6 +574,10 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    dask: book (False)
+        Use dask workers to consume from Kafka
+    max_batch_size: int
+        The maximum amount of records per batch
 
     Examples
     --------
@@ -549,7 +592,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, **kwargs)
+                              npartitions=npartitions,
+                              max_batch_size=max_batch_size,
+                              **kwargs)
     if dask:
         source = source.scatter()
 

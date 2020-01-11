@@ -319,21 +319,29 @@ class Stream(object):
 
         return output._ipython_display_(**kwargs)
 
-    def _emit(self, x):
+    def _emit(self, x, futures=None):
+        if futures and not isinstance(futures, list):
+            futures = [futures]
+
         result = []
         for downstream in list(self.downstreams):
-            r = downstream.update(x, who=self)
+            r = downstream.update(x, futures=futures, who=self)
             if type(r) is list:
                 result.extend(r)
             else:
                 result.append(r)
 
+        if len(self.downstreams) == 0 and futures:
+            for future in futures:
+                if not future.done():
+                    future.set_result(None)
+
         return [element for element in result if element is not None]
 
-    def emit(self, x, asynchronous=False):
+    def emit(self, x, futures=None, asynchronous=False):
         """ Push data into the stream at this point
 
-        This is typically done only at source Streams but can theortically be
+        This is typically done only at source Streams but can theoretically be
         done at any point
         """
         ts_async = getattr(thread_state, 'asynchronous', False)
@@ -341,7 +349,7 @@ class Stream(object):
             if not ts_async:
                 thread_state.asynchronous = True
             try:
-                result = self._emit(x)
+                result = self._emit(x, futures)
                 if self.loop:
                     return gen.convert_yielded(result)
             finally:
@@ -358,8 +366,8 @@ class Stream(object):
                 raise gen.Return(result)
             sync(self.loop, _)
 
-    def update(self, x, who=None):
-        self._emit(x)
+    def update(self, x, futures=None, who=None):
+        self._emit(x, futures)
 
     def gather(self):
         """ This is a no-op for core streamz
@@ -369,24 +377,24 @@ class Stream(object):
         return self
 
     def connect(self, downstream):
-        ''' Connect this stream to a downstream element.
+        """ Connect this stream to a downstream element.
 
         Parameters
         ----------
         downstream: Stream
             The downstream stream to connect to
-        '''
+        """
         self._add_downstream(downstream)
         downstream._add_upstream(self)
 
     def disconnect(self, downstream):
-        ''' Disconnect this stream to a downstream element.
+        """ Disconnect this stream to a downstream element.
 
         Parameters
         ----------
         downstream: Stream
             The downstream stream to disconnect from
-        '''
+        """
         self._remove_downstream(downstream)
 
         downstream._remove_upstream(self)
@@ -532,8 +540,12 @@ class sink(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
         _global_sinks.add(self)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         result = self.func(x, *self.args, **self.kwargs)
+        if futures:
+            for future in futures:
+                if not future.done():
+                    future.set_result(None)
         if gen.isawaitable(result):
             return result
         else:
@@ -573,14 +585,14 @@ class map(Stream):
 
         Stream.__init__(self, upstream, stream_name=stream_name)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         try:
             result = self.func(x, *self.args, **self.kwargs)
         except Exception as e:
             logger.exception(e)
             raise
         else:
-            return self._emit(result)
+            return self._emit(result, futures)
 
 
 @Stream.register_api()
@@ -618,7 +630,7 @@ class starmap(Stream):
 
         Stream.__init__(self, upstream, stream_name=stream_name)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         y = x + self.args
         try:
             result = self.func(*y, **self.kwargs)
@@ -626,7 +638,7 @@ class starmap(Stream):
             logger.exception(e)
             raise
         else:
-            return self._emit(result)
+            return self._emit(result, futures)
 
 
 def _truthy(x):
@@ -668,9 +680,12 @@ class filter(Stream):
 
         Stream.__init__(self, upstream, stream_name=stream_name)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         if self.predicate(x, *self.args, **self.kwargs):
-            return self._emit(x)
+            return self._emit(x, futures)
+        if futures:
+            for future in futures:
+                future.set_result(None)
 
 
 @Stream.register_api()
@@ -749,10 +764,10 @@ class accumulate(Stream):
         stream_name = kwargs.pop('stream_name', None)
         Stream.__init__(self, upstream, stream_name=stream_name)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         if self.state is no_default:
             self.state = x
-            return self._emit(x)
+            return self._emit(x, futures)
         else:
             try:
                 result = self.func(self.state, x, **self.kwargs)
@@ -764,7 +779,7 @@ class accumulate(Stream):
             else:
                 state = result
             self.state = state
-            return self._emit(result)
+            return self._emit(result, futures)
 
 
 @Stream.register_api()
@@ -803,9 +818,12 @@ class slice(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
         self._check_end()
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         if self.state >= self.star and self.state % self.step == 0:
-            self.emit(x)
+            self.emit(x, futures)
+        else:
+            for future in futures:
+                future.set_result(None)
         self.state += 1
         self._check_end()
 
@@ -837,12 +855,14 @@ class partition(Stream):
         self.buffer = []
         Stream.__init__(self, upstream, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         self.buffer.append(x)
         if len(self.buffer) == self.n:
             result, self.buffer = self.buffer, []
-            return self._emit(tuple(result))
+            return self._emit(tuple(result), futures)
         else:
+            for future in futures:
+                future.set_result('drop')
             return []
 
 
@@ -878,11 +898,14 @@ class sliding_window(Stream):
         self.partial = return_partial
         Stream.__init__(self, upstream, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         self.buffer.append(x)
         if self.partial or len(self.buffer) == self.n:
-            return self._emit(tuple(self.buffer))
+            return self._emit(tuple(self.buffer), futures)
         else:
+            for future in futures:
+                if not future.done():
+                    future.set_result('drop')
             return []
 
 
@@ -907,13 +930,15 @@ class timed_window(Stream):
         self.interval = convert_interval(interval)
         self.buffer = []
         self.last = gen.moment
+        self.last_futures = []
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         self.buffer.append(x)
+        # self.last_futures = futures
         return self.last
 
     @gen.coroutine
@@ -943,13 +968,13 @@ class delay(Stream):
         while True:
             last = time()
             x = yield self.queue.get()
-            yield self._emit(x)
+            yield self._emit(*x)
             duration = self.interval - (time() - last)
             if duration > 0:
                 yield gen.sleep(duration)
 
-    def update(self, x, who=None):
-        return self.queue.put(x)
+    def update(self, x, futures=None, who=None):
+        return self.queue.put((x, futures))
 
 
 @Stream.register_api()
@@ -973,13 +998,13 @@ class rate_limit(Stream):
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
     @gen.coroutine
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         now = time()
         old_next = self.next
         self.next = max(now, self.next) + self.interval
         if now < old_next:
             yield gen.sleep(old_next - now)
-        yield self._emit(x)
+        yield self._emit(x, futures)
 
 
 @Stream.register_api()
@@ -999,21 +1024,21 @@ class buffer(Stream):
 
         self.loop.add_callback(self.cb)
 
-    def update(self, x, who=None):
-        return self.queue.put(x)
+    def update(self, x, futures=None, who=None):
+        return self.queue.put((x, futures))
 
     @gen.coroutine
     def cb(self):
         while True:
             x = yield self.queue.get()
-            yield self._emit(x)
+            yield self._emit(*x)
 
 
 @Stream.register_api()
 class zip(Stream):
     """ Combine streams together into a stream of tuples
 
-    We emit a new tuple once all streams have produce a new tuple.
+    We emit a new tuple once all streams have produced a new tuple.
 
     See also
     --------
@@ -1061,17 +1086,24 @@ class zip(Stream):
 
         return tuple(out)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         L = self.buffers[who]  # get buffer for stream
-        L.append(x)
+        L.append((x, futures))
         if len(L) == 1 and all(self.buffers.values()):
-            tup = tuple(self.buffers[up][0] for up in self.upstreams)
+            all_futures = []
+            values = []
+            for up in self.upstreams:
+                x, f = self.buffers[up][0]
+                values.append(x)
+                if f:
+                    all_futures.extend(f)
+            tup = tuple(values)
             for buf in self.buffers.values():
                 buf.popleft()
             self.condition.notify_all()
             if self.literals:
                 tup = self.pack_literals(tup)
-            return self._emit(tup)
+            return self._emit(tup, all_futures)
         elif len(L) > self.maxsize:
             return self.condition.wait()
 
@@ -1136,14 +1168,19 @@ class combine_latest(Stream):
         if self._initial_emit_on is None:
             self.emit_on = self.upstreams
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         if self.missing and who in self.missing:
             self.missing.remove(who)
 
         self.last[self.upstreams.index(who)] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
-            return self._emit(tup)
+            return self._emit(tup, futures)
+        else:
+            if futures:
+                for future in futures:
+                    if not future.done():
+                        future.set_result('drop')
 
 
 @Stream.register_api()
@@ -1168,14 +1205,19 @@ class flatten(Stream):
     --------
     partition
     """
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         L = []
-        for item in x:
+        for item in x[:-1]:
             y = self._emit(item)
             if type(y) is list:
                 L.extend(y)
             else:
                 L.append(y)
+        y = self._emit(x[-1], futures)
+        if type(y) is list:
+            L.extend(y)
+        else:
+            L.append(y)
         return L
 
 
@@ -1227,7 +1269,7 @@ class unique(Stream):
 
         Stream.__init__(self, upstream, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         y = self.key(x)
         emit = True
         if isinstance(self.seen, list):
@@ -1238,11 +1280,14 @@ class unique(Stream):
             if self.maxsize:
                 del self.seen[self.maxsize:]
             if emit:
-                return self._emit(x)
+                return self._emit(x, futures)
         else:
             if self.seen.get(y, '~~not_seen~~') == '~~not_seen~~':
                 self.seen[y] = 1
-                return self._emit(x)
+                return self._emit(x, futures)
+        if futures:
+            for future in futures:
+                future.set_result('drop')
 
 
 @Stream.register_api()
@@ -1261,8 +1306,8 @@ class union(Stream):
     def __init__(self, *upstreams, **kwargs):
         super(union, self).__init__(upstreams=upstreams, **kwargs)
 
-    def update(self, x, who=None):
-        return self._emit(x)
+    def update(self, x, futures=None, who=None):
+        return self._emit(x, futures)
 
 
 @Stream.register_api()
@@ -1296,11 +1341,11 @@ class pluck(Stream):
         self.pick = pick
         super(pluck, self).__init__(upstream, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         if isinstance(self.pick, list):
-            return self._emit(tuple([x[ind] for ind in self.pick]))
+            return self._emit(tuple([x[ind] for ind in self.pick]), futures)
         else:
-            return self._emit(x[self.pick])
+            return self._emit(x[self.pick], futures)
 
 
 @Stream.register_api()
@@ -1325,15 +1370,21 @@ class collect(Stream):
         if cache is None:
             cache = deque()
         self.cache = cache
+        self.last_futures = []
 
         Stream.__init__(self, upstream, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         self.cache.append(x)
+        for future in self.last_futures:
+            if not future.done():
+                future.set_result('drop')
+        if futures:
+            self.last_futures = futures
 
     def flush(self, _=None):
         out = tuple(self.cache)
-        self._emit(out)
+        self._emit(out, self.last_futures)
         self.cache.clear()
 
 
@@ -1342,7 +1393,7 @@ class zip_latest(Stream):
     """Combine multiple streams together to a stream of tuples
 
     The stream which this is called from is lossless. All elements from
-    the lossless stream are emitted reguardless of when they came in.
+    the lossless stream are emitted regardless of when they came in.
     This will emit a new tuple consisting of an element from the lossless
     stream paired with the latest elements from the other streams.
     Elements are only emitted when an element on the lossless stream are
@@ -1355,26 +1406,32 @@ class zip_latest(Stream):
     """
     def __init__(self, lossless, *upstreams, **kwargs):
         upstreams = (lossless,) + upstreams
-        self.last = [None for _ in upstreams]
+        self.last = [None] * len(upstreams)
+        self.last_futures = [None] * len(upstreams)
         self.missing = set(upstreams)
         self.lossless = lossless
         self.lossless_buffer = deque()
         Stream.__init__(self, upstreams=upstreams, **kwargs)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         idx = self.upstreams.index(who)
         if who is self.lossless:
-            self.lossless_buffer.append(x)
+            self.lossless_buffer.append((x, futures))
 
         self.last[idx] = x
+        self.last_futures[idx] = futures
         if self.missing and who in self.missing:
             self.missing.remove(who)
 
         if not self.missing:
             L = []
             while self.lossless_buffer:
-                self.last[0] = self.lossless_buffer.popleft()
-                L.append(self._emit(tuple(self.last)))
+                self.last[0], _ = self.lossless_buffer.popleft()
+                flat_futures = []
+                for f_list in self.last_futures:
+                    if f_list:
+                        flat_futures.extend(f_list)
+                L.append(self._emit(tuple(self.last), flat_futures))
             return L
 
 
@@ -1397,13 +1454,19 @@ class latest(Stream):
     def __init__(self, upstream, **kwargs):
         self.condition = Condition()
         self.next = []
+        self.futures = []
 
         Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
         self.loop.add_callback(self.cb)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         self.next = [x]
+        if self.futures:
+            for f in self.futures:
+                if not f.done():
+                    f.set_result('drop')
+        self.futures = futures
         self.loop.add_callback(self.condition.notify)
 
     @gen.coroutine
@@ -1411,7 +1474,7 @@ class latest(Stream):
         while True:
             yield self.condition.wait()
             [x] = self.next
-            yield self._emit(x)
+            yield self._emit(x, self.futures)
 
 
 @Stream.register_api()
