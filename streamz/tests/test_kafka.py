@@ -6,6 +6,7 @@ import random
 import requests
 import shlex
 import subprocess
+import time
 from tornado import gen
 
 from ..core import Stream
@@ -219,3 +220,67 @@ def test_kafka_dask_batch(c, s, w1, w2):
         yield await_for(lambda: any(out), 10, period=0.2)
         assert b'value-1' in out[0]
         stream.upstream.stopped = True
+
+
+def test_kafka_batch_checkpointing():
+    j1 = random.randint(0, 10000)
+    ARGS1 = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j1}
+    j2 = j1 + 1
+    ARGS2 = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j2}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        for i in range(10):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        stream1 = Stream.from_kafka_batched(TOPIC, ARGS1)
+        out1 = stream1.sink_to_list()
+        stream1.start()
+        wait_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10, period=0.2)
+        stream1.upstream.stopped = True
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS1)
+        out2 = stream2.sink_to_list()
+        stream2.start()
+        time.sleep(5)
+        assert len(out2) == 0
+        stream2.upstream.stopped = True
+        stream3 = Stream.from_kafka_batched(TOPIC, ARGS2)
+        out3 = stream3.sink_to_list()
+        stream3.start()
+        wait_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10, period=0.2)
+        stream3.upstream.stopped = True
+
+
+@gen_cluster(client=True, timeout=60)
+def test_kafka_dask_batch_checkpointing(c, s, w1, w2):
+    j1 = random.randint(0, 10000)
+    ARGS1 = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j1}
+    j2 = j1 + 1
+    ARGS2 = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j2}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        for i in range(10):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        stream1 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
+                                           dask=True)
+        out1 = stream1.gather().sink_to_list()
+        stream1.start()
+        wait_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10, period=0.2)
+        stream1.upstream.stopped = True
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
+                                           dask=True)
+        out2 = stream2.gather().sink_to_list()
+        stream2.start()
+        time.sleep(5)
+        assert len(out2) == 0
+        stream2.upstream.stopped = True
+        stream3 = Stream.from_kafka_batched(TOPIC, ARGS2, asynchronous=True,
+                                           dask=True)
+        out3 = stream3.gather().sink_to_list()
+        stream3.start()
+        wait_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10, period=0.2)
+        stream3.upstream.stopped = True
