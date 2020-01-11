@@ -12,6 +12,7 @@ from tornado import gen
 from ..core import Stream
 from ..dask import DaskStream
 from streamz.utils_test import gen_test, wait_for, await_for
+
 pytest.importorskip('distributed')
 from distributed.utils_test import gen_cluster  # flake8: noqa
 
@@ -68,15 +69,17 @@ def launch_kafka():
     def end():
         if cid:
             stop_docker(cid=cid)
+
     atexit.register(end)
 
     def predicate():
         try:
             out = subprocess.check_output(['docker', 'logs', cid],
-                                      stderr=subprocess.STDOUT)
+                                          stderr=subprocess.STDOUT)
             return b'kafka entered RUNNING state' in out
         except subprocess.CalledProcessError:
             pass
+
     wait_for(predicate, 10, period=0.1)
     return cid
 
@@ -225,10 +228,10 @@ def test_kafka_dask_batch(c, s, w1, w2):
 def test_kafka_batch_checkpointing():
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
-            'group.id': 'streamz-test%i' % j1}
+             'group.id': 'streamz-test%i' % j1}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
-            'group.id': 'streamz-test%i' % j2}
+             'group.id': 'streamz-test%i' % j2}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
@@ -237,7 +240,8 @@ def test_kafka_batch_checkpointing():
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS1)
         out1 = stream1.sink_to_list()
         stream1.start()
-        wait_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10, period=0.2)
+        wait_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10,
+                 period=0.2)
         stream1.upstream.stopped = True
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS1)
         out2 = stream2.sink_to_list()
@@ -248,7 +252,8 @@ def test_kafka_batch_checkpointing():
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS2)
         out3 = stream3.sink_to_list()
         stream3.start()
-        wait_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10, period=0.2)
+        wait_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10,
+                 period=0.2)
         stream3.upstream.stopped = True
 
 
@@ -256,31 +261,33 @@ def test_kafka_batch_checkpointing():
 def test_kafka_dask_batch_checkpointing(c, s, w1, w2):
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
-            'group.id': 'streamz-test%i' % j1}
+             'group.id': 'streamz-test%i' % j1}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
-            'group.id': 'streamz-test%i' % j2}
+             'group.id': 'streamz-test%i' % j2}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out1 = stream1.gather().sink_to_list()
         stream1.start()
-        wait_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10, period=0.2)
+        yield await_for(lambda: any(out1) and out1[-1][-1] == b'value-9', 10,
+                 period=0.2)
         stream1.upstream.stopped = True
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out2 = stream2.gather().sink_to_list()
         stream2.start()
         time.sleep(5)
         assert len(out2) == 0
         stream2.upstream.stopped = True
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS2, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out3 = stream3.gather().sink_to_list()
         stream3.start()
-        wait_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10, period=0.2)
+        yield await_for(lambda: any(out3) and out3[-1][-1] == b'value-9', 10,
+                 period=0.2)
         stream3.upstream.stopped = True
