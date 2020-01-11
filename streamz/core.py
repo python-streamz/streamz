@@ -1526,7 +1526,7 @@ class to_kafka(Stream):
             self.producer.poll(0)
             yield gen.sleep(self.polltime)
 
-    def update(self, x, who=None):
+    def update(self, x, futures=None, who=None):
         future = gen.Future()
         self.futures.append(future)
 
