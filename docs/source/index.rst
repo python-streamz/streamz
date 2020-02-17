@@ -5,8 +5,7 @@ Streamz helps you build pipelines to manage continuous streams of data.  It is
 simple to use in simple cases, but also supports complex pipelines that involve
 branching, joining, flow control, feedback, back pressure, and so on.
 
-Optionally, Streamz can also work with Pandas dataframes to provide sensible
-streaming operations on continuous tabular data.
+Optionally, Streamz can also work with both `Pandas <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.html>`_ and `cuDF <https://docs.rapids.ai/api/cudf/stable/>`_ dataframes, to provide sensible streaming operations on continuous tabular data.
 
 To learn more about how to use streams, visit :doc:`Core documentation <core>`.
 
