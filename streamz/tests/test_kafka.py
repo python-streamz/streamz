@@ -196,7 +196,7 @@ def test_kafka_batch():
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # out may still be empty or first item of out may be []
-        wait_for(lambda: any(out) and out[-1][-1] == b'value-9', 10, period=0.2)
+        wait_for(lambda: any(out) and out[-1][-1][1] == b'value-9', 10, period=0.2)
         stream.upstream.stopped = True
 
 
@@ -217,5 +217,5 @@ def test_kafka_dask_batch(c, s, w1, w2):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         yield await_for(lambda: any(out), 10, period=0.2)
-        assert b'value-1' in out[0]
+        assert (None, b'value-1') in out[0]
         stream.upstream.stopped = True
