@@ -388,7 +388,7 @@ def test_setitem_overwrites(stream):
     pytest.param({}, 'count', marks=pytest.mark.slow),
     ({'ddof': 0}, 'std'),
     pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow),
-    ({'arg': {'sum', 'min'}}, 'aggregate')
+    ({'arg': {'x':'sum'}}, 'aggregate')
 ])
 @pytest.mark.parametrize('window', [
     pytest.param(2, marks=pytest.mark.slow),
