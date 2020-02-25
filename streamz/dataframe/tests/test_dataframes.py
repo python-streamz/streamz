@@ -387,8 +387,8 @@ def test_setitem_overwrites(stream):
     pytest.param({}, 'var', marks=pytest.mark.slow),
     pytest.param({}, 'count', marks=pytest.mark.slow),
     ({'ddof': 0}, 'std'),
-    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow)
-    # ({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate') -- Deprecated usage with Pandas1.0
+    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow),
+    ({'arg': {'sum', 'min'}}, 'aggregate')
 ])
 @pytest.mark.parametrize('window', [
     pytest.param(2, marks=pytest.mark.slow),
