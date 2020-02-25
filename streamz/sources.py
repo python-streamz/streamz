@@ -575,7 +575,7 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    out.append((msg.key(), msg.value()))
+                    out.append({'key':msg.key(), 'value':msg.value()})
                 if high <= msg.offset():
                     break
             else:
