@@ -560,7 +560,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
 
 
 def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
-    """Fetch a batch of kafka messages in given topic/partition
+    """Fetch a batch of kafka messages (keys & values) in given topic/partition
 
     This will block until messages are available, or timeout is reached.
     """
