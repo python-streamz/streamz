@@ -189,7 +189,7 @@ def test_kafka_batch():
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka_batched(TOPIC, ARGS)
+        stream = Stream.from_kafka_batched(TOPIC, ARGS, keys=True)
         out = stream.sink_to_list()
         stream.start()
         for i in range(10):
@@ -208,8 +208,8 @@ def test_kafka_dask_batch(c, s, w1, w2):
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True,
-                                           dask=True)
+        stream = Stream.from_kafka_batched(TOPIC, ARGS, keys=True,
+                                           asynchronous=True, dask=True)
         out = stream.gather().sink_to_list()
         stream.start()
         yield gen.sleep(5)  # this frees the loop while dask workers report in
