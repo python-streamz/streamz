@@ -453,12 +453,13 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, **kwargs):
+                 npartitions=1, keys=False, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.keys = keys
         self.stopped = True
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
@@ -481,7 +482,7 @@ class FromKafkaBatched(Stream):
                     lowest = max(current_position, low)
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    lowest, high - 1))
+                                    self.keys, lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
@@ -507,8 +508,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, **kwargs):
-    """ Get messages from Kafka in batches
+                       npartitions=1, start=False, dask=False, keys=False, **kwargs):
+    """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
     https://docs.confluent.io/current/clients/confluent-kafka-python/
@@ -535,6 +536,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    keys: bool (False)
+        Whether to extract keys along with the messages. If True, this will yield each message as a dict:
+        {'key':msg.key(), 'value':msg.value()}
 
     Examples
     --------
@@ -549,7 +553,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, **kwargs)
+                              npartitions=npartitions, keys=keys,
+                              **kwargs)
     if dask:
         source = source.scatter()
 
@@ -559,8 +564,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
-    """Fetch a batch of kafka messages in given topic/partition
+def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=None):
+    """Fetch a batch of kafka messages (keys & values) in given topic/partition
 
     This will block until messages are available, or timeout is reached.
     """
@@ -575,7 +580,10 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    out.append(msg.value())
+                    if keys:
+                        out.append({'key':msg.key(), 'value':msg.value()})
+                    else:
+                        out.append(msg.value())
                 if high <= msg.offset():
                     break
             else:
