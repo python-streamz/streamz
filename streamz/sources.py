@@ -509,7 +509,7 @@ class FromKafkaBatched(Stream):
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
                        npartitions=1, start=False, dask=False, keys=False, **kwargs):
-    """ Get messages from Kafka in batches
+    """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
     https://docs.confluent.io/current/clients/confluent-kafka-python/
@@ -536,6 +536,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    keys: bool (False)
+        Whether to extract keys along with the messages. If True, this will yield each message as a dict:
+        {'key':msg.key(), 'value':msg.value()}
 
     Examples
     --------
