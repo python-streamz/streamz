@@ -459,7 +459,6 @@ class FromKafkaBatched(Stream):
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
-        self.keys = keys
         self.stopped = True
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
@@ -506,7 +505,7 @@ class FromKafkaBatched(Stream):
                     lowest = max(current_position, low)
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    self.keys, lowest, high - 1))
+                                    lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
@@ -577,8 +576,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, keys=keys,
-                              **kwargs)
+                              npartitions=npartitions, **kwargs)
     if dask:
         source = source.scatter()
 
@@ -604,10 +602,7 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    if keys:
-                        out.append({'key':msg.key(), 'value':msg.value()})
-                    else:
-                        out.append(msg.value())
+                    out.append(msg.value())
                 if high <= msg.offset():
                     break
             else:
