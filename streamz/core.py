@@ -58,16 +58,33 @@ def identity(x):
 
 
 class RefCounter:
+    """ A counter to track references to data
+
+        This class is used to track how many nodes in the DAG are referencing
+        a particular element in the pipeline. When the count reaches zero,
+        then parties interested in knowing if data is done being processed are
+        notified
+
+        Parameters
+        ----------
+        initial: int, optional
+            The initial value of the reference counter
+        cb: callable
+            The function to use a callback when the reference count reaches zero
+        loop: tornado.ioloop.IOLoop
+            The loop on which to create a callback when the reference count
+            reaches zero
+    """
     def __init__(self, initial=0, cb=None, loop=None):
         self.loop = loop if loop else get_io_loop()
         self.count = initial
         self.cb = cb
 
-    def retain(self, x=1):
-        self.count += x
+    def retain(self, n=1):
+        self.count += n
 
-    def release(self, x=1):
-        self.count -= x
+    def release(self, n=1):
+        self.count -= n
         if self.count <= 0 and self.cb:
             self.loop.add_callback(self.cb)
 
@@ -340,21 +357,27 @@ class Stream(object):
         return output._ipython_display_(**kwargs)
 
     def _emit(self, x, metadata=None):
-        if metadata is None:
-            metadata = {}
+        """
+        Push data into the stream at this point
 
-        refs = []
-        if 'refs' in metadata:
-            refs = metadata['refs']
-            if not isinstance(refs, list):
-                refs = [refs]
+        Parameters
+        ----------
+        x: any
+            an element of data
+        metadata: list[dict], optional
+            Various types of metadata associated with the data element in `x`.
+
+            ref: RefCounter
+            A reference counter used to check when data is done
+
+        """
+        if metadata:
+            self._retain_refs(metadata, len(self.downstreams))
+        else:
+            metadata = []
 
         result = []
-        downstreams = list(self.downstreams)
-        for ref in refs:
-            ref.retain(len(downstreams))
-
-        for downstream in downstreams:
+        for downstream in list(self.downstreams):
             r = downstream.update(x, who=self, metadata=metadata)
 
             if type(r) is list:
@@ -362,8 +385,7 @@ class Stream(object):
             else:
                 result.append(r)
 
-            for ref in refs:
-                ref.release()
+            self._release_refs(metadata)
 
         return [element for element in result if element is not None]
 
@@ -372,6 +394,18 @@ class Stream(object):
 
         This is typically done only at source Streams but can theortically be
         done at any point
+
+        Parameters
+        ----------
+        x: any
+            an element of data
+        asynchronous:
+            emit asynchronously
+        metadata: list[dict], optional
+            Various types of metadata associated with the data element in `x`.
+
+            ref: RefCounter
+            A reference counter used to check when data is done
         """
         ts_async = getattr(thread_state, 'asynchronous', False)
         if self.loop is None or asynchronous or self.asynchronous or ts_async:
@@ -388,7 +422,7 @@ class Stream(object):
             def _():
                 thread_state.asynchronous = True
                 try:
-                    result = yield self._emit(x)
+                    result = yield self._emit(x, metadata=metadata)
                 finally:
                     del thread_state.asynchronous
 
@@ -534,27 +568,39 @@ class Stream(object):
         from .batch import Batch
         return Batch(stream=self, **kwargs)
 
-    def _retain_refs(self, metadata):
-        if not isinstance(metadata, list):
-            metadata = [metadata]
-        for m in metadata:
-            if m and 'refs' in m:
-                refs = m['refs']
-                if not isinstance(refs, list):
-                    refs = [refs]
-                for ref in refs:
-                    ref.retain(1)
+    def _retain_refs(self, metadata, n=1):
+        """ Retain all references in the provided metadata `n` number of times
 
-    def _release_refs(self, metadata):
-        if not isinstance(metadata, list):
-            metadata = [metadata]
+        Parameters
+        ----------
+        metadata: list[dict], optional
+            Various types of metadata associated with the data element in `x`.
+
+            ref: RefCounter
+            A reference counter used to check when data is done
+        n: The number of times to retain the provided references
+
+        """
         for m in metadata:
-            if m and 'refs' in m:
-                refs = m['refs']
-                if not isinstance(refs, list):
-                    refs = [refs]
-                for ref in refs:
-                    ref.release(1)
+            if 'ref' in m:
+                m['ref'].retain(n)
+
+    def _release_refs(self, metadata, n=1):
+        """ Release all references in the provided metadata `n` number of times
+
+        Parameters
+        ----------
+        metadata: list[dict], optional
+            Various types of metadata associated with the data element in `x`.
+
+            ref: RefCounter
+            A reference counter used to check when data is done
+        n: The number of times to retain the provided references
+
+        """
+        for m in metadata:
+            if 'ref' in m:
+                m['ref'].release(n)
 
 
 @Stream.register_api()
@@ -908,8 +954,7 @@ class partition(Stream):
             result, self.buffer = self.buffer, []
             metadata_result, self.metadata_buffer = self.metadata_buffer, []
             ret = self._emit(tuple(result), list(metadata_result))
-            for metadata in metadata_result:
-                self._release_refs(metadata)
+            self._release_refs(metadata_result)
             return ret
         else:
             return []
@@ -1529,7 +1574,8 @@ class latest(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None, metadata=None):
-        self._release_refs(self.next_metadata)
+        if self.next_metadata:
+            self._release_refs(self.next_metadata)
         self._retain_refs(metadata)
 
         self.next = [x]
