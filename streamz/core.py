@@ -81,9 +81,24 @@ class RefCounter:
         self.cb = cb
 
     def retain(self, n=1):
+        """Retain the reference
+
+        Parameters
+        ----------
+        n: The number of times to retain the reference
+        """
         self.count += n
 
     def release(self, n=1):
+        """Release the reference
+
+        If the reference count is equal to or less than zero, the callback, if
+        provided will added to the provided loop or default loop
+
+        Parameters
+        ----------
+        n: The number of references to release
+        """
         self.count -= n
         if self.count <= 0 and self.cb:
             self.loop.add_callback(self.cb)
@@ -392,7 +407,7 @@ class Stream(object):
     def emit(self, x, asynchronous=False, metadata=None):
         """ Push data into the stream at this point
 
-        This is typically done only at source Streams but can theortically be
+        This is typically done only at source Streams but can theoretically be
         done at any point
 
         Parameters
@@ -440,24 +455,24 @@ class Stream(object):
         return self
 
     def connect(self, downstream):
-        ''' Connect this stream to a downstream element.
+        """ Connect this stream to a downstream element.
 
         Parameters
         ----------
         downstream: Stream
             The downstream stream to connect to
-        '''
+        """
         self._add_downstream(downstream)
         downstream._add_upstream(self)
 
     def disconnect(self, downstream):
-        ''' Disconnect this stream to a downstream element.
+        """ Disconnect this stream to a downstream element.
 
         Parameters
         ----------
         downstream: Stream
             The downstream stream to disconnect from
-        '''
+        """
         self._remove_downstream(downstream)
 
         downstream._remove_upstream(self)

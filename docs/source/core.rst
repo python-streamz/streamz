@@ -378,3 +378,19 @@ For operations like this Streamz adds virtually no overhead.
 
 Streams provides higher level APIs for situations just like this one.  You may
 want to read further about :doc:`collections <collections>`
+
+
+Metadata
+--------
+
+Metadata can be emitted into the pipeline to accompany the data as a list of dictionaries. Most functions will pass the metadata to the downstream function without making any changes. However, functions that make the pipeline asynchronous require logic that dictates how and when the metadata will be passed downstream. Synchronous functions and asynchronous functions that have a 1:1 ratio of the number of values on the input to the number of values on the output will emit the metadata collection without any modification. However, functions that have multiple input streams or emit collections of data will emit the metadata associated with the emitted data as a collection.
+
+
+Reference Counting and Checkpointing
+------------------------------------
+
+Checkpointing is achieved in Streamz through the use of reference counting. With this method, a checkpoint can be saved when and only when data has progressed through all of the the pipeline without any issues. This prevents data loss and guarantees at-least-once semantics.
+
+Any node that caches or holds data after it returns increments the reference counter associated with the given data by one. When a node is no longer holding the data, it will release it by decrementing the counter by one. When the counter changes to zero, a callback associated with the data is triggered.
+
+References are passed in the metadata as a value of the `ref` keyword. Each metadata object contains only one reference counter object.

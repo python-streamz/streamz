@@ -541,6 +541,13 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     topic per time interval, if there is new data. If using dask, one future
     will be produced per partition per time-step, if there is data.
 
+    Checkpointing is achieved through the use of reference counting. A reference
+    counter is emitted downstream for each batch of data. A callback is
+    triggered when the reference count reaches zero and the offsets are
+    committed back to Kafka. Upon the start of this function, the previously
+    committed offsets will be fetched from Kafka and begin reading form there.
+    This will guarantee at-least-once semantics.
+
     Parameters
     ----------
     topic: str
