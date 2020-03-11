@@ -453,12 +453,18 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, **kwargs):
+                 npartitions=1, max_batch_size=10000, keys=False,
+                 engine=None, **kwargs):
         self.consumer_params = consumer_params
+        self.consumer_params["enable.auto.commit"] = "false"
+        self.consumer_params["auto.offset.reset"] = "earliest"
         self.topic = topic
         self.npartitions = npartitions
+        self.max_batch_size = max_batch_size
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.keys = keys
+        self.engine = engine
         self.stopped = True
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
@@ -467,9 +473,14 @@ class FromKafkaBatched(Stream):
     def poll_kafka(self):
         import confluent_kafka as ck
 
+        if self.engine == "cudf":
+            print("import kafka")
+            from custreamz import kafka
+
         def commit(_part):
-            topic, part_no, _, offset = _part[1:]
+            topic, part_no, _, _, offset = _part[1:]
             _tp = ck.TopicPartition(topic, part_no, offset + 1)
+            print("committing offset:" + str(offset+1) + " in partition:" + str(part_no))
             self.consumer.commit(offsets=[_tp], asynchronous=True)
 
         @gen.coroutine
@@ -484,13 +495,12 @@ class FromKafkaBatched(Stream):
         while True:
             try:
                 committed = self.consumer.committed(tps, timeout=1)
-            except ck.KafkaException:
+            except:
                 pass
             else:
                 for tp in committed:
                     self.positions[tp.partition] = tp.offset
                 break
-
         try:
             while not self.stopped:
                 out = []
@@ -499,13 +509,15 @@ class FromKafkaBatched(Stream):
                     try:
                         low, high = self.consumer.get_watermark_offsets(
                             tp, timeout=0.1)
-                    except (RuntimeError, ck.KafkaException):
+                    except:
                         continue
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
+                    if high > lowest + self.max_batch_size:
+                        high = lowest + self.max_batch_size
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    lowest, high - 1))
+                                    self.keys, lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
@@ -519,8 +531,15 @@ class FromKafkaBatched(Stream):
 
     def start(self):
         import confluent_kafka as ck
+        if self.engine == "cudf":
+            from custreamz import kafka
+
         if self.stopped:
-            self.consumer = ck.Consumer(self.consumer_params)
+            if self.engine == "cudf":
+                self.consumer = kafka.KafkaHandle(self.consumer_params, topics=[self.topic],
+                                                  partitions=list(range(self.npartitions)))
+            else:
+                self.consumer = ck.Consumer(self.consumer_params)
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
@@ -531,7 +550,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, **kwargs):
+                       npartitions=1, start=False, dask=False, keys=False,
+                       max_batch_size=10000, engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -583,17 +603,22 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, **kwargs)
+                              npartitions=npartitions, keys=keys,
+                              max_batch_size=max_batch_size, engine=engine,
+                              **kwargs)
     if dask:
         source = source.scatter()
 
     if start:
         source.start()
 
-    return source.starmap(get_message_batch)
+    if engine == "cudf":
+        return source.starmap(get_message_batch_cudf)
+    else:
+        return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
+def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=None):
     """Fetch a batch of kafka messages (keys & values) in given topic/partition
 
     This will block until messages are available, or timeout is reached.
@@ -609,7 +634,10 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    out.append(msg.value())
+                    if keys:
+                        out.append({'key':msg.key(), 'value':msg.value()})
+                    else:
+                        out.append(msg.value())
                 if high <= msg.offset():
                     break
             else:
@@ -619,3 +647,10 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
     finally:
         consumer.close()
     return out
+
+
+def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, timeout=None):
+    from custreamz import kafka
+    consumer = kafka.KafkaHandle(kafka_params, topics=[topic], partitions=[partition])
+    gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
+    return gdf
