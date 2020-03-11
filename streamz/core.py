@@ -20,7 +20,7 @@ try:
 except ImportError:
     PollIOLoop = None  # dropped in tornado 6.0
 
-from collections import Iterable
+from collections.abc import Iterable
 
 from .compatibility import get_thread_identity
 from .orderedweakset import OrderedWeakrefSet
