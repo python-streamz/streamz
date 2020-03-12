@@ -469,7 +469,7 @@ class FromKafkaBatched(Stream):
         import confluent_kafka as ck
 
         def commit(_part):
-            topic, part_no, _, offset = _part[1:]
+            topic, part_no, _, _, offset = _part[1:]
             _tp = ck.TopicPartition(topic, part_no, offset + 1)
             self.consumer.commit(offsets=[_tp], asynchronous=True)
 
