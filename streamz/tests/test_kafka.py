@@ -198,7 +198,7 @@ def test_kafka_batch():
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka_batched(TOPIC, ARGS, keys=True)
+        stream = Stream.from_kafka_batched(TOPIC, ARGS, max_batch_size=4, keys=True)
         out = stream.sink_to_list()
         stream.start()
         for i in range(10):
@@ -207,6 +207,8 @@ def test_kafka_batch():
         # out may still be empty or first item of out may be []
         wait_for(lambda: any(out) and out[-1][-1]['value'] == b'value-9', 10, period=0.2)
         assert out[-1][-1]['key'] == b'9'
+        # max_batch_size checks
+        assert len(out[0]) == len(out[1]) == 4 and len(out) == 3
         stream.upstream.stopped = True
 
 
