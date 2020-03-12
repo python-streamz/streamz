@@ -5,7 +5,7 @@ import time
 import tornado.ioloop
 from tornado import gen
 
-from .core import Stream, convert_interval
+from .core import Stream, convert_interval, RefCounter
 
 
 def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
@@ -453,13 +453,12 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, keys=False, **kwargs):
+                 npartitions=1, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
-        self.keys = keys
         self.stopped = True
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
@@ -467,6 +466,30 @@ class FromKafkaBatched(Stream):
     @gen.coroutine
     def poll_kafka(self):
         import confluent_kafka as ck
+
+        def commit(_part):
+            topic, part_no, _, offset = _part[1:]
+            _tp = ck.TopicPartition(topic, part_no, offset + 1)
+            self.consumer.commit(offsets=[_tp], asynchronous=True)
+
+        @gen.coroutine
+        def checkpoint_emit(_part):
+            ref = RefCounter(cb=lambda: commit(_part))
+            yield self._emit(_part, metadata=[{'ref': ref}])
+
+        tps = []
+        for partition in range(self.npartitions):
+            tps.append(ck.TopicPartition(self.topic, partition))
+
+        while True:
+            try:
+                committed = self.consumer.committed(tps, timeout=1)
+            except ck.KafkaException:
+                pass
+            else:
+                for tp in committed:
+                    self.positions[tp.partition] = tp.offset
+                break
 
         try:
             while not self.stopped:
@@ -482,11 +505,11 @@ class FromKafkaBatched(Stream):
                     lowest = max(current_position, low)
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    self.keys, lowest, high - 1))
+                                    lowest, high - 1))
                         self.positions[partition] = high
 
                 for part in out:
-                    yield self._emit(part)
+                    yield self.loop.add_callback(checkpoint_emit, part)
 
                 else:
                     yield gen.sleep(self.poll_interval)
@@ -508,7 +531,7 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, keys=False, **kwargs):
+                       npartitions=1, start=False, dask=False, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -517,6 +540,13 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     This source will emit lists of messages for each partition of a single given
     topic per time interval, if there is new data. If using dask, one future
     will be produced per partition per time-step, if there is data.
+
+    Checkpointing is achieved through the use of reference counting. A reference
+    counter is emitted downstream for each batch of data. A callback is
+    triggered when the reference count reaches zero and the offsets are
+    committed back to Kafka. Upon the start of this function, the previously
+    committed offsets will be fetched from Kafka and begin reading form there.
+    This will guarantee at-least-once semantics.
 
     Parameters
     ----------
@@ -553,8 +583,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, keys=keys,
-                              **kwargs)
+                              npartitions=npartitions, **kwargs)
     if dask:
         source = source.scatter()
 
@@ -564,7 +593,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=None):
+def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
     """Fetch a batch of kafka messages (keys & values) in given topic/partition
 
     This will block until messages are available, or timeout is reached.
@@ -580,10 +609,7 @@ def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=N
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    if keys:
-                        out.append({'key':msg.key(), 'value':msg.value()})
-                    else:
-                        out.append(msg.value())
+                    out.append(msg.value())
                 if high <= msg.offset():
                     break
             else:
