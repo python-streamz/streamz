@@ -206,6 +206,7 @@ def test_kafka_batch():
                                            latest=True, keys=True)
         out = stream.sink_to_list()
         stream.start()
+        time.sleep(5)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()
