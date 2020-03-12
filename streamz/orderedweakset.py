@@ -7,7 +7,7 @@ import collections
 import weakref
 
 
-class OrderedSet(collections.MutableSet):
+class OrderedSet(collections.abc.MutableSet):
     def __init__(self, values=()):
         self._od = collections.OrderedDict().fromkeys(values)
 

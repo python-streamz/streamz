@@ -586,6 +586,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    max_batch_size: int
+        The maximum number of messages per partition to be consumed per batch
     keys: bool (False)
         Whether to extract keys along with the messages. If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
