@@ -453,12 +453,13 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, keys=False, **kwargs):
+                 npartitions=1, max_batch_size=10000, keys=False, **kwargs):
         self.consumer_params = consumer_params
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.max_batch_size = max_batch_size
         self.keys = keys
         self.stopped = True
 
@@ -504,6 +505,8 @@ class FromKafkaBatched(Stream):
                         continue
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
+                    if high > lowest + self.max_batch_size:
+                        high = lowest + self.max_batch_size
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
                                     self.keys, lowest, high - 1))
@@ -532,7 +535,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, keys=False, **kwargs):
+                       npartitions=1, start=False, dask=False,
+                       max_batch_size=10000, keys=False, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -567,6 +571,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    max_batch_size: int
+        The maximum number of messages per partition to be consumed per batch
     keys: bool (False)
         Whether to extract keys along with the messages. If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
@@ -584,7 +590,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, keys=keys,
+                              npartitions=npartitions,
+                              max_batch_size=max_batch_size,
+                              keys=keys,
                               **kwargs)
     if dask:
         source = source.scatter()
