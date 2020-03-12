@@ -198,14 +198,17 @@ def test_kafka_batch():
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka_batched(TOPIC, ARGS)
+        stream = Stream.from_kafka_batched(TOPIC, ARGS, max_batch_size=4, keys=True)
         out = stream.sink_to_list()
         stream.start()
         for i in range(10):
-            kafka.produce(TOPIC, b'value-%d' % i)
+            kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()
         # out may still be empty or first item of out may be []
-        wait_for(lambda: any(out) and out[-1][-1] == b'value-9', 10, period=0.2)
+        wait_for(lambda: any(out) and out[-1][-1]['value'] == b'value-9', 10, period=0.2)
+        assert out[-1][-1]['key'] == b'9'
+        # max_batch_size checks
+        assert len(out[0]) == len(out[1]) == 4 and len(out) == 3
         stream.upstream.stopped = True
 
 
@@ -216,8 +219,8 @@ def test_kafka_dask_batch(c, s, w1, w2):
             'group.id': 'streamz-test%i' % j}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True,
-                                           dask=True)
+        stream = Stream.from_kafka_batched(TOPIC, ARGS, keys=True,
+                                           asynchronous=True, dask=True)
         out = stream.gather().sink_to_list()
         stream.start()
         yield gen.sleep(5)  # this frees the loop while dask workers report in
@@ -226,7 +229,7 @@ def test_kafka_dask_batch(c, s, w1, w2):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         yield await_for(lambda: any(out), 10, period=0.2)
-        assert b'value-1' in out[0]
+        assert {'key':None, 'value':b'value-1'} in out[0]
         stream.upstream.stopped = True
 
 
