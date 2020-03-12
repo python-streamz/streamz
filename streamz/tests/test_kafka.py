@@ -202,7 +202,7 @@ def test_kafka_batch():
         out = stream.sink_to_list()
         stream.start()
         for i in range(10):
-            kafka.produce(TOPIC, b'value-%d' % i)
+            kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()
         # out may still be empty or first item of out may be []
         wait_for(lambda: any(out) and out[-1][-1]['value'] == b'value-9', 10, period=0.2)
@@ -224,7 +224,7 @@ def test_kafka_dask_batch(c, s, w1, w2):
         yield gen.sleep(5)  # this frees the loop while dask workers report in
         assert isinstance(stream, DaskStream)
         for i in range(10):
-            kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
+            kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         yield await_for(lambda: any(out), 10, period=0.2)
         assert {'key':None, 'value':b'value-1'} in out[0]
