@@ -521,7 +521,7 @@ class FromKafkaBatched(Stream):
                                     self.keys, lowest, high - 1))
                         self.positions[partition] = high
                 self.latest = False
-                self.consumer_params["auto.offset.reset"] = "earliest"
+                self.consumer_params['auto.offset.reset'] = "earliest"
 
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
