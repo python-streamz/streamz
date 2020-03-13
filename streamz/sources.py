@@ -504,6 +504,12 @@ class FromKafkaBatched(Stream):
                         low, high = self.consumer.get_watermark_offsets(
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
+                        print("Recreating consumer")
+                        self.consumer.unsubscribe()
+                        self.consumer.close()
+                        self.consumer = ck.Consumer(self.consumer_params)
+                        self.consumer.subscribe([self.topic])
+                        time.sleep(5)
                         continue
                     if self.latest is True:
                         self.positions[partition] = high
