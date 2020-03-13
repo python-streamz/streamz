@@ -456,6 +456,8 @@ class FromKafkaBatched(Stream):
                  npartitions=1, max_batch_size=10000, latest=False,
                  keys=False, **kwargs):
         self.consumer_params = consumer_params
+        # Override the auto-commit config to enforce custom streamz checkpointing
+        self.consumer_params["enable.auto.commit"] = "false"
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
@@ -505,7 +507,7 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
-                    if self.latest is True:
+                    if self.latest is True or self.consumer_params["auto.offset.reset"] == "latest":
                         self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
@@ -516,6 +518,7 @@ class FromKafkaBatched(Stream):
                                     self.keys, lowest, high - 1))
                         self.positions[partition] = high
                 self.latest = False
+                self.consumer_params["auto.offset.reset"] = "earliest"
 
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
@@ -580,7 +583,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     max_batch_size: int
         The maximum number of messages per partition to be consumed per batch
     latest: bool (False)
-        Whether to start reading messages from the start of the topic or from the latest offset
+        Whether to start reading messages from the start of the topic or from the latest offset.
+        This can also be achieved by setting "auto.offset.reset": "latest" in the consumer configs.
     keys: bool (False)
         Whether to extract keys along with the messages. If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
