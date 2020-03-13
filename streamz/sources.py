@@ -457,7 +457,7 @@ class FromKafkaBatched(Stream):
                  keys=False, **kwargs):
         self.consumer_params = consumer_params
         # Override the auto-commit config to enforce custom streamz checkpointing
-        self.consumer_params["enable.auto.commit"] = False
+        self.consumer_params['enable.auto.commit'] = False
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
@@ -507,8 +507,11 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
-                    if self.latest is True or self.consumer_params["auto.offset.reset"] == "latest":
+                    if self.latest is True:
                         self.positions[partition] = high
+                    if 'auto.offset.reset' in self.consumer_params.keys():
+                        if self.consumer_params['auto.offset.reset'] == "latest":
+                            self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
                     if high > lowest + self.max_batch_size:
