@@ -650,6 +650,10 @@ def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=N
 
 
 def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, timeout=None):
+    """
+    Fetch a batch of kafka messages (currently, messages must be in JSON format)
+    in given topic/partition as a cudf dataframe
+    """
     from custreamz import kafka
     consumer = kafka.Consumer(kafka_params)
     gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
