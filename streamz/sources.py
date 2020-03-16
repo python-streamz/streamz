@@ -474,7 +474,6 @@ class FromKafkaBatched(Stream):
         import confluent_kafka as ck
 
         if self.engine == "cudf":
-            print("import kafka")
             from custreamz import kafka
 
         def commit(_part):
@@ -536,8 +535,7 @@ class FromKafkaBatched(Stream):
 
         if self.stopped:
             if self.engine == "cudf":
-                self.consumer = kafka.KafkaHandle(self.consumer_params, topics=[self.topic],
-                                                  partitions=list(range(self.npartitions)))
+                self.consumer = kafka.Consumer(self.consumer_params)
             else:
                 self.consumer = ck.Consumer(self.consumer_params)
             self.stopped = False
@@ -653,6 +651,6 @@ def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=N
 
 def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, timeout=None):
     from custreamz import kafka
-    consumer = kafka.KafkaHandle(kafka_params, topics=[topic], partitions=[partition])
+    consumer = kafka.Consumer(kafka_params)
     gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
     return gdf
