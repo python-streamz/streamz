@@ -457,9 +457,9 @@ class FromKafkaBatched(Stream):
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
         # Override the auto-commit config to enforce custom streamz checkpointing
-        self.consumer_params['enable.auto.commit'] = False
+        self.consumer_params['enable.auto.commit'] = 'false'
         if 'auto.offset.reset' not in self.consumer_params.keys():
-            consumer_params['auto.offset.reset'] = "earliest"
+            consumer_params['auto.offset.reset'] = 'earliest'
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
