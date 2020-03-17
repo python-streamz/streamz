@@ -456,13 +456,15 @@ class FromKafkaBatched(Stream):
                  npartitions=1, max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
-        self.consumer_params["enable.auto.commit"] = "false"
-        self.consumer_params["auto.offset.reset"] = "earliest"
+        # Override the auto-commit config to enforce custom streamz checkpointing
+        self.consumer_params['enable.auto.commit'] = False
+        if 'auto.offset.reset' not in self.consumer_params.keys():
+            consumer_params['auto.offset.reset'] = "earliest"
         self.topic = topic
         self.npartitions = npartitions
-        self.max_batch_size = max_batch_size
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.max_batch_size = max_batch_size
         self.keys = keys
         self.engine = engine
         self.stopped = True
@@ -549,8 +551,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, keys=False,
-                       max_batch_size=10000, engine=None, **kwargs):
+                       npartitions=1, start=False, dask=False, max_batch_size=10000,
+                       keys=False, engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
