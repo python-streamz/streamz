@@ -551,8 +551,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, max_batch_size=10000,
-                       keys=False, engine=None, **kwargs):
+                       npartitions=1, start=False, dask=False,
+                       max_batch_size=10000, keys=False, engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -606,8 +606,10 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, keys=keys,
-                              max_batch_size=max_batch_size, engine=engine,
+                              npartitions=npartitions,
+                              max_batch_size=max_batch_size,
+                              keys=keys,
+                              engine=engine,
                               **kwargs)
     if dask:
         source = source.scatter()
