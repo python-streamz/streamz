@@ -493,6 +493,7 @@ class FromKafkaBatched(Stream):
 
         while True:
             try:
+                self.consumer.assign(tps)
                 committed = self.consumer.committed(tps, timeout=1)
             except:
                 pass
