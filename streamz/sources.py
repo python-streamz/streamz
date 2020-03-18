@@ -592,6 +592,10 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     keys: bool (False)
         Whether to extract keys along with the messages. If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
+    engine: str (None)
+        If engine is "cudf", streamz reads data (messages must be JSON) from Kafka
+        in an accelerated manner directly into cudf dataframes.
+        Please refer to API here: github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
 
     Examples
     --------
