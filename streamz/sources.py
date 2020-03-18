@@ -492,7 +492,6 @@ class FromKafkaBatched(Stream):
         tps = []
         for partition in range(self.npartitions):
             tps.append(ck.TopicPartition(self.topic, partition))
-        self.consumer.assign(tps)
 
         while True:
             try:
