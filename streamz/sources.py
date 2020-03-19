@@ -455,6 +455,8 @@ class FromKafkaBatched(Stream):
     def __init__(self, topic, consumer_params, poll_interval='1s',
                  npartitions=1, max_batch_size=10000, keys=False, **kwargs):
         self.consumer_params = consumer_params
+        # Override the auto-commit config to enforce custom streamz checkpointing
+        self.consumer_params['enable.auto.commit'] = 'false'
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
@@ -503,6 +505,9 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
+                    if 'auto.offset.reset' in self.consumer_params.keys():
+                        if self.consumer_params['auto.offset.reset'] == 'latest':
+                            self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
                     if high > lowest + self.max_batch_size:
@@ -511,6 +516,7 @@ class FromKafkaBatched(Stream):
                         out.append((self.consumer_params, self.topic, partition,
                                     self.keys, lowest, high - 1))
                         self.positions[partition] = high
+                self.consumer_params['auto.offset.reset'] = 'earliest'
 
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
@@ -536,7 +542,8 @@ class FromKafkaBatched(Stream):
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
                        npartitions=1, start=False, dask=False,
-                       max_batch_size=10000, keys=False, **kwargs):
+                       max_batch_size=10000, keys=False,
+                       **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
@@ -576,6 +583,10 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     keys: bool (False)
         Whether to extract keys along with the messages. If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
+
+    Important Kafka Configurations:
+    If 'auto.offset.reset': 'latest' is set in the consumer configs, the stream starts reading messages
+    from latest offset. Else, if it's set to 'earliest', it will read from the start offset.
 
     Examples
     --------
