@@ -95,6 +95,7 @@ Definitions
 
 .. autofunction:: filenames
 .. autofunction:: from_kafka
+.. autofunction:: from_kafka_batched
 .. autofunction:: from_textfile
 
 .. currentmodule:: streamz.dask

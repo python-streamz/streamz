@@ -195,12 +195,18 @@ def test_from_kafka_thread():
 def test_kafka_batch():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
-            'group.id': 'streamz-test%i' % j}
+            'group.id': 'streamz-test%i' % j,
+            'auto.offset.reset': 'latest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
+        # These messages aren't read since Stream starts reading from latest offsets
+        for i in range(10):
+            kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
+        kafka.flush()
         stream = Stream.from_kafka_batched(TOPIC, ARGS, max_batch_size=4, keys=True)
         out = stream.sink_to_list()
         stream.start()
+        time.sleep(5)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()

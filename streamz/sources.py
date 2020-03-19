@@ -512,6 +512,9 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except:
                         continue
+                    if 'auto.offset.reset' in self.consumer_params.keys():
+                        if self.consumer_params['auto.offset.reset'] == 'latest':
+                            self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
                     if high > lowest + self.max_batch_size:
@@ -520,6 +523,7 @@ class FromKafkaBatched(Stream):
                         out.append((self.consumer_params, self.topic, partition,
                                     self.keys, lowest, high - 1))
                         self.positions[partition] = high
+                self.consumer_params['auto.offset.reset'] = 'earliest'
 
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
@@ -595,6 +599,10 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         If engine is "cudf", streamz reads data (messages must be JSON) from Kafka
         in an accelerated manner directly into cudf dataframes.
         Please refer to API here: github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
+
+    Important Kafka Configurations:
+    If 'auto.offset.reset': 'latest' is set in the consumer configs, the stream starts reading messages
+    from latest offset. Else, if it's set to 'earliest', it will read from the start offset.
 
     Examples
     --------
