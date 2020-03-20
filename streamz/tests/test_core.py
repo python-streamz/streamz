@@ -294,7 +294,7 @@ def test_timed_window_metadata():
     L = []
     sink = sink_metadata_to_list(stream, L)
     stream.connect(sink)
-    L2 = sink.sink_to_list()
+    sink.sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
