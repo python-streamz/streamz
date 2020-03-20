@@ -1063,9 +1063,9 @@ class timed_window(Stream):
         while True:
             L, self.buffer = self.buffer, []
             metadata, self.metadata_buffer = self.metadata_buffer, []
-            self.last = self._emit(L, metadata)
-            for m in metadata:
-                self._release_refs(m)
+            m = [m for l in metadata for m in l]
+            self.last = self._emit(L, m)
+            self._release_refs(m)
             yield self.last
             yield gen.sleep(self.interval)
 
@@ -1222,9 +1222,9 @@ class zip(Stream):
             self.condition.notify_all()
             if self.literals:
                 tup = self.pack_literals(tup)
-            ret = self._emit(tup, list(md))
-            for m in md:
-                self._release_refs(m)
+            md = [m for l in md for m in l]
+            ret = self._emit(tup, md)
+            self._release_refs(md)
             return ret
         elif len(L) > self.maxsize:
             return self.condition.wait()
@@ -1306,7 +1306,8 @@ class combine_latest(Stream):
         self.last[idx] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
-            return self._emit(tup, self.metadata)
+            md = [m for l in self.metadata for m in l]
+            return self._emit(tup, md)
 
 
 @Stream.register_api()
@@ -1558,7 +1559,8 @@ class zip_latest(Stream):
             L = []
             while self.lossless_buffer:
                 self.last[0], self.metadata[0] = self.lossless_buffer.popleft()
-                L.append(self._emit(tuple(self.last), metadata=self.metadata))
+                md = [m for l in self.metadata for m in l]
+                L.append(self._emit(tuple(self.last), md))
                 self._release_refs(self.metadata[0])
             return L
 
