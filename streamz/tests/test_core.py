@@ -18,9 +18,8 @@ import streamz as sz
 
 from streamz import Stream, RefCounter
 from streamz.sources import sink_to_file, PeriodicCallback
-from streamz.utils_test import (inc, double, gen_test, tmpfile,
-                                captured_logger,  # noqa: F401
-                                clean, await_for, metadata)  # noqa: F401
+from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
+        clean, await_for, metadata)  # noqa: F401
 from distributed.utils_test import loop   # noqa: F401
 
 
@@ -208,7 +207,11 @@ def test_sliding_window_metadata():
     source.emit(1, metadata=[{'v': 1}])
     source.emit(2, metadata=[{'v': 2}])
     source.emit(3, metadata=[{'v': 3}])
-    assert L == [[{'v': 1}], [{'v': 1}, {'v': 2}], [{'v': 2}, {'v': 3}]]
+    assert L == [
+        [{'v': 1}],  # First emit, because 0 has no metadata
+        [{'v': 1}, {'v': 2}],  # Second emit
+        [{'v': 2}, {'v': 3}]  # Third emit
+    ]
 
 
 @gen_test()
@@ -283,7 +286,10 @@ def test_timed_window_metadata():
     source.emit(2, metadata=[{'v': 2}])
     source.emit(3, metadata=[{'v': 3}])
     yield gen.sleep(0.1)
-    assert L == [[{'v': 1}], [{'v': 2}, {'v': 3}]]
+    assert L == [
+        [{'v': 1}],  # first emit because 0 has no metadata
+        [{'v': 2}, {'v': 3}]  # second emit
+    ]
 
 
 def test_timed_window_timedelta(clean):  # noqa: F811
@@ -580,7 +586,11 @@ def test_combine_latest_metadata():
     b.emit(2, metadata=[{'v': 2}])
     b.emit(3)
     b.emit(4, metadata=[{'v': 4}])
-    assert L == [[{'v': 1}, {'v': 2}], [{'v': 1}], [{'v': 1}, {'v': 4}]]
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # first emit when 2 is introduced
+        [{'v': 1}],  # 3 has no metadata but it replaces the value on 'b'
+        [{'v': 1}, {'v': 4}]  # 4 replaces the value without metadata on 'b'
+    ]
 
 
 @gen_test()
@@ -637,7 +647,10 @@ def test_zip_metadata():
     b.emit(2, metadata=[{'v': 2}])
     a.emit(3)
     b.emit(4, metadata=[{'v': 4}])
-    assert L == [[{'v': 1}, {'v': 2}], [{'v': 4}]]
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # first emit when 2 is introduced
+        [{'v': 4}]  # second emit when 4 is introduced, and 3 has no metadata
+    ]
 
 
 def test_frequencies():
@@ -845,7 +858,10 @@ def test_collect_metadata():
     source.emit(3, metadata=[{'v': 3}])
     source.emit(4, metadata=[{'v': 4}])
     collector.flush()
-    assert L == [[{'v': 1}, {'v': 2}], [{'v': 3}, {'v': 4}]]
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # Flush 0-2, but 0 has no metadata
+        [{'v': 3}, {'v': 4}]   # Flush the rest
+    ]
 
 
 def test_map_str():
@@ -899,7 +915,10 @@ def test_partition_metadata():
     source.emit(1, metadata=[{'v': 1}])
     source.emit(2, metadata=[{'v': 2}])
     source.emit(3, metadata=[{'v': 3}])
-    assert L == [[{'v': 1}], [{'v': 2}, {'v': 3}]]
+    assert L == [
+        [{'v': 1}],  # first emit when 1 is introduced. 0 has no metadata
+        [{'v': 2}, {'v': 3}]  # second emit
+    ]
 
 
 def test_stream_name_str():
@@ -999,7 +1018,10 @@ def test_zip_latest_metadata():
     b.emit(2, metadata=[{'v': 2}])
     a.emit(3)
     b.emit(4, metadata=[{'v': 4}])
-    assert L == [[{'v': 1}, {'v': 2}], [{'v': 2}]]
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # the first emit when 2 is introduced
+        [{'v': 2}]  # 3 has no metadata
+    ]
 
 
 def test_connect():
