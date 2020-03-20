@@ -18,20 +18,10 @@ import streamz as sz
 
 from streamz import Stream, RefCounter
 from streamz.sources import sink_to_file, PeriodicCallback
-from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
-        clean, await_for)  # noqa: F401
+from streamz.utils_test import (inc, double, gen_test, tmpfile,
+                                captured_logger,  # noqa: F401
+                                clean, await_for, metadata)  # noqa: F401
 from distributed.utils_test import loop   # noqa: F401
-
-
-class sink_metadata_to_list(Stream):
-    def __init__(self, upstream, L):
-        Stream.__init__(self, upstream)
-        self.L = L
-
-    def update(self, x, who=None, metadata=None):
-        if metadata:
-            self.L.append(metadata)
-        self._emit(x, metadata)
 
 
 def test_basic():
@@ -212,11 +202,7 @@ def test_sliding_window_ref_counts():
 
 def test_sliding_window_metadata():
     source = Stream()
-    stream = source.sliding_window(2)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
+    L = metadata(source.sliding_window(2)).sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
@@ -289,12 +275,7 @@ def test_timed_window_ref_counts():
 @gen_test()
 def test_timed_window_metadata():
     source = Stream()
-    stream = source.timed_window(0.01)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
-    sink.sink_to_list()
+    L = metadata(source.timed_window(0.01)).sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
@@ -593,11 +574,7 @@ def test_combine_latest_ref_counts():
 def test_combine_latest_metadata():
     a = Stream()
     b = Stream()
-    stream = a.combine_latest(b)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
+    L = metadata(a.combine_latest(b)).sink_to_list()
 
     a.emit(1, metadata=[{'v': 1}])
     b.emit(2, metadata=[{'v': 2}])
@@ -654,11 +631,7 @@ def test_zip_ref_counts():
 def test_zip_metadata():
     a = Stream()
     b = Stream()
-    stream = a.zip(b)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
+    L = metadata(a.zip(b)).sink_to_list()
 
     a.emit(1, metadata=[{'v': 1}])
     b.emit(2, metadata=[{'v': 2}])
@@ -863,10 +836,7 @@ def test_collect_ref_counts():
 def test_collect_metadata():
     source = Stream()
     collector = source.collect()
-
-    L = []
-    sink = sink_metadata_to_list(collector, L)
-    collector.connect(sink)
+    L = metadata(collector).sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
@@ -923,11 +893,7 @@ def test_partition_ref_counts():
 
 def test_partition_metadata():
     source = Stream()
-    stream = source.partition(2)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
+    L = metadata(source.partition(2)).sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
@@ -1027,11 +993,7 @@ def test_zip_latest_ref_counts():
 def test_zip_latest_metadata():
     a = Stream()
     b = Stream()
-    stream = a.zip_latest(b)
-
-    L = []
-    sink = sink_metadata_to_list(stream, L)
-    stream.connect(sink)
+    L = metadata(a.zip_latest(b)).sink_to_list()
 
     a.emit(1, metadata=[{'v': 1}])
     b.emit(2, metadata=[{'v': 2}])

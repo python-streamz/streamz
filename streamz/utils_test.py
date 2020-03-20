@@ -10,7 +10,7 @@ import pytest
 from tornado import gen
 from tornado.ioloop import IOLoop
 
-from .core import _io_loops
+from .core import _io_loops, Stream
 
 
 @contextmanager
@@ -125,3 +125,9 @@ def await_for(predicate, timeout, fail_func=None, period=0.001):
             if fail_func is not None:
                 fail_func()
             pytest.fail("condition not reached until %s seconds" % (timeout,))
+
+
+class metadata(Stream):
+    def update(self, x, who=None, metadata=None):
+        if metadata:
+            return self._emit(metadata)
