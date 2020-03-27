@@ -1554,3 +1554,15 @@ def test_connect_discombine_latest():
 
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
+
+
+def test_buffer_after_partition():
+    Stream().partition(1).buffer(1)
+
+
+def test_buffer_after_timed_window():
+    Stream().timed_window(1).buffer(1)
+
+
+def test_buffer_after_sliding_window():
+    Stream().sliding_window(1).buffer(1)

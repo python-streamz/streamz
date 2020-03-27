@@ -954,19 +954,19 @@ class partition(Stream):
 
     def __init__(self, upstream, n, **kwargs):
         self.n = n
-        self.buffer = []
+        self._buffer = []
         self.metadata_buffer = []
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None, metadata=None):
         self._retain_refs(metadata)
-        self.buffer.append(x)
+        self._buffer.append(x)
         if isinstance(metadata, list):
             self.metadata_buffer.extend(metadata)
         else:
             self.metadata_buffer.append(metadata)
-        if len(self.buffer) == self.n:
-            result, self.buffer = self.buffer, []
+        if len(self._buffer) == self.n:
+            result, self._buffer = self._buffer, []
             metadata_result, self.metadata_buffer = self.metadata_buffer, []
             ret = self._emit(tuple(result), list(metadata_result))
             self._release_refs(metadata_result)
@@ -1003,20 +1003,20 @@ class sliding_window(Stream):
 
     def __init__(self, upstream, n, return_partial=True, **kwargs):
         self.n = n
-        self.buffer = deque(maxlen=n)
+        self._buffer = deque(maxlen=n)
         self.metadata_buffer = deque(maxlen=n)
         self.partial = return_partial
         Stream.__init__(self, upstream, **kwargs)
 
     def update(self, x, who=None, metadata=None):
         self._retain_refs(metadata)
-        self.buffer.append(x)
+        self._buffer.append(x)
         if not isinstance(metadata, list):
             metadata = [metadata]
         self.metadata_buffer.append(metadata)
-        if self.partial or len(self.buffer) == self.n:
+        if self.partial or len(self._buffer) == self.n:
             flat_metadata = [m for l in self.metadata_buffer for m in l]
-            ret = self._emit(tuple(self.buffer), flat_metadata)
+            ret = self._emit(tuple(self._buffer), flat_metadata)
             if len(self.metadata_buffer) == self.n:
                 completed = self.metadata_buffer.popleft()
                 self._release_refs(completed)
@@ -1044,7 +1044,7 @@ class timed_window(Stream):
 
     def __init__(self, upstream, interval, **kwargs):
         self.interval = convert_interval(interval)
-        self.buffer = []
+        self._buffer = []
         self.metadata_buffer = []
         self.last = gen.moment
 
@@ -1053,7 +1053,7 @@ class timed_window(Stream):
         self.loop.add_callback(self.cb)
 
     def update(self, x, who=None, metadata=None):
-        self.buffer.append(x)
+        self._buffer.append(x)
         self._retain_refs(metadata)
         self.metadata_buffer.append(metadata)
         return self.last
@@ -1061,7 +1061,7 @@ class timed_window(Stream):
     @gen.coroutine
     def cb(self):
         while True:
-            L, self.buffer = self.buffer, []
+            L, self._buffer = self._buffer, []
             metadata, self.metadata_buffer = self.metadata_buffer, []
             m = [m for l in metadata for m in l]
             self.last = self._emit(L, m)
