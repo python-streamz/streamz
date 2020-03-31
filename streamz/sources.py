@@ -673,5 +673,9 @@ def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, time
     """
     from custreamz import kafka
     consumer = kafka.Consumer(kafka_params)
-    gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
+    gdf = None
+    try:
+        gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
+    finally:
+        consumer.close()
     return gdf
