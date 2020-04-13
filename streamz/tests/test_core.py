@@ -700,13 +700,8 @@ def test_unique_key():
 
 
 def test_unique_metadata():
-    @Stream.register_api()
-    class get_metadata(Stream):
-        def update(self, x, metadata=None, who=None):
-            self._emit(metadata)
-
     source = Stream()
-    L = source.unique().get_metadata().flatten().sink_to_list()
+    L = metadata(source.unique()).flatten().sink_to_list()
     for i in range(5):
         source.emit(i, metadata=[{'v': i}])
 
