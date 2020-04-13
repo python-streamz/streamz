@@ -699,6 +699,20 @@ def test_unique_key():
     assert L == [1, 2, 3]
 
 
+def test_unique_metadata():
+    @Stream.register_api()
+    class get_metadata(Stream):
+        def update(self, x, metadata=None, who=None):
+            self._emit(metadata)
+
+    source = Stream()
+    L = source.unique().get_metadata().flatten().sink_to_list()
+    for i in range(5):
+        source.emit(i, metadata=[{'v': i}])
+
+    assert L == [{'v': i} for i in range(5)]
+
+
 def test_unique_history():
     source = Stream()
     s = source.unique(maxsize=2)

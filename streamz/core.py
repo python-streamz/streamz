@@ -1409,7 +1409,7 @@ class unique(Stream):
         else:
             if self.seen.get(y, '~~not_seen~~') == '~~not_seen~~':
                 self.seen[y] = 1
-                return self._emit(x)
+                return self._emit(x, metadata=metadata)
 
 
 @Stream.register_api()
