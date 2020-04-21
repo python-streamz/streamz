@@ -219,7 +219,7 @@ def test_kafka_batch():
 
 
 @gen_cluster(client=True, timeout=60)
-def test_kafka_dask_batch(c, s, w1, w2):
+async def test_kafka_dask_batch(c, s, w1, w2):
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
@@ -278,7 +278,7 @@ def test_kafka_batch_checkpointing_sync_nodes():
 
 
 @gen_cluster(client=True, timeout=60)
-def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
+async def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
     '''
     Testing whether Dask's scatter and gather works in conformity with
     the reference counting checkpointing implementation.

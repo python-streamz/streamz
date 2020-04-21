@@ -13,9 +13,8 @@ from distributed import Future, Client
 from distributed.utils import sync
 from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # noqa: F401
 
-
 @gen_cluster(client=True)
-def test_map(c, s, a, b):
+async def test_map(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
     futures_L = futures.sink_to_list()
@@ -29,7 +28,7 @@ def test_map(c, s, a, b):
 
 
 @gen_cluster(client=True)
-def test_scan(c, s, a, b):
+async def test_scan(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc).scan(add)
     futures_L = futures.sink_to_list()
@@ -43,7 +42,7 @@ def test_scan(c, s, a, b):
 
 
 @gen_cluster(client=True)
-def test_scan_state(c, s, a, b):
+async def test_scan_state(c, s, a, b):
     source = Stream(asynchronous=True)
 
     def f(acc, i):
@@ -58,7 +57,7 @@ def test_scan_state(c, s, a, b):
 
 
 @gen_cluster(client=True)
-def test_zip(c, s, a, b):
+async def test_zip(c, s, a, b):
     a = Stream(asynchronous=True)
     b = Stream(asynchronous=True)
     c = scatter(a).zip(scatter(b))
@@ -106,7 +105,7 @@ def test_sync_2(loop):  # noqa: F811
 
 @pytest.mark.slow
 @gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
-def test_buffer(c, s, a, b):
+async def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
     L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()
 
@@ -166,7 +165,7 @@ def test_stream_shares_client_loop(loop):  # noqa: F811
 
 
 @gen_cluster(client=True)
-def test_starmap(c, s, a, b):
+async def test_starmap(c, s, a, b):
     def add(x, y, z=0):
         return x + y + z
 
