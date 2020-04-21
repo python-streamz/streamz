@@ -498,6 +498,7 @@ class FromKafkaBatched(Stream):
                 for tp in committed:
                     self.positions[tp.partition] = tp.offset
                 break
+
         try:
             while not self.stopped:
                 out = []
