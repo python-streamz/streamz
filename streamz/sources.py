@@ -475,13 +475,9 @@ class FromKafkaBatched(Stream):
     def poll_kafka(self):
         import confluent_kafka as ck
 
-        if self.engine == "cudf":
-            from custreamz import kafka
-
         def commit(_part):
             topic, part_no, _, _, offset = _part[1:]
             _tp = ck.TopicPartition(topic, part_no, offset + 1)
-            print("committing offset:" + str(offset+1) + " in partition:" + str(part_no))
             self.consumer.commit(offsets=[_tp], asynchronous=True)
 
         @gen.coroutine
@@ -496,7 +492,7 @@ class FromKafkaBatched(Stream):
         while True:
             try:
                 committed = self.consumer.committed(tps, timeout=1)
-            except:
+            except ck.KafkaException:
                 pass
             else:
                 for tp in committed:
@@ -510,7 +506,7 @@ class FromKafkaBatched(Stream):
                     try:
                         low, high = self.consumer.get_watermark_offsets(
                             tp, timeout=0.1)
-                    except:
+                    except (RuntimeError, ck.KafkaException, ValueError):
                         continue
                     if 'auto.offset.reset' in self.consumer_params.keys():
                         if self.consumer_params['auto.offset.reset'] == 'latest':
@@ -676,7 +672,7 @@ def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, time
     consumer = kafka.Consumer(kafka_params)
     gdf = None
     try:
-        gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high+1)
+        gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high + 1)
     finally:
         consumer.close()
     return gdf
