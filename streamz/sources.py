@@ -507,7 +507,7 @@ class FromKafkaBatched(Stream):
                     try:
                         low, high = self.consumer.get_watermark_offsets(
                             tp, timeout=0.1)
-                    except (RuntimeError, ck.KafkaException, ValueError):
+                    except (RuntimeError, ck.KafkaException):
                         continue
                     if 'auto.offset.reset' in self.consumer_params.keys():
                         if self.consumer_params['auto.offset.reset'] == 'latest':
