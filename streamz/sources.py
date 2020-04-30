@@ -609,12 +609,17 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Folks interested in trying out custreamz would benefit from this accelerated Kafka reader.
         If one does not want to use GPUs, they can use streamz as is, with the default engine=None.
 
-        To use this option, one must install RAPIDS custreamz using:
-        https://anaconda.org/rapidsai-nightly/custreamz
+        To use this option, one must install custreamz (use the appropriate CUDA version recipe) using:
+        conda env create --name custreamz --file
+        {https://github.com/jdye64/cudf/blob/kratos/conda/environments/custreamz_dev_cuda10.1.yml}
         This will install all GPU dependencies, including streamz.
 
         Please refer to RAPIDS custreamz.kafka API here:
-        github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
+        https://github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
+
+        The accelerated Kafka datasource will soon be officially merged into RAPIDS custreamz.
+        Then, custreamz can simply be installed using: https://anaconda.org/rapidsai-nightly/custreamz,
+        instead of the command above.
 
         Please refer to RAPIDS cudf API here:
         https://docs.rapids.ai/api/cudf/stable/
