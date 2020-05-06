@@ -619,8 +619,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         https://github.com/jdye64/cudf/blob/kratos/conda/environments/custreamz_dev_cuda10.1.yml
         Instead of creating a new conda environment, one can alternatively install all the packages
         mentioned in the .yml file. But creating a new conda environment with the .yml script installs
-        everything cleanly. Also, this is temporary (as mentioned below) until the code gets merged
-        into cudf/custreamz, after which it be a single line nightly package install.
+        everything cleanly. Also, this is temporary (as mentioned below) until custreamz.kafka code
+        gets merged into cudf/custreamz, after which it be a single line nightly package install.
 
         The accelerated Kafka datasource will soon be officially merged into RAPIDS custreamz.
         Then, custreamz can simply be installed using: https://anaconda.org/rapidsai-nightly/custreamz,
