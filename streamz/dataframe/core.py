@@ -49,32 +49,32 @@ class BaseFrame(Streaming):
 class Frame(BaseFrame):
     _stream_type = 'streaming'
 
-    def groupby(self, other):
+    def groupby(self, other, start=None):
         """ Groupby aggreagtions """
-        return GroupBy(self, other)
+        return GroupBy(self, other, start=start)
 
-    def aggregate(self, aggregation):
+    def aggregate(self, aggregation, start=None):
         return self.accumulate_partitions(aggregations.accumulator,
                                           agg=aggregation,
-                                          start=None, stream_type='updating',
+                                          start=start, stream_type='updating',
                                           returns_state=True)
 
-    def sum(self):
+    def sum(self, start=None):
         """ Sum frame """
-        return self.aggregate(aggregations.Sum())
+        return self.aggregate(aggregations.Sum(), start)
 
-    def count(self):
+    def count(self, start=None):
         """ Count of frame """
-        return self.aggregate(aggregations.Count())
+        return self.aggregate(aggregations.Count(), start)
 
     @property
     def size(self):
         """ size of frame """
         return self.aggregate(aggregations.Size())
 
-    def mean(self):
+    def mean(self, start=None):
         """ Average """
-        return self.aggregate(aggregations.Mean())
+        return self.aggregate(aggregations.Mean(), start)
 
     def rolling(self, window, min_periods=1):
         """ Compute rolling aggregations
@@ -602,13 +602,14 @@ def _accumulate_size(accumulator, new):
 class GroupBy(object):
     """ Groupby aggregations on streaming dataframes """
 
-    def __init__(self, root, grouper, index=None):
+    def __init__(self, root, grouper, index=None, start=None):
         self.root = root
         self.grouper = grouper
         self.index = index
+        self.start=start
 
     def __getitem__(self, index):
-        return GroupBy(self.root, self.grouper, index)
+        return GroupBy(self.root, self.grouper, index, self.start)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
@@ -640,7 +641,7 @@ class GroupBy(object):
 
         outstream = stream.accumulate(aggregations.groupby_accumulator,
                                       agg=agg,
-                                      start=None,
+                                      start=self.start,
                                       returns_state=True)
 
         for fn, s_type in _stream_types[stream_type]:
