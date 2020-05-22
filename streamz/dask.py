@@ -66,12 +66,17 @@ class accumulate(DaskStream):
         self.state = start
         self.returns_state = returns_state
         self.kwargs = kwargs
+        self.rolling_acc = kwargs.pop('rolling_accumulator', False)
+        self.sdf_checkpoint = kwargs.pop('sdf_checkpoint', False)
         DaskStream.__init__(self, upstream)
 
     def update(self, x, who=None, metadata=None):
         if self.state is core.no_default:
             self.state = x
-            return self._emit(self.state, metadata=metadata)
+            if self.rolling_acc and self.sdf_checkpoint:
+                return self._emit((self.state, x), metadata=metadata)
+            else:
+                return self._emit(x, metadata=metadata)
         else:
             client = default_client()
             result = client.submit(self.func, self.state, x, **self.kwargs)
@@ -81,7 +86,10 @@ class accumulate(DaskStream):
             else:
                 state = result
             self.state = state
-            return self._emit(result, metadata=metadata)
+            if self.rolling_acc and self.sdf_checkpoint:
+                return self._emit((self.state, result), metadata=metadata)
+            else:
+                return self._emit(result, metadata=metadata)
 
 
 @core.Stream.register_api()

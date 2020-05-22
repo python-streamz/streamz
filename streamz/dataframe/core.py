@@ -406,54 +406,81 @@ class Rolling(object):
         else:
             raise AttributeError("Rolling has no attribute %r" % key)
 
-    def _known_aggregation(self, op, *args, **kwargs):
+    def _known_aggregation(self, op, sdf_checkpoint, start, *args, **kwargs):
         return self.root.accumulate_partitions(rolling_accumulator,
                                                window=self.window,
                                                op=op,
                                                args=args,
                                                kwargs=kwargs,
-                                               start=(),
-                                               returns_state=True)
+                                               start=start,
+                                               returns_state=True,
+                                               rolling_accumulator=True,
+                                               sdf_checkpoint=sdf_checkpoint)
 
-    def sum(self):
+    def sum(self, sdf_checkpoint=False, start=()):
         """ Rolling sum """
-        return self._known_aggregation('sum')
+        return self._known_aggregation('sum',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start)
 
-    def mean(self):
+    def mean(self, sdf_checkpoint=False, start=()):
         """ Rolling mean """
-        return self._known_aggregation('mean')
+        return self._known_aggregation('mean',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start)
 
-    def min(self):
+    def min(self, sdf_checkpoint=False, start=()):
         """ Rolling minimum """
-        return self._known_aggregation('min')
+        return self._known_aggregation('min',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start)
 
-    def max(self):
+    def max(self, sdf_checkpoint=False, start=()):
         """ Rolling maximum """
-        return self._known_aggregation('max')
+        return self._known_aggregation('max',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start)
 
-    def median(self):
+    def median(self, sdf_checkpoint=False, start=()):
         """ Rolling median """
-        return self._known_aggregation('median')
+        return self._known_aggregation('median',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start)
 
-    def std(self, *args, **kwargs):
+    def std(self, sdf_checkpoint=False, start=(), *args, **kwargs):
         """ Rolling standard deviation """
-        return self._known_aggregation('std', *args, **kwargs)
+        return self._known_aggregation('std',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start,
+                                       *args, **kwargs)
 
-    def var(self, *args, **kwargs):
+    def var(self, sdf_checkpoint=False, start=(), *args, **kwargs):
         """ Rolling variance """
-        return self._known_aggregation('var', *args, **kwargs)
+        return self._known_aggregation('var',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start,
+                                       *args, **kwargs)
 
-    def count(self, *args, **kwargs):
+    def count(self, sdf_checkpoint=False, start=(), *args, **kwargs):
         """ Rolling count """
-        return self._known_aggregation('count', *args, **kwargs)
+        return self._known_aggregation('count',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start,
+                                       *args, **kwargs)
 
-    def aggregate(self, *args, **kwargs):
+    def aggregate(self, sdf_checkpoint=False, start=(), *args, **kwargs):
         """ Rolling aggregation """
-        return self._known_aggregation('aggregate', *args, **kwargs)
+        return self._known_aggregation('aggregate',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start,
+                                       *args, **kwargs)
 
-    def quantile(self, *args, **kwargs):
+    def quantile(self, sdf_checkpoint=False, start=(), *args, **kwargs):
         """ Rolling quantile """
-        return self._known_aggregation('quantile', *args, **kwargs)
+        return self._known_aggregation('quantile',
+                                       sdf_checkpoint=sdf_checkpoint,
+                                       start=start,
+                                       *args, **kwargs)
 
 
 class Window(OperatorMixin):
@@ -568,7 +595,8 @@ class Window(OperatorMixin):
         return WindowedGroupBy(self.root, other, None, self.n, self.value)
 
 
-def rolling_accumulator(acc, new, window=None, op=None, args=(), kwargs={}):
+def rolling_accumulator(acc, new, window=None, op=None, rolling_accumulator=True,
+                        sdf_checkpoint=False, args=(), kwargs={}):
     if len(acc):
         df_package = get_dataframe_package(new)
         df = df_package.concat([acc, new])

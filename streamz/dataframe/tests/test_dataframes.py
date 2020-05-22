@@ -28,7 +28,7 @@ def client():
         client.close()
 
 
-@pytest.fixture(params=['core', 'dask'])
+@pytest.fixture(params=['core','dask'])
 def stream(request, client):  # flake8: noqa
     if request.param == 'core':
         return Stream()
@@ -300,7 +300,7 @@ def test_groupby_aggregate_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
     sdf = DataFrame(stream, example=example)
     output0 = sdf.groupby(['name'], start=None).amount.sum().stream.gather().sink_to_list()
-    df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100], 'other': [6, 8]})
+    df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100]})
     stream.emit(df)
 
     out_df0 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
@@ -310,7 +310,7 @@ def test_groupby_aggregate_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
     sdf = DataFrame(stream, example=example)
     output1 = sdf.groupby(['name'], start=output0[0]).amount.sum().stream.gather().sink_to_list()
-    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200], 'other': [6, 8, 10]})
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
 
     out_df1 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
@@ -324,12 +324,38 @@ def test_reductions_with_start_state(stream):
     output1 = sdf.amount.count(start=3).stream.gather().sink_to_list()
     output2 = sdf.amount.sum(start=10).stream.gather().sink_to_list()
 
-    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200], 'other': [6, 8, 10]})
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
 
     assert output0[0] == 72.0
     assert output1[0] == 6
     assert output2[0] == 360
+
+
+def test_rolling_aggs_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.rolling(2).amount.sum(sdf_checkpoint=True, start=()).stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Tom'], 'amount': [100]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Linda'], 'amount': [200]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Bob'], 'amount': [250]})
+    stream.emit(df)
+    assert assert_eq(output0[-1][0].reset_index(drop=True), pd.Series([200, 250], name="amount"))
+    assert assert_eq(output0[-1][1].reset_index(drop=True), pd.Series([450.0], name="amount"))
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.rolling(2).amount.sum(sdf_checkpoint=True, start=output0[-1][0]).stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice'], 'amount': [50], 'other': [6]})
+    stream.emit(df)
+    assert assert_eq(output1[-1][0].reset_index(drop=True), pd.Series([250, 50], name="amount"))
+    assert assert_eq(output1[-1][1].reset_index(drop=True), pd.Series([300.0], name="amount"))
 
 
 def test_value_counts(stream):
