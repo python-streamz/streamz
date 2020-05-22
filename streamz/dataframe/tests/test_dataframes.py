@@ -262,9 +262,9 @@ def test_getitem(stream):
 
 
 @pytest.mark.parametrize('agg', [
-    # lambda x: x.sum(),
-    # lambda x: x.mean(),
-    # lambda x: x.count(),
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
     lambda x: x.var(ddof=1),
     lambda x: x.std(),
     # pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
@@ -294,6 +294,42 @@ def test_groupby_aggregate(agg, grouper, indexer, stream):
     first = df.iloc[:3]
     assert assert_eq(L[0], f(first))
     assert assert_eq(L[-1], f(df))
+
+
+def test_groupby_aggregate_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.groupby(['name'], start=None).amount.sum().stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100], 'other': [6, 8]})
+    stream.emit(df)
+
+    out_df0 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
+    assert assert_eq(output0[0].reset_index(), out_df0)
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.groupby(['name'], start=output0[0]).amount.sum().stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200], 'other': [6, 8, 10]})
+    stream.emit(df)
+
+    out_df1 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
+    assert assert_eq(output1[0].reset_index(), out_df1)
+
+
+def test_reductions_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.amount.mean(start=(10, 2)).stream.gather().sink_to_list()
+    output1 = sdf.amount.count(start=3).stream.gather().sink_to_list()
+    output2 = sdf.amount.sum(start=10).stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200], 'other': [6, 8, 10]})
+    stream.emit(df)
+
+    assert output0[0] == 72.0
+    assert output1[0] == 6
+    assert output2[0] == 360
 
 
 def test_value_counts(stream):
