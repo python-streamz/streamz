@@ -617,7 +617,7 @@ class GroupBy(object):
         self.root = root
         self.grouper = grouper
         self.index = index
-        self.start=start
+        self.start = start
 
     def __getitem__(self, index):
         return GroupBy(self.root, self.grouper, index, self.start)
