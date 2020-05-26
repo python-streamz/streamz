@@ -335,7 +335,7 @@ def test_reductions_with_start_state(stream):
 def test_rolling_aggs_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
     sdf = DataFrame(stream, example=example)
-    output0 = sdf.rolling(2).amount.sum(sdf_checkpoint=True, start=()).stream.gather().sink_to_list()
+    output0 = sdf.rolling(2, sdf_checkpoint=True, start=()).amount.sum().stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
     stream.emit(df)
@@ -351,7 +351,7 @@ def test_rolling_aggs_with_start_state(stream):
     stream = Stream()
     example = pd.DataFrame({'name': [], 'amount': [], 'other': []})
     sdf = DataFrame(stream, example=example)
-    output1 = sdf.rolling(2).amount.sum(sdf_checkpoint=True, start=output0[-1][0]).stream.gather().sink_to_list()
+    output1 = sdf.rolling(2, sdf_checkpoint=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice'], 'amount': [50], 'other': [6]})
     stream.emit(df)
     assert assert_eq(output1[-1][0].reset_index(drop=True), pd.Series([250, 50], name="amount"))
