@@ -106,7 +106,7 @@ class Frame(BaseFrame):
         """
         return Rolling(self, window, min_periods, sdf_checkpoint, start)
 
-    def window(self, n=None, value=None):
+    def window(self, n=None, value=None, sdf_checkpoint=False, start=None):
         """ Sliding window operations
 
         Windowed operations are defined over a sliding window of data, either
@@ -134,7 +134,7 @@ class Frame(BaseFrame):
         --------
         DataFrame.rolling: mimic's Pandas rolling aggregations
         """
-        return Window(self, n=n, value=value)
+        return Window(self, n=n, value=value, sdf_checkpoint=sdf_checkpoint, start=start)
 
     def _cumulative_aggregation(self, op):
         return self.accumulate_partitions(_cumulative_accumulator,
@@ -471,7 +471,7 @@ class Window(OperatorMixin):
     DataFrame.window: contains full docstring
     """
 
-    def __init__(self, sdf, n=None, value=None):
+    def __init__(self, sdf, n=None, value=None, sdf_checkpoint=False, start=None):
         if value is None and isinstance(n, (str, pd.Timedelta)):
             value = n
             n = None
@@ -480,10 +480,12 @@ class Window(OperatorMixin):
         if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
             value = pd.Timedelta(value)
         self.value = value
+        self.sdf_checkpoint = sdf_checkpoint
+        self.start = start
 
     def __getitem__(self, key):
         sdf = self.root[key]
-        return Window(sdf, n=self.n, value=self.value)
+        return Window(sdf, n=self.n, value=self.value, sdf_checkpoint=self.sdf_checkpoint, start=self.start)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
@@ -526,9 +528,11 @@ class Window(OperatorMixin):
                                                diff=diff,
                                                window=window,
                                                agg=agg,
-                                               start=None,
+                                               start=self.start,
                                                returns_state=True,
-                                               stream_type='updating')
+                                               stream_type='updating',
+                                               sdf_checkpoint=self.sdf_checkpoint,
+                                               window_accumulator=True)
 
     def full(self):
         return self.aggregate(aggregations.Full())

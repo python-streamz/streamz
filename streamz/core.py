@@ -868,19 +868,20 @@ class accumulate(Stream):
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
         self.rolling_acc = kwargs.pop('rolling_accumulator', False)
+        self.window_acc = kwargs.pop('window_accumulator', False)
         self.sdf_checkpoint = kwargs.pop('sdf_checkpoint', False)
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None, metadata=None):
         if self.state is no_default:
             self.state = x
-            if self.rolling_acc and self.sdf_checkpoint:
+            if (self.rolling_acc and self.sdf_checkpoint) or (self.window_acc and self.sdf_checkpoint):
                 return self._emit((self.state, x), metadata=metadata)
             else:
                 return self._emit(x, metadata=metadata)
         else:
             try:
-                result = self.func(self.state, x, **self.kwargs)
+                    result = self.func(self.state, x, **self.kwargs)
             except Exception as e:
                 logger.exception(e)
                 raise
@@ -890,7 +891,7 @@ class accumulate(Stream):
                 state = result
             self.state = state
 
-            if self.rolling_acc and self.sdf_checkpoint:
+            if (self.rolling_acc and self.sdf_checkpoint) or (self.window_acc and self.sdf_checkpoint):
                 return self._emit((self.state, result), metadata=metadata)
             else:
                 return self._emit(result, metadata=metadata)
