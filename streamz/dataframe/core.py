@@ -580,7 +580,6 @@ class Window(OperatorMixin):
 
 def rolling_accumulator(acc, new, window=None, op=None, rolling_accumulator=True,
                         sdf_checkpoint=False, args=(), kwargs={}):
-    print("acc ", acc)
     if len(acc):
         df_package = get_dataframe_package(new)
         df = df_package.concat([acc, new])
