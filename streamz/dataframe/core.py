@@ -416,7 +416,6 @@ class Rolling(object):
                                                kwargs=kwargs,
                                                start=self.start,
                                                returns_state=True,
-                                               rolling_accumulator=True,
                                                sdf_checkpoint=self.sdf_checkpoint)
 
     def sum(self):
@@ -532,8 +531,7 @@ class Window(OperatorMixin):
                                                start=self.start,
                                                returns_state=True,
                                                stream_type='updating',
-                                               sdf_checkpoint=self.sdf_checkpoint,
-                                               window_accumulator=True)
+                                               sdf_checkpoint=self.sdf_checkpoint)
 
     def full(self):
         return self.aggregate(aggregations.Full())
@@ -578,7 +576,7 @@ class Window(OperatorMixin):
                                self.sdf_checkpoint, self.start)
 
 
-def rolling_accumulator(acc, new, window=None, op=None, rolling_accumulator=True,
+def rolling_accumulator(acc, new, window=None, op=None,
                         sdf_checkpoint=False, args=(), kwargs={}):
     if len(acc):
         df_package = get_dataframe_package(new)
@@ -742,7 +740,6 @@ class WindowedGroupBy(GroupBy):
                                       returns_state=True,
                                       diff=diff,
                                       window=window,
-                                      windowed_groupby_accumulator=True,
                                       sdf_checkpoint=self.sdf_checkpoint)
 
         for fn, s_type in _stream_types[stream_type]:
