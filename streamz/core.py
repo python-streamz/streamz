@@ -892,7 +892,6 @@ class accumulate(Stream):
             else:
                 state = result
             self.state = state
-
             if (self.rolling_acc and self.sdf_checkpoint) or \
                     (self.window_acc and self.sdf_checkpoint) or (self.window_groupby_acc and self.sdf_checkpoint):
                 return self._emit((self.state, result), metadata=metadata)
