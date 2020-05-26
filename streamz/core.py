@@ -883,7 +883,7 @@ class accumulate(Stream):
                 return self._emit(x, metadata=metadata)
         else:
             try:
-                    result = self.func(self.state, x, **self.kwargs)
+                result = self.func(self.state, x, **self.kwargs)
             except Exception as e:
                 logger.exception(e)
                 raise
