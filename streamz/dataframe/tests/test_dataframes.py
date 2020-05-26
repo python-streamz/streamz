@@ -374,6 +374,29 @@ def test_window_aggs_with_start_state(stream):
     assert output1[-1][1] == 300
 
 
+def test_windowed_groupby_aggs_with_start_state(stream):
+
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.window(5, sdf_checkpoint=True, start=None).groupby(['name']).amount.sum().\
+        stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Alice', 'Linda', 'Bob'], 'amount': [250, 300, 350]})
+    stream.emit(df)
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.window(5, sdf_checkpoint=True, start=output0[-1][0]).groupby(['name']).amount.sum().\
+        stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom', 'Bob'], 'amount': [50, 100, 150, 200]})
+    stream.emit(df)
+    out_df1 = pd.DataFrame({'name':['Alice', 'Bob', 'Linda', 'Tom'], 'amount':[50.0, 550.0, 100.0, 150.0]})
+    assert_eq(output1[-1][1].reset_index(), out_df1)
+
+
 def test_value_counts(stream):
     s = pd.Series(['a', 'b', 'a'])
 

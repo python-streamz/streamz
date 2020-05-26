@@ -515,7 +515,8 @@ class Window(OperatorMixin):
         return self.root.example
 
     def reset_index(self):
-        return Window(self.root.reset_index(), n=self.n, value=self.value)
+        return Window(self.root.reset_index(), n=self.n, value=self.value,
+                      sdf_checkpoint=self.sdf_checkpoint, start=self.start)
 
     def aggregate(self, agg):
         if self.n is not None:
@@ -573,7 +574,8 @@ class Window(OperatorMixin):
 
     def groupby(self, other):
         """ Groupby-aggregations within window """
-        return WindowedGroupBy(self.root, other, None, self.n, self.value)
+        return WindowedGroupBy(self.root, other, None, self.n, self.value,
+                               self.sdf_checkpoint, self.start)
 
 
 def rolling_accumulator(acc, new, window=None, op=None, rolling_accumulator=True,
@@ -687,7 +689,7 @@ class GroupBy(object):
 class WindowedGroupBy(GroupBy):
     """ Groupby aggregations over a window of data """
 
-    def __init__(self, root, grouper, index=None, n=None, value=None):
+    def __init__(self, root, grouper, index=None, n=None, value=None, sdf_checkpoint=False, start=None):
         self.root = root
         self.grouper = grouper
         self.index = index
@@ -695,9 +697,11 @@ class WindowedGroupBy(GroupBy):
         if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
             value = pd.Timedelta(value)
         self.value = value
+        self.sdf_checkpoint = sdf_checkpoint
+        self.start = start
 
     def __getitem__(self, index):
-        return WindowedGroupBy(self.root, self.grouper, index, self.n, self.value)
+        return WindowedGroupBy(self.root, self.grouper, index, self.n, self.value, self.sdf_checkpoint, self.start)
 
     def _accumulate(self, Agg, **kwargs):
         stream_type = 'updating'
@@ -734,10 +738,12 @@ class WindowedGroupBy(GroupBy):
 
         outstream = stream.accumulate(aggregations.windowed_groupby_accumulator,
                                       agg=agg,
-                                      start=None,
+                                      start=self.start,
                                       returns_state=True,
                                       diff=diff,
-                                      window=window)
+                                      window=window,
+                                      windowed_groupby_accumulator=True,
+                                      sdf_checkpoint=self.sdf_checkpoint)
 
         for fn, s_type in _stream_types[stream_type]:
             """Function checks if example is of a specific frame type"""
