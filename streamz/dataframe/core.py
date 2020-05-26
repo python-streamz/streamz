@@ -388,15 +388,15 @@ class Rolling(object):
     >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
     """
 
-    def __init__(self, sdf, window, min_periods, start, sdf_checkpoint):
+    def __init__(self, sdf, window, min_periods, sdf_checkpoint, start):
         self.root = sdf
         if not isinstance(window, int):
             window = pd.Timedelta(window)
             min_periods = 1
         self.window = window
         self.min_periods = min_periods
-        self.start = start
         self.sdf_checkpoint = sdf_checkpoint
+        self.start = start
 
     def __getitem__(self, key):
         sdf = self.root[key]
@@ -580,6 +580,7 @@ class Window(OperatorMixin):
 
 def rolling_accumulator(acc, new, window=None, op=None, rolling_accumulator=True,
                         sdf_checkpoint=False, args=(), kwargs={}):
+    print("acc ", acc)
     if len(acc):
         df_package = get_dataframe_package(new)
         df = df_package.concat([acc, new])

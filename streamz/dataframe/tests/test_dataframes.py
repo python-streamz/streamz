@@ -502,8 +502,8 @@ def test_setitem_overwrites(stream):
     pytest.param(5, marks=pytest.mark.slow)
 ])
 @pytest.mark.parametrize('pre_get,post_get', [
-    (lambda df: df, lambda df: df),
-    (lambda df: df.x, lambda x: x),
+    # (lambda df: df, lambda df: df),
+    # (lambda df: df.x, lambda x: x),
     (lambda df: df, lambda df: df.x)
 ])
 def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
