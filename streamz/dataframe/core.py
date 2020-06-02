@@ -50,7 +50,7 @@ class Frame(BaseFrame):
     _stream_type = 'streaming'
 
     def groupby(self, other):
-        """ Groupby aggreagtions """
+        """ Groupby aggregations """
         return GroupBy(self, other)
 
     def aggregate(self, aggregation, start=None):
