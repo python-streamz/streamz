@@ -853,23 +853,28 @@ def test_custom_aggregation():
 
 def test_groupby_aggregate_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
-    sdf = DataFrame(stream, example=example)
-    output0 = sdf.groupby(['name'], start=None).amount.sum().stream.gather().sink_to_list()
+    sdf = DataFrame(stream, example=example).groupby(['name'])
+    output0 = sdf.amount.sum(start=None).stream.gather().sink_to_list()
+    output1 = sdf.amount.mean(sdf_checkpoint=True, start=None).stream.gather().sink_to_list()
+
     df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100]})
     stream.emit(df)
 
-    out_df0 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
-    assert assert_eq(output0[0].reset_index(), out_df0)
+    out_df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
+    assert assert_eq(output0[0].reset_index(), out_df)
+    assert assert_eq(output1[0][1].reset_index(), out_df)
 
-    stream = Stream()
     example = pd.DataFrame({'name': [], 'amount': []})
-    sdf = DataFrame(stream, example=example)
-    output1 = sdf.groupby(['name'], start=output0[0]).amount.sum().stream.gather().sink_to_list()
+    sdf = DataFrame(stream, example=example).groupby(['name'])
+    output2 = sdf.amount.sum(start=output0[0]).stream.gather().sink_to_list()
+    output3 = sdf.amount.mean(sdf_checkpoint=True, start=output1[0][0]).stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
 
     out_df1 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
-    assert assert_eq(output1[0].reset_index(), out_df1)
+    out_df2 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [50.0, 200.0, 100.0]})
+    assert assert_eq(output2[0].reset_index(), out_df1)
+    assert assert_eq(output3[0][1].reset_index(), out_df2)
 
 
 def test_reductions_with_start_state(stream):

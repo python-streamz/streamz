@@ -49,9 +49,9 @@ class BaseFrame(Streaming):
 class Frame(BaseFrame):
     _stream_type = 'streaming'
 
-    def groupby(self, other, start=None):
+    def groupby(self, other):
         """ Groupby aggreagtions """
-        return GroupBy(self, other, start=start)
+        return GroupBy(self, other)
 
     def aggregate(self, aggregation, start=None):
         return self.accumulate_partitions(aggregations.accumulator,
@@ -611,14 +611,13 @@ def _accumulate_size(accumulator, new):
 class GroupBy(object):
     """ Groupby aggregations on streaming dataframes """
 
-    def __init__(self, root, grouper, index=None, start=None):
+    def __init__(self, root, grouper, index=None):
         self.root = root
         self.grouper = grouper
         self.index = index
-        self.start = start
 
     def __getitem__(self, index):
-        return GroupBy(self.root, self.grouper, index, self.start)
+        return GroupBy(self.root, self.grouper, index)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
@@ -626,7 +625,7 @@ class GroupBy(object):
         else:
             raise AttributeError("GroupBy has no attribute %r" % key)
 
-    def _accumulate(self, Agg, **kwargs):
+    def _accumulate(self, Agg, sdf_checkpoint=False, start=None, **kwargs):
         stream_type = 'updating'
 
         if isinstance(self.grouper, Streaming):
@@ -650,8 +649,9 @@ class GroupBy(object):
 
         outstream = stream.accumulate(aggregations.groupby_accumulator,
                                       agg=agg,
-                                      start=self.start,
-                                      returns_state=True)
+                                      start=start,
+                                      returns_state=True,
+                                      sdf_checkpoint=sdf_checkpoint)
 
         for fn, s_type in _stream_types[stream_type]:
             """Function checks if example is of a specific frame type"""
@@ -659,13 +659,13 @@ class GroupBy(object):
                 return s_type(outstream, example)
         return Streaming(outstream, example, stream_type=stream_type)
 
-    def count(self):
+    def count(self, start=None):
         """ Groupby-count """
-        return self._accumulate(aggregations.GroupbyCount)
+        return self._accumulate(aggregations.GroupbyCount, start=start)
 
-    def mean(self):
+    def mean(self, sdf_checkpoint=False, start=None):
         """ Groupby-mean """
-        return self._accumulate(aggregations.GroupbyMean)
+        return self._accumulate(aggregations.GroupbyMean, sdf_checkpoint=sdf_checkpoint, start=start)
 
     def size(self):
         """ Groupby-size """
@@ -675,9 +675,9 @@ class GroupBy(object):
         """ Groupby-std """
         return self.var(ddof=ddof) ** 0.5
 
-    def sum(self):
+    def sum(self, start=None):
         """ Groupby-sum """
-        return self._accumulate(aggregations.GroupbySum)
+        return self._accumulate(aggregations.GroupbySum, start=start)
 
     def var(self, ddof=1):
         """ Groupby-variance """
