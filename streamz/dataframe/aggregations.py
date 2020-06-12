@@ -203,7 +203,7 @@ def diff_loc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
-    mx = pd.Timestamp(max(df.index.max() for df in dfs))
+    mx = max(df.index.max() for df in dfs)
     mn = mx - pd.Timedelta(window)
     old = []
     while pd.Timestamp(dfs[0].index.min()) < mn:
