@@ -856,25 +856,31 @@ def test_groupby_aggregate_with_start_state(stream):
     sdf = DataFrame(stream, example=example).groupby(['name'])
     output0 = sdf.amount.sum(start=None).stream.gather().sink_to_list()
     output1 = sdf.amount.mean(sdf_checkpoint=True, start=None).stream.gather().sink_to_list()
+    output2 = sdf.amount.count(start=None).stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100]})
     stream.emit(df)
 
-    out_df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
-    assert assert_eq(output0[0].reset_index(), out_df)
-    assert assert_eq(output1[0][1].reset_index(), out_df)
+    out_df0 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
+    out_df1 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [1, 1]})
+    assert assert_eq(output0[0].reset_index(), out_df0)
+    assert assert_eq(output1[0][1].reset_index(), out_df0)
+    assert assert_eq(output2[0].reset_index(), out_df1)
 
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example).groupby(['name'])
-    output2 = sdf.amount.sum(start=output0[0]).stream.gather().sink_to_list()
-    output3 = sdf.amount.mean(sdf_checkpoint=True, start=output1[0][0]).stream.gather().sink_to_list()
+    output3 = sdf.amount.sum(start=output0[0]).stream.gather().sink_to_list()
+    output4 = sdf.amount.mean(sdf_checkpoint=True, start=output1[0][0]).stream.gather().sink_to_list()
+    output5 = sdf.amount.count(start=output2[0]).stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
 
-    out_df1 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
-    out_df2 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [50.0, 200.0, 100.0]})
-    assert assert_eq(output2[0].reset_index(), out_df1)
-    assert assert_eq(output3[0][1].reset_index(), out_df2)
+    out_df2 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
+    out_df3 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [50.0, 200.0, 100.0]})
+    out_df4 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [2, 1, 2]})
+    assert assert_eq(output3[0].reset_index(), out_df2)
+    assert assert_eq(output4[0][1].reset_index(), out_df3)
+    assert assert_eq(output5[0].reset_index(), out_df4)
 
 
 def test_reductions_with_start_state(stream):

@@ -177,3 +177,12 @@ def test_starmap(c, s, a, b):
         yield source.emit((i, i))
 
     assert L == [10, 12, 14, 16, 18]
+
+
+@gen_cluster(client=True)
+def test_accumulate(c, s, a, b):
+    source = Stream(asynchronous=True)
+    L = source.scatter().accumulate(lambda acc, x: acc + x).gather().sink_to_list()
+    for i in range(3):
+        yield source.emit(i)
+    assert L[-1] == 3
