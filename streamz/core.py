@@ -1022,7 +1022,7 @@ class sliding_window(Stream):
             metadata = [metadata]
         self.metadata_buffer.append(metadata)
         if self.partial or len(self._buffer) == self.n:
-            flat_metadata = [m for l in self.metadata_buffer for m in l]
+            flat_metadata = [m for ml in self.metadata_buffer for m in ml]
             ret = self._emit(tuple(self._buffer), flat_metadata)
             if len(self.metadata_buffer) == self.n:
                 completed = self.metadata_buffer.popleft()
@@ -1070,7 +1070,7 @@ class timed_window(Stream):
         while True:
             L, self._buffer = self._buffer, []
             metadata, self.metadata_buffer = self.metadata_buffer, []
-            m = [m for l in metadata for m in l]
+            m = [m for ml in metadata for m in ml]
             self.last = self._emit(L, m)
             self._release_refs(m)
             yield self.last
@@ -1229,7 +1229,7 @@ class zip(Stream):
             self.condition.notify_all()
             if self.literals:
                 tup = self.pack_literals(tup)
-            md = [m for l in md for m in l]
+            md = [m for ml in md for m in ml]
             ret = self._emit(tup, md)
             self._release_refs(md)
             return ret
@@ -1313,7 +1313,7 @@ class combine_latest(Stream):
         self.last[idx] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
-            md = [m for l in self.metadata for m in l]
+            md = [m for ml in self.metadata for m in ml]
             return self._emit(tup, md)
 
 
@@ -1566,7 +1566,7 @@ class zip_latest(Stream):
             L = []
             while self.lossless_buffer:
                 self.last[0], self.metadata[0] = self.lossless_buffer.popleft()
-                md = [m for l in self.metadata for m in l]
+                md = [m for ml in self.metadata for m in ml]
                 L.append(self._emit(tuple(self.last), md))
                 self._release_refs(self.metadata[0])
             return L
