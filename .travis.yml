@@ -24,6 +24,7 @@ install:
   - conda env create --name test-streamz --file ./conda/environments/streamz_dev.yml
   - source activate test-streamz
   - pip install git+https://github.com/dask/distributed.git --upgrade --no-deps
+  - pip install flaky
 
   - python setup.py install
 

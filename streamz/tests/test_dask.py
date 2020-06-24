@@ -76,7 +76,7 @@ def test_zip(c, s, a, b):
 @gen_cluster(client=True)
 def test_accumulate(c, s, a, b):
     source = Stream(asynchronous=True)
-    L = source.scatter().accumulate(lambda acc, x: acc + x, sdf_checkpoint=True).gather().sink_to_list()
+    L = source.scatter().accumulate(lambda acc, x: acc + x, with_state=True).gather().sink_to_list()
     for i in range(3):
         yield source.emit(i)
     assert L[-1][1] == 3
