@@ -110,7 +110,7 @@ class RefCounter:
 
 
 class Stream(object):
-    """ A Stream is an infinite sequence of data
+    """ A Stream is an infinite sequence of data.
 
     Streams subscribe to each other passing and transforming data between them.
     A Stream object listens for updates from upstream, reacts to these updates,
@@ -121,6 +121,8 @@ class Stream(object):
 
     Parameters
     ----------
+    stream_name: str or None
+        This is the name of the stream.
     asynchronous: boolean or None
         Whether or not this stream will be used in asynchronous functions or
         normal Python functions.  Leave as None if you don't know.
@@ -867,13 +869,13 @@ class accumulate(Stream):
         self.returns_state = returns_state
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
-        self.sdf_checkpoint = kwargs.pop('sdf_checkpoint', False)
+        self.with_state = kwargs.pop('with_state', False)
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None, metadata=None):
         if self.state is no_default:
             self.state = x
-            if self.sdf_checkpoint:
+            if self.with_state:
                 return self._emit((self.state, x), metadata=metadata)
             else:
                 return self._emit(x, metadata=metadata)
@@ -888,7 +890,7 @@ class accumulate(Stream):
             else:
                 state = result
             self.state = state
-            if self.sdf_checkpoint:
+            if self.with_state:
                 return self._emit((self.state, result), metadata=metadata)
             else:
                 return self._emit(result, metadata=metadata)

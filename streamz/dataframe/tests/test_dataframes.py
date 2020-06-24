@@ -855,7 +855,7 @@ def test_groupby_aggregate_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example).groupby(['name'])
     output0 = sdf.amount.sum(start=None).stream.gather().sink_to_list()
-    output1 = sdf.amount.mean(sdf_checkpoint=True, start=None).stream.gather().sink_to_list()
+    output1 = sdf.amount.mean(with_state=True, start=None).stream.gather().sink_to_list()
     output2 = sdf.amount.count(start=None).stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100]})
@@ -870,7 +870,7 @@ def test_groupby_aggregate_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example).groupby(['name'])
     output3 = sdf.amount.sum(start=output0[0]).stream.gather().sink_to_list()
-    output4 = sdf.amount.mean(sdf_checkpoint=True, start=output1[0][0]).stream.gather().sink_to_list()
+    output4 = sdf.amount.mean(with_state=True, start=output1[0][0]).stream.gather().sink_to_list()
     output5 = sdf.amount.count(start=output2[0]).stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
@@ -901,7 +901,7 @@ def test_reductions_with_start_state(stream):
 def test_rolling_aggs_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output0 = sdf.rolling(2, sdf_checkpoint=True, start=()).amount.sum().stream.gather().sink_to_list()
+    output0 = sdf.rolling(2, with_state=True, start=()).amount.sum().stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
@@ -913,7 +913,7 @@ def test_rolling_aggs_with_start_state(stream):
     stream = Stream()
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output1 = sdf.rolling(2, sdf_checkpoint=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
+    output1 = sdf.rolling(2, with_state=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
     stream.emit(df)
     assert assert_eq(output1[-1][0].reset_index(drop=True), pd.Series([250, 50], name="amount"))
@@ -923,7 +923,7 @@ def test_rolling_aggs_with_start_state(stream):
 def test_window_aggs_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output0 = sdf.window(2, sdf_checkpoint=True, start=None).amount.sum().stream.gather().sink_to_list()
+    output0 = sdf.window(2, with_state=True, start=None).amount.sum().stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
     stream.emit(df)
@@ -934,7 +934,7 @@ def test_window_aggs_with_start_state(stream):
     stream = Stream()
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output1 = sdf.window(2, sdf_checkpoint=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
+    output1 = sdf.window(2, with_state=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
     stream.emit(df)
     assert output1[-1][1] == 300
@@ -943,7 +943,7 @@ def test_window_aggs_with_start_state(stream):
 def test_windowed_groupby_aggs_with_start_state(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output0 = sdf.window(5, sdf_checkpoint=True, start=None).groupby(['name']).amount.sum().\
+    output0 = sdf.window(5, with_state=True, start=None).groupby(['name']).amount.sum().\
         stream.gather().sink_to_list()
 
     df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
@@ -954,7 +954,7 @@ def test_windowed_groupby_aggs_with_start_state(stream):
     stream = Stream()
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
-    output1 = sdf.window(5, sdf_checkpoint=True, start=output0[-1][0]).groupby(['name']).amount.sum().\
+    output1 = sdf.window(5, with_state=True, start=output0[-1][0]).groupby(['name']).amount.sum().\
         stream.gather().sink_to_list()
     df = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom', 'Bob'], 'amount': [50, 100, 150, 200]})
     stream.emit(df)

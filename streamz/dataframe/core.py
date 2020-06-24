@@ -60,11 +60,23 @@ class Frame(BaseFrame):
                                           returns_state=True)
 
     def sum(self, start=None):
-        """ Sum frame """
+        """ Sum frame.
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+        """
         return self.aggregate(aggregations.Sum(), start)
 
     def count(self, start=None):
-        """ Count of frame """
+        """ Count of frame
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+        """
         return self.aggregate(aggregations.Count(), start)
 
     @property
@@ -73,10 +85,16 @@ class Frame(BaseFrame):
         return self.aggregate(aggregations.Size())
 
     def mean(self, start=None):
-        """ Average """
+        """ Average frame
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+        """
         return self.aggregate(aggregations.Mean(), start)
 
-    def rolling(self, window, min_periods=1, sdf_checkpoint=False, start=()):
+    def rolling(self, window, min_periods=1, with_state=False, start=()):
         """ Compute rolling aggregations
 
         When followed by an aggregation method like ``sum``, ``mean``, or
@@ -95,6 +113,11 @@ class Frame(BaseFrame):
         ----------
         window: int or timedelta
             Window over which to roll
+        with_state: bool (False)
+            Whether to return the state along with the result as a tuple (state, result).
+            State may be needed downstream for a number of reasons like checkpointing.
+        start: () or resulting Python object type from the operation
+            Accepts a valid start state.
 
         Returns
         -------
@@ -104,9 +127,9 @@ class Frame(BaseFrame):
         --------
         DataFrame.window: more generic window operations
         """
-        return Rolling(self, window, min_periods, sdf_checkpoint, start)
+        return Rolling(self, window, min_periods, with_state, start)
 
-    def window(self, n=None, value=None, sdf_checkpoint=False, start=None):
+    def window(self, n=None, value=None, with_state=False, start=None):
         """ Sliding window operations
 
         Windowed operations are defined over a sliding window of data, either
@@ -121,6 +144,18 @@ class Frame(BaseFrame):
         Windowed dataframes support all normal arithmetic, aggregations, and
         groupby-aggregations.
 
+        Parameters
+        ----------
+        n: int
+            Window of number of elements over which to roll
+        value: str
+            Window of time over which to roll
+        with_state: bool (False)
+            Whether to return the state along with the result as a tuple (state, result).
+            State may be needed downstream for a number of reasons like checkpointing.
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+
         Examples
         --------
         >>> df.window(n=10).std()
@@ -134,7 +169,7 @@ class Frame(BaseFrame):
         --------
         DataFrame.rolling: mimic's Pandas rolling aggregations
         """
-        return Window(self, n=n, value=value, sdf_checkpoint=sdf_checkpoint, start=start)
+        return Window(self, n=n, value=value, with_state=with_state, start=start)
 
     def _cumulative_aggregation(self, op):
         return self.accumulate_partitions(_cumulative_accumulator,
@@ -259,7 +294,7 @@ class _DataFrameMixin(object):
 
 
 class DataFrame(Frame, _DataFrameMixin):
-    """ A Streaming dataframe
+    """ A Streaming Dataframe
 
     This is a logical collection over a stream of Pandas dataframes.
     Operations on this object will translate to the appropriate operations on
@@ -315,7 +350,7 @@ class _SeriesMixin(object):
 
 
 class Series(Frame, _SeriesMixin):
-    """ A Streaming series
+    """ A Streaming Series
 
     This is a logical collection over a stream of Pandas series objects.
     Operations on this object will translate to the appropriate operations on
@@ -388,19 +423,19 @@ class Rolling(object):
     >>> sdf.rolling('100ms').x.mean()  # doctest: +SKIP
     """
 
-    def __init__(self, sdf, window, min_periods, sdf_checkpoint, start):
+    def __init__(self, sdf, window, min_periods, with_state, start):
         self.root = sdf
         if not isinstance(window, int):
             window = pd.Timedelta(window)
             min_periods = 1
         self.window = window
         self.min_periods = min_periods
-        self.sdf_checkpoint = sdf_checkpoint
+        self.with_state = with_state
         self.start = start
 
     def __getitem__(self, key):
         sdf = self.root[key]
-        return Rolling(sdf, self.window, self.min_periods, self.sdf_checkpoint, self.start)
+        return Rolling(sdf, self.window, self.min_periods, self.with_state, self.start)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
@@ -416,7 +451,7 @@ class Rolling(object):
                                                kwargs=kwargs,
                                                start=self.start,
                                                returns_state=True,
-                                               sdf_checkpoint=self.sdf_checkpoint)
+                                               with_state=self.with_state)
 
     def sum(self):
         """ Rolling sum """
@@ -470,7 +505,7 @@ class Window(OperatorMixin):
     DataFrame.window: contains full docstring
     """
 
-    def __init__(self, sdf, n=None, value=None, sdf_checkpoint=False, start=None):
+    def __init__(self, sdf, n=None, value=None, with_state=False, start=None):
         if value is None and isinstance(n, (str, pd.Timedelta)):
             value = n
             n = None
@@ -479,12 +514,12 @@ class Window(OperatorMixin):
         if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
             value = pd.Timedelta(value)
         self.value = value
-        self.sdf_checkpoint = sdf_checkpoint
+        self.with_state = with_state
         self.start = start
 
     def __getitem__(self, key):
         sdf = self.root[key]
-        return Window(sdf, n=self.n, value=self.value, sdf_checkpoint=self.sdf_checkpoint, start=self.start)
+        return Window(sdf, n=self.n, value=self.value, with_state=self.with_state, start=self.start)
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
@@ -495,7 +530,7 @@ class Window(OperatorMixin):
     def map_partitions(self, func, *args, **kwargs):
         args2 = [a.root if isinstance(a, Window) else a for a in args]
         root = self.root.map_partitions(func, *args2, **kwargs)
-        return Window(root, n=self.n, value=self.value)
+        return Window(root, n=self.n, value=self.value, with_state=self.with_state, start=self.start)
 
     @property
     def index(self):
@@ -515,7 +550,7 @@ class Window(OperatorMixin):
 
     def reset_index(self):
         return Window(self.root.reset_index(), n=self.n, value=self.value,
-                      sdf_checkpoint=self.sdf_checkpoint, start=self.start)
+                      with_state=self.with_state, start=self.start)
 
     def aggregate(self, agg):
         if self.n is not None:
@@ -531,7 +566,7 @@ class Window(OperatorMixin):
                                                start=self.start,
                                                returns_state=True,
                                                stream_type='updating',
-                                               sdf_checkpoint=self.sdf_checkpoint)
+                                               with_state=self.with_state)
 
     def full(self):
         return self.aggregate(aggregations.Full())
@@ -573,11 +608,11 @@ class Window(OperatorMixin):
     def groupby(self, other):
         """ Groupby-aggregations within window """
         return WindowedGroupBy(self.root, other, None, self.n, self.value,
-                               self.sdf_checkpoint, self.start)
+                               self.with_state, self.start)
 
 
 def rolling_accumulator(acc, new, window=None, op=None,
-                        sdf_checkpoint=False, args=(), kwargs={}):
+                        with_state=False, args=(), kwargs={}):
     if len(acc):
         df_package = get_dataframe_package(new)
         df = df_package.concat([acc, new])
@@ -625,7 +660,7 @@ class GroupBy(object):
         else:
             raise AttributeError("GroupBy has no attribute %r" % key)
 
-    def _accumulate(self, Agg, sdf_checkpoint=False, start=None, **kwargs):
+    def _accumulate(self, Agg, with_state=False, start=None, **kwargs):
         stream_type = 'updating'
 
         if isinstance(self.grouper, Streaming):
@@ -651,7 +686,7 @@ class GroupBy(object):
                                       agg=agg,
                                       start=start,
                                       returns_state=True,
-                                      sdf_checkpoint=sdf_checkpoint)
+                                      with_state=with_state)
 
         for fn, s_type in _stream_types[stream_type]:
             """Function checks if example is of a specific frame type"""
@@ -660,12 +695,24 @@ class GroupBy(object):
         return Streaming(outstream, example, stream_type=stream_type)
 
     def count(self, start=None):
-        """ Groupby-count """
+        """ Groupby-count
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+        """
         return self._accumulate(aggregations.GroupbyCount, start=start)
 
-    def mean(self, sdf_checkpoint=False, start=None):
-        """ Groupby-mean """
-        return self._accumulate(aggregations.GroupbyMean, sdf_checkpoint=sdf_checkpoint, start=start)
+    def mean(self, with_state=False, start=None):
+        """ Groupby-mean
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+        """
+        return self._accumulate(aggregations.GroupbyMean, with_state=with_state, start=start)
 
     def size(self):
         """ Groupby-size """
@@ -676,7 +723,14 @@ class GroupBy(object):
         return self.var(ddof=ddof) ** 0.5
 
     def sum(self, start=None):
-        """ Groupby-sum """
+        """ Groupby-sum
+
+        Parameters
+        ----------
+        start: None or resulting Python object type from the operation
+            Accepts a valid start state.
+
+        """
         return self._accumulate(aggregations.GroupbySum, start=start)
 
     def var(self, ddof=1):
@@ -687,7 +741,7 @@ class GroupBy(object):
 class WindowedGroupBy(GroupBy):
     """ Groupby aggregations over a window of data """
 
-    def __init__(self, root, grouper, index=None, n=None, value=None, sdf_checkpoint=False, start=None):
+    def __init__(self, root, grouper, index=None, n=None, value=None, with_state=False, start=None):
         self.root = root
         self.grouper = grouper
         self.index = index
@@ -695,11 +749,11 @@ class WindowedGroupBy(GroupBy):
         if isinstance(value, str) and isinstance(self.root.example.index, pd.DatetimeIndex):
             value = pd.Timedelta(value)
         self.value = value
-        self.sdf_checkpoint = sdf_checkpoint
+        self.with_state = with_state
         self.start = start
 
     def __getitem__(self, index):
-        return WindowedGroupBy(self.root, self.grouper, index, self.n, self.value, self.sdf_checkpoint, self.start)
+        return WindowedGroupBy(self.root, self.grouper, index, self.n, self.value, self.with_state, self.start)
 
     def _accumulate(self, Agg, **kwargs):
         stream_type = 'updating'
@@ -740,7 +794,7 @@ class WindowedGroupBy(GroupBy):
                                       returns_state=True,
                                       diff=diff,
                                       window=window,
-                                      sdf_checkpoint=self.sdf_checkpoint)
+                                      with_state=self.with_state)
 
         for fn, s_type in _stream_types[stream_type]:
             """Function checks if example is of a specific frame type"""

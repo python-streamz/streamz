@@ -241,7 +241,7 @@ def diff_align(dfs, groupers):
     return old, groupers
 
 
-def window_accumulator(acc, new, diff=None, window=None, agg=None, sdf_checkpoint=False):
+def window_accumulator(acc, new, diff=None, window=None, agg=None, with_state=False):
     """ An accumulation binary operator for windowed aggregations
 
     This is the function that is actually given to the ``Stream.accumulate``
@@ -284,7 +284,7 @@ def window_accumulator(acc, new, diff=None, window=None, agg=None, sdf_checkpoin
     return acc2, result
 
 
-def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None, sdf_checkpoint=False):
+def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None, with_state=False):
     """ An accumulation binary operator for windowed groupb-aggregations
 
     This is the function that is actually given to the ``Stream.accumulate``
