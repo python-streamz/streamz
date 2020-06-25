@@ -387,8 +387,8 @@ def test_setitem_overwrites(stream):
     pytest.param({}, 'var', marks=pytest.mark.slow),
     pytest.param({}, 'count', marks=pytest.mark.slow),
     ({'ddof': 0}, 'std'),
-    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow),
-    ({'arg': {'A': 'sum', 'B': 'min'}}, 'aggregate')
+    pytest.param({'quantile': 0.5}, 'quantile', marks=pytest.mark.slow)
+    # ({'arg': {'A':'sum', 'B':'min'}, 'aggregate') -- deprecated with Pandas1.0
 ])
 @pytest.mark.parametrize('window', [
     pytest.param(2, marks=pytest.mark.slow),
@@ -407,7 +407,7 @@ def test_setitem_overwrites(stream):
 ])
 def test_rolling_count_aggregations(op, window, m, pre_get, post_get, kwargs,
         stream):
-    index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
+    index = pd.date_range(start='2000-01-01', end='2000-01-03', freq='1h')
     df = pd.DataFrame({'x': np.arange(len(index))}, index=index)
 
     expected = getattr(post_get(pre_get(df).rolling(window)), op)(**kwargs)
@@ -725,7 +725,7 @@ def test_windowing_n(func, n, getter):
                                      lambda g: g[['x']],
                                      lambda g: g[['x', 'y']]])
 def test_groupby_windowing_value(func, value, getter, grouper, indexer):
-    index = pd.DatetimeIndex(start='2000-01-01', end='2000-01-03', freq='1h')
+    index = pd.date_range(start='2000-01-01', end='2000-01-03', freq='1h')
     df = pd.DataFrame({'x': np.arange(len(index), dtype=float),
                        'y': np.arange(len(index), dtype=float) % 2},
                       index=index)

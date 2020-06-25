@@ -52,10 +52,10 @@ class map(DaskStream):
 
         DaskStream.__init__(self, upstream)
 
-    def update(self, x, who=None):
+    def update(self, x, who=None, metadata=None):
         client = default_client()
         result = client.submit(self.func, x, *self.args, **self.kwargs)
-        return self._emit(result)
+        return self._emit(result, metadata=metadata)
 
 
 @DaskStream.register_api()
@@ -68,10 +68,10 @@ class accumulate(DaskStream):
         self.kwargs = kwargs
         DaskStream.__init__(self, upstream)
 
-    def update(self, x, who=None):
+    def update(self, x, who=None, metadata=None):
         if self.state is core.no_default:
             self.state = x
-            return self._emit(self.state)
+            return self._emit(self.state, metadata=metadata)
         else:
             client = default_client()
             result = client.submit(self.func, self.state, x, **self.kwargs)
@@ -81,7 +81,7 @@ class accumulate(DaskStream):
             else:
                 state = result
             self.state = state
-            return self._emit(result)
+            return self._emit(result, metadata=metadata)
 
 
 @core.Stream.register_api()
@@ -92,10 +92,14 @@ class scatter(DaskStream):
     All elements flowing through the input will be scattered out to the cluster
     """
     @gen.coroutine
-    def update(self, x, who=None):
+    def update(self, x, who=None, metadata=None):
         client = default_client()
+
+        self._retain_refs(metadata)
         future = yield client.scatter(x, asynchronous=True)
-        f = yield self._emit(future)
+        f = yield self._emit(future, metadata=metadata)
+        self._release_refs(metadata)
+
         raise gen.Return(f)
 
 
@@ -118,10 +122,14 @@ class gather(core.Stream):
     scatter
     """
     @gen.coroutine
-    def update(self, x, who=None):
+    def update(self, x, who=None, metadata=None):
         client = default_client()
+
+        self._retain_refs(metadata)
         result = yield client.gather(x, asynchronous=True)
-        result2 = yield self._emit(result)
+        result2 = yield self._emit(result, metadata=metadata)
+        self._release_refs(metadata)
+
         raise gen.Return(result2)
 
 
@@ -134,10 +142,10 @@ class starmap(DaskStream):
 
         DaskStream.__init__(self, upstream, stream_name=stream_name)
 
-    def update(self, x, who=None):
+    def update(self, x, who=None, metadata=None):
         client = default_client()
         result = client.submit(apply, self.func, x, self.kwargs)
-        return self._emit(result)
+        return self._emit(result, metadata=metadata)
 
 
 @DaskStream.register_api()

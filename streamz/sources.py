@@ -5,7 +5,7 @@ import time
 import tornado.ioloop
 from tornado import gen
 
-from .core import Stream, convert_interval
+from .core import Stream, convert_interval, RefCounter
 
 
 def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
@@ -67,7 +67,7 @@ class from_textfile(Source):
     Examples
     --------
     >>> source = Stream.from_textfile('myfile.json')  # doctest: +SKIP
-    >>> js.map(json.loads).pluck('value').sum().sink(print)  # doctest: +SKIP
+    >>> source.map(json.loads).pluck('value').sum().sink(print)  # doctest: +SKIP
     >>> source.start()  # doctest: +SKIP
 
     Returns
@@ -453,12 +453,20 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, **kwargs):
+                 npartitions=1, max_batch_size=10000, keys=False,
+                 engine=None, **kwargs):
         self.consumer_params = consumer_params
+        # Override the auto-commit config to enforce custom streamz checkpointing
+        self.consumer_params['enable.auto.commit'] = 'false'
+        if 'auto.offset.reset' not in self.consumer_params.keys():
+            consumer_params['auto.offset.reset'] = 'earliest'
         self.topic = topic
         self.npartitions = npartitions
         self.positions = [0] * npartitions
         self.poll_interval = convert_interval(poll_interval)
+        self.max_batch_size = max_batch_size
+        self.keys = keys
+        self.engine = engine
         self.stopped = True
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
@@ -466,6 +474,30 @@ class FromKafkaBatched(Stream):
     @gen.coroutine
     def poll_kafka(self):
         import confluent_kafka as ck
+
+        def commit(_part):
+            topic, part_no, _, _, offset = _part[1:]
+            _tp = ck.TopicPartition(topic, part_no, offset + 1)
+            self.consumer.commit(offsets=[_tp], asynchronous=True)
+
+        @gen.coroutine
+        def checkpoint_emit(_part):
+            ref = RefCounter(cb=lambda: commit(_part))
+            yield self._emit(_part, metadata=[{'ref': ref}])
+
+        tps = []
+        for partition in range(self.npartitions):
+            tps.append(ck.TopicPartition(self.topic, partition))
+
+        while True:
+            try:
+                committed = self.consumer.committed(tps, timeout=1)
+            except ck.KafkaException:
+                pass
+            else:
+                for tp in committed:
+                    self.positions[tp.partition] = tp.offset
+                break
 
         try:
             while not self.stopped:
@@ -477,15 +509,21 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
+                    if 'auto.offset.reset' in self.consumer_params.keys():
+                        if self.consumer_params['auto.offset.reset'] == 'latest':
+                            self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
+                    if high > lowest + self.max_batch_size:
+                        high = lowest + self.max_batch_size
                     if high > lowest:
                         out.append((self.consumer_params, self.topic, partition,
-                                    lowest, high - 1))
+                                    self.keys, lowest, high - 1))
                         self.positions[partition] = high
+                self.consumer_params['auto.offset.reset'] = 'earliest'
 
                 for part in out:
-                    yield self._emit(part)
+                    yield self.loop.add_callback(checkpoint_emit, part)
 
                 else:
                     yield gen.sleep(self.poll_interval)
@@ -495,8 +533,14 @@ class FromKafkaBatched(Stream):
 
     def start(self):
         import confluent_kafka as ck
+        if self.engine == "cudf":  # pragma: no cover
+            from custreamz import kafka
+
         if self.stopped:
-            self.consumer = ck.Consumer(self.consumer_params)
+            if self.engine == "cudf": # pragma: no cover
+                self.consumer = kafka.Consumer(self.consumer_params)
+            else:
+                self.consumer = ck.Consumer(self.consumer_params)
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
@@ -507,8 +551,10 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False, **kwargs):
-    """ Get messages from Kafka in batches
+                       npartitions=1, start=False, dask=False,
+                       max_batch_size=10000, keys=False,
+                       engine=None, **kwargs):
+    """ Get messages and keys (optional) from Kafka in batches
 
     Uses the confluent-kafka library,
     https://docs.confluent.io/current/clients/confluent-kafka-python/
@@ -516,6 +562,13 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     This source will emit lists of messages for each partition of a single given
     topic per time interval, if there is new data. If using dask, one future
     will be produced per partition per time-step, if there is data.
+
+    Checkpointing is achieved through the use of reference counting. A reference
+    counter is emitted downstream for each batch of data. A callback is
+    triggered when the reference count reaches zero and the offsets are
+    committed back to Kafka. Upon the start of this function, the previously
+    committed offsets will be fetched from Kafka and begin reading form there.
+    This will guarantee at-least-once semantics.
 
     Parameters
     ----------
@@ -535,6 +588,51 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Number of partitions in the topic
     start: bool (False)
         Whether to start polling upon instantiation
+    max_batch_size: int
+        The maximum number of messages per partition to be consumed per batch
+    keys: bool (False)
+        Whether to extract keys along with the messages. If True, this will yield each message as a dict:
+        {'key':msg.key(), 'value':msg.value()}
+    engine: str (None)
+        If engine is set to "cudf", streamz reads data (messages must be JSON) from Kafka
+        in an accelerated manner directly into cuDF (GPU) dataframes.
+
+        Please refer to RAPIDS cudf API here:
+        https://docs.rapids.ai/api/cudf/stable/
+
+        This is done using the custreamz.kafka module in cudf. custreamz.kafka has the exact
+        same API as Confluent Kafka, so it serves as a drop-in replacement with minimal duplication
+        of code. But under the hood, it reads messages from librdkafka and directly uploads them to
+        the GPU as a cuDF dataframe instead of gathering all the messages back from C++ into Python.
+        This essentially avoids the GIL issue described in the Confluent Kafka consumer:
+        https://github.com/confluentinc/confluent-kafka-python/issues/597, and hence enables reading
+        from Kafka in a faster fashion with fewer processes. This accelerated reader also adheres to
+        the checkpointing mechanism in streamz.
+
+        Folks interested in trying out custreamz would benefit from this accelerated Kafka reader.
+        If one does not want to use GPUs, they can use streamz as is, with the default engine=None.
+
+        To use this option, one must install custreamz (use the appropriate CUDA version recipe) using
+        the following command, which will install all GPU dependencies, including streamz:
+        conda env create --name custreamz --file custreamz_dev_cuda10.1.yml
+        The file custreamz_dev_cuda10.1.yml can be downloaded from:
+        https://github.com/jdye64/cudf/blob/kratos/conda/environments/custreamz_dev_cuda10.1.yml
+        Instead of creating a new conda environment, one can alternatively install all the packages
+        mentioned in the .yml file. But creating a new conda environment with the .yml script installs
+        everything cleanly. Also, this is temporary (as mentioned below) until custreamz.kafka code
+        gets merged into cudf/custreamz, after which it be a single line nightly package install.
+
+        The accelerated Kafka datasource will soon be officially merged into RAPIDS custreamz.
+        Then, custreamz can simply be installed using: https://anaconda.org/rapidsai-nightly/custreamz,
+        instead of the command above.
+
+        Please refer to RAPIDS custreamz.kafka API here:
+        https://github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
+
+    Important Kafka Configurations
+    ----------
+    If 'auto.offset.reset': 'latest' is set in the consumer configs, the stream starts reading messages
+    from the latest offset. Else, if it's set to 'earliest', it will read from the start offset.
 
     Examples
     --------
@@ -549,18 +647,25 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
-                              npartitions=npartitions, **kwargs)
+                              npartitions=npartitions,
+                              max_batch_size=max_batch_size,
+                              keys=keys,
+                              engine=engine,
+                              **kwargs)
     if dask:
         source = source.scatter()
 
     if start:
         source.start()
 
-    return source.starmap(get_message_batch)
+    if engine == "cudf": # pragma: no cover
+        return source.starmap(get_message_batch_cudf)
+    else:
+        return source.starmap(get_message_batch)
 
 
-def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
-    """Fetch a batch of kafka messages in given topic/partition
+def get_message_batch(kafka_params, topic, partition, keys, low, high, timeout=None):
+    """Fetch a batch of kafka messages (keys & values) in given topic/partition
 
     This will block until messages are available, or timeout is reached.
     """
@@ -575,7 +680,10 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
             msg = consumer.poll(0)
             if msg and msg.value() and msg.error() is None:
                 if high >= msg.offset():
-                    out.append(msg.value())
+                    if keys:
+                        out.append({'key':msg.key(), 'value':msg.value()})
+                    else:
+                        out.append(msg.value())
                 if high <= msg.offset():
                     break
             else:
@@ -585,3 +693,18 @@ def get_message_batch(kafka_params, topic, partition, low, high, timeout=None):
     finally:
         consumer.close()
     return out
+
+
+def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, timeout=None): # pragma: no cover
+    """
+    Fetch a batch of kafka messages (currently, messages must be in JSON format)
+    in given topic/partition as a cudf dataframe
+    """
+    from custreamz import kafka
+    consumer = kafka.Consumer(kafka_params)
+    gdf = None
+    try:
+        gdf = consumer.read_gdf(topic=topic, partition=partition, lines=True, start=low, end=high + 1)
+    finally:
+        consumer.close()
+    return gdf
