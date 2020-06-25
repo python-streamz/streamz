@@ -549,8 +549,7 @@ class Window(OperatorMixin):
         return self.root.example
 
     def reset_index(self):
-        return Window(self.root.reset_index(), n=self.n, value=self.value,
-                      with_state=self.with_state, start=self.start)
+        return Window(self.root.reset_index(), n=self.n, value=self.value)
 
     def aggregate(self, agg):
         if self.n is not None:

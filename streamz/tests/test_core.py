@@ -1424,7 +1424,7 @@ def test_map_errors_raises():
 @gen_test()
 def test_accumulate_errors_log():
     a = Stream(asynchronous=True)
-    b = a.delay(0.001).accumulate(lambda x, y: x / y)  # noqa: F841
+    b = a.delay(0.001).accumulate(lambda x, y: x / y, with_state=True)  # noqa: F841
     with captured_logger('streamz') as logger:
         a._emit(1)
         a._emit(0)
@@ -1436,7 +1436,7 @@ def test_accumulate_errors_log():
 
 def test_accumulate_errors_raises():
     a = Stream()
-    b = a.accumulate(lambda x, y: x / y)  # noqa: F841
+    b = a.accumulate(lambda x, y: x / y, with_state=True)  # noqa: F841
     with pytest.raises(ZeroDivisionError):
         a.emit(1)
         a.emit(0)
