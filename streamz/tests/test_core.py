@@ -16,10 +16,10 @@ from tornado.ioloop import IOLoop
 
 import streamz as sz
 
-from streamz import Stream
+from streamz import Stream, RefCounter
 from streamz.sources import sink_to_file, PeriodicCallback
 from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
-        clean, await_for)  # noqa: F401
+        clean, await_for, metadata)  # noqa: F401
 from distributed.utils_test import loop   # noqa: F401
 
 
@@ -183,6 +183,37 @@ def test_sliding_window():
                  (5, 6), (6, 7), (7, 8), (8, 9)]
 
 
+def test_sliding_window_ref_counts():
+    source = Stream()
+    _ = source.sliding_window(2)
+
+    r_prev = RefCounter()
+    source.emit(-2)
+    source.emit(-1, metadata=[{'ref': r_prev}])
+    for i in range(10):
+        r = RefCounter()
+        assert r_prev.count == 1
+        source.emit(i, metadata=[{'ref': r}])
+        assert r_prev.count == 0
+        assert r.count == 1
+        r_prev = r
+
+
+def test_sliding_window_metadata():
+    source = Stream()
+    L = metadata(source.sliding_window(2)).sink_to_list()
+
+    source.emit(0)
+    source.emit(1, metadata=[{'v': 1}])
+    source.emit(2, metadata=[{'v': 2}])
+    source.emit(3, metadata=[{'v': 3}])
+    assert L == [
+        [{'v': 1}],  # First emit, because 0 has no metadata
+        [{'v': 1}, {'v': 2}],  # Second emit
+        [{'v': 2}, {'v': 3}]  # Third emit
+    ]
+
+
 @gen_test()
 def test_backpressure():
     q = Queue(maxsize=2)
@@ -226,6 +257,39 @@ def test_timed_window():
 
     yield gen.sleep(0.1)
     assert not L[-1]
+
+
+@gen_test()
+def test_timed_window_ref_counts():
+    source = Stream()
+    _ = source.timed_window(0.01)
+
+    ref1 = RefCounter()
+    source.emit(1, metadata=[{'ref': ref1}])
+    assert ref1.count == 1
+    yield gen.sleep(0.05)
+
+    ref2 = RefCounter()
+    source.emit(2, metadata=[{'ref': ref2}])
+    assert ref1.count == 0
+    assert ref2.count == 1
+
+
+@gen_test()
+def test_timed_window_metadata():
+    source = Stream()
+    L = metadata(source.timed_window(0.01)).sink_to_list()
+
+    source.emit(0)
+    source.emit(1, metadata=[{'v': 1}])
+    yield gen.sleep(0.1)
+    source.emit(2, metadata=[{'v': 2}])
+    source.emit(3, metadata=[{'v': 3}])
+    yield gen.sleep(0.1)
+    assert L == [
+        [{'v': 1}],  # first emit because 0 has no metadata
+        [{'v': 2}, {'v': 3}]  # second emit
+    ]
 
 
 def test_timed_window_timedelta(clean):  # noqa: F811
@@ -332,6 +396,22 @@ def test_delay():
 
 
 @gen_test()
+def test_delay_ref_counts():
+    source = Stream(asynchronous=True)
+    _ = source.delay(0.01)
+
+    refs = []
+    for i in range(5):
+        r = RefCounter()
+        refs.append(r)
+        source.emit(i, metadata=[{'ref': r}])
+
+    assert all(r.count == 1 for r in refs)
+    yield gen.sleep(0.05)
+    assert all(r.count == 0 for r in refs)
+
+
+@gen_test()
 def test_buffer():
     source = Stream(asynchronous=True)
     L = source.map(inc).buffer(10).map(inc).rate_limit(0.05).sink_to_list()
@@ -351,6 +431,22 @@ def test_buffer():
 
     assert L
     assert stop - start > 0.04
+
+
+@gen_test()
+def test_buffer_ref_counts():
+    source = Stream(asynchronous=True)
+    _ = source.buffer(5)
+
+    refs = []
+    for i in range(5):
+        r = RefCounter()
+        refs.append(r)
+        source.emit(i, metadata=[{'ref': r}])
+
+    assert all(r.count == 1 for r in refs)
+    yield gen.sleep(0.05)
+    assert all(r.count == 0 for r in refs)
 
 
 def test_zip():
@@ -459,6 +555,44 @@ def test_combine_latest_emit_on_stream():
     assert L == [(2, 'a'), (3, 'a'), (4, 'b')]
 
 
+def test_combine_latest_ref_counts():
+    a = Stream()
+    b = Stream()
+    _ = a.combine_latest(b)
+
+    ref1 = RefCounter()
+    a.emit(1, metadata=[{'ref': ref1}])
+    assert ref1.count == 1
+
+    # The new value kicks out the old value
+    ref2 = RefCounter()
+    a.emit(2, metadata=[{'ref': ref2}])
+    assert ref1.count == 0
+    assert ref2.count == 1
+
+    # The value on stream a is still retained and the value on stream b is new
+    ref3 = RefCounter()
+    b.emit(3, metadata=[{'ref': ref3}])
+    assert ref2.count == 1
+    assert ref3.count == 1
+
+
+def test_combine_latest_metadata():
+    a = Stream()
+    b = Stream()
+    L = metadata(a.combine_latest(b)).sink_to_list()
+
+    a.emit(1, metadata=[{'v': 1}])
+    b.emit(2, metadata=[{'v': 2}])
+    b.emit(3)
+    b.emit(4, metadata=[{'v': 4}])
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # first emit when 2 is introduced
+        [{'v': 1}],  # 3 has no metadata but it replaces the value on 'b'
+        [{'v': 1}, {'v': 4}]  # 4 replaces the value without metadata on 'b'
+    ]
+
+
 @gen_test()
 def test_zip_timeout():
     a = Stream(asynchronous=True)
@@ -478,6 +612,45 @@ def test_zip_timeout():
     yield future
 
     assert L == [(1, 'a')]
+
+
+def test_zip_ref_counts():
+    a = Stream()
+    b = Stream()
+    _ = a.zip(b)
+
+    # The first value in a becomes buffered
+    ref1 = RefCounter()
+    a.emit(1, metadata=[{'ref': ref1}])
+    assert ref1.count == 1
+
+    # The second value in a also becomes buffered
+    ref2 = RefCounter()
+    a.emit(2, metadata=[{'ref': ref2}])
+    assert ref1.count == 1
+    assert ref2.count == 1
+
+    # All emitted values are removed from the buffer
+    ref3 = RefCounter()
+    b.emit(3, metadata=[{'ref': ref3}])
+    assert ref1.count == 0
+    assert ref2.count == 1  # still in the buffer
+    assert ref3.count == 0
+
+
+def test_zip_metadata():
+    a = Stream()
+    b = Stream()
+    L = metadata(a.zip(b)).sink_to_list()
+
+    a.emit(1, metadata=[{'v': 1}])
+    b.emit(2, metadata=[{'v': 2}])
+    a.emit(3)
+    b.emit(4, metadata=[{'v': 4}])
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # first emit when 2 is introduced
+        [{'v': 4}]  # second emit when 4 is introduced, and 3 has no metadata
+    ]
 
 
 def test_frequencies():
@@ -524,6 +697,15 @@ def test_unique_key():
     source.emit(3)
 
     assert L == [1, 2, 3]
+
+
+def test_unique_metadata():
+    source = Stream()
+    L = metadata(source.unique()).flatten().sink_to_list()
+    for i in range(5):
+        source.emit(i, metadata=[{'v': i}])
+
+    assert L == [{'v': i} for i in range(5)]
 
 
 def test_unique_history():
@@ -657,6 +839,40 @@ def test_collect():
     assert L == [(1, 2), (), (3,)]
 
 
+def test_collect_ref_counts():
+    source = Stream()
+    collector = source.collect()
+
+    refs = []
+    for i in range(10):
+        r = RefCounter()
+        refs.append(r)
+        source.emit(i, metadata=[{'ref': r}])
+
+    assert all(r.count == 1 for r in refs)
+
+    collector.flush()
+    assert all(r.count == 0 for r in refs)
+
+
+def test_collect_metadata():
+    source = Stream()
+    collector = source.collect()
+    L = metadata(collector).sink_to_list()
+
+    source.emit(0)
+    source.emit(1, metadata=[{'v': 1}])
+    source.emit(2, metadata=[{'v': 2}])
+    collector.flush()
+    source.emit(3, metadata=[{'v': 3}])
+    source.emit(4, metadata=[{'v': 4}])
+    collector.flush()
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # Flush 0-2, but 0 has no metadata
+        [{'v': 3}, {'v': 4}]   # Flush the rest
+    ]
+
+
 def test_map_str():
     def add(x=0, y=0):
         return x + y
@@ -685,6 +901,33 @@ def test_partition_str():
     source = Stream()
     s = source.partition(2)
     assert str(s) == '<partition: 2>'
+
+
+def test_partition_ref_counts():
+    source = Stream()
+    _ = source.partition(2)
+
+    for i in range(10):
+        r = RefCounter()
+        source.emit(i, metadata=[{'ref': r}])
+        if i % 2 == 0:
+            assert r.count == 1
+        else:
+            assert r.count == 0
+
+
+def test_partition_metadata():
+    source = Stream()
+    L = metadata(source.partition(2)).sink_to_list()
+
+    source.emit(0)
+    source.emit(1, metadata=[{'v': 1}])
+    source.emit(2, metadata=[{'v': 2}])
+    source.emit(3, metadata=[{'v': 3}])
+    assert L == [
+        [{'v': 1}],  # first emit when 1 is introduced. 0 has no metadata
+        [{'v': 2}, {'v': 3}]  # second emit
+    ]
 
 
 def test_stream_name_str():
@@ -745,6 +988,49 @@ def test_triple_zip_latest():
     s3.emit('b')
     s1.emit(3)
     assert L_simple == [(1, 'III', 'a'), (2, 'III', 'a'), (3, 'III', 'b')]
+
+
+def test_zip_latest_ref_counts():
+    a = Stream()
+    b = Stream()
+    _ = a.zip_latest(b)
+
+    ref1 = RefCounter()
+    a.emit(1, metadata=[{'ref': ref1}])
+    assert ref1.count == 1  # Retained until stream b has a value
+
+    # The lossless stream is never retained if all upstreams have a value
+    ref2 = RefCounter()
+    b.emit(2, metadata=[{'ref': ref2}])
+    assert ref1.count == 0
+    assert ref2.count == 1
+
+    # Kick out the stream b value and verify it has zero references
+    ref3 = RefCounter()
+    b.emit(3, metadata=[{'ref': ref3}])
+    assert ref2.count == 0
+    assert ref3.count == 1
+
+    # Verify the lossless value is not retained, but the lossy value is
+    ref4 = RefCounter()
+    a.emit(3, metadata=[{'ref': ref4}])
+    assert ref3.count == 1
+    assert ref4.count == 0
+
+
+def test_zip_latest_metadata():
+    a = Stream()
+    b = Stream()
+    L = metadata(a.zip_latest(b)).sink_to_list()
+
+    a.emit(1, metadata=[{'v': 1}])
+    b.emit(2, metadata=[{'v': 2}])
+    a.emit(3)
+    b.emit(4, metadata=[{'v': 4}])
+    assert L == [
+        [{'v': 1}, {'v': 2}],  # the first emit when 2 is introduced
+        [{'v': 2}]  # 3 has no metadata
+    ]
 
 
 def test_connect():
@@ -954,6 +1240,20 @@ def test_latest():
 
     yield gen.sleep(0.060)
     assert L == [2, 4]
+
+
+def test_latest_ref_counts():
+    source = Stream()
+    _ = source.latest()
+
+    ref1 = RefCounter()
+    source.emit(1, metadata=[{'ref': ref1}])
+    assert ref1.count == 1
+
+    ref2 = RefCounter()
+    source.emit(2, metadata=[{'ref': ref2}])
+    assert ref1.count == 0
+    assert ref2.count == 1
 
 
 def test_destroy():
@@ -1263,3 +1563,15 @@ def test_connect_discombine_latest():
 
 if sys.version_info >= (3, 5):
     from streamz.tests.py3_test_core import *  # noqa
+
+
+def test_buffer_after_partition():
+    Stream().partition(1).buffer(1)
+
+
+def test_buffer_after_timed_window():
+    Stream().timed_window(1).buffer(1)
+
+
+def test_buffer_after_sliding_window():
+    Stream().sliding_window(1).buffer(1)

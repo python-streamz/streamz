@@ -7,7 +7,7 @@ language: python
 
 matrix:
   include:
-    - python: 3.6
+    - python: 3.7
 
 env:
   - STREAMZ_LAUNCH_KAFKA=true
