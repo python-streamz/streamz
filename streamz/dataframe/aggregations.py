@@ -203,8 +203,8 @@ def diff_loc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
-    mx = pd.Timestamp(max(df.index.max() for df in dfs))
-    mn = mx - window
+    mx = max(df.index.max() for df in dfs)
+    mn = mx - pd.Timedelta(window)
     old = []
     while pd.Timestamp(dfs[0].index.min()) < mn:
         o = dfs[0].loc[:mn]
@@ -241,7 +241,7 @@ def diff_align(dfs, groupers):
     return old, groupers
 
 
-def window_accumulator(acc, new, diff=None, window=None, agg=None):
+def window_accumulator(acc, new, diff=None, window=None, agg=None, with_state=False):
     """ An accumulation binary operator for windowed aggregations
 
     This is the function that is actually given to the ``Stream.accumulate``
@@ -284,7 +284,7 @@ def window_accumulator(acc, new, diff=None, window=None, agg=None):
     return acc2, result
 
 
-def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None):
+def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, grouper=None, with_state=False):
     """ An accumulation binary operator for windowed groupb-aggregations
 
     This is the function that is actually given to the ``Stream.accumulate``

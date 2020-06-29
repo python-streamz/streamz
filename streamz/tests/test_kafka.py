@@ -1,5 +1,6 @@
 import atexit
 from contextlib import contextmanager
+from flaky import flaky
 import os
 import pytest
 import random
@@ -8,6 +9,7 @@ import shlex
 import subprocess
 import time
 from tornado import gen
+
 
 from ..core import Stream
 from ..dask import DaskStream
@@ -112,6 +114,7 @@ def split(messages):
     return parsed
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_from_kafka():
     j = random.randint(0, 10000)
@@ -144,6 +147,7 @@ def test_from_kafka():
         stream._close_consumer()
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
@@ -162,6 +166,7 @@ def test_to_kafka():
         assert out[-1] == b'final message'
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_from_kafka_thread():
     j = random.randint(0, 10000)

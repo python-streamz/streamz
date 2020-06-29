@@ -262,9 +262,9 @@ def test_getitem(stream):
 
 
 @pytest.mark.parametrize('agg', [
-    # lambda x: x.sum(),
-    # lambda x: x.mean(),
-    # lambda x: x.count(),
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
     lambda x: x.var(ddof=1),
     lambda x: x.std(),
     # pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
@@ -849,3 +849,114 @@ def test_custom_aggregation():
     sdf.emit(df)
 
     assert L == [1, -198, -397]
+
+
+def test_groupby_aggregate_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example).groupby(['name'])
+    output0 = sdf.amount.sum(start=None).stream.gather().sink_to_list()
+    output1 = sdf.amount.mean(with_state=True, start=None).stream.gather().sink_to_list()
+    output2 = sdf.amount.count(start=None).stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50, 100]})
+    stream.emit(df)
+
+    out_df0 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [50.0, 100.0]})
+    out_df1 = pd.DataFrame({'name': ['Alice', 'Tom'], 'amount': [1, 1]})
+    assert assert_eq(output0[0].reset_index(), out_df0)
+    assert assert_eq(output1[0][1].reset_index(), out_df0)
+    assert assert_eq(output2[0].reset_index(), out_df1)
+
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example).groupby(['name'])
+    output3 = sdf.amount.sum(start=output0[0]).stream.gather().sink_to_list()
+    output4 = sdf.amount.mean(with_state=True, start=output1[0][0]).stream.gather().sink_to_list()
+    output5 = sdf.amount.count(start=output2[0]).stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+
+    out_df2 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [100.0, 200.0, 200.0]})
+    out_df3 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [50.0, 200.0, 100.0]})
+    out_df4 = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom'], 'amount': [2, 1, 2]})
+    assert assert_eq(output3[0].reset_index(), out_df2)
+    assert assert_eq(output4[0][1].reset_index(), out_df3)
+    assert assert_eq(output5[0].reset_index(), out_df4)
+
+
+def test_reductions_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.amount.mean(start=(10, 2)).stream.gather().sink_to_list()
+    output1 = sdf.amount.count(start=3).stream.gather().sink_to_list()
+    output2 = sdf.amount.sum(start=10).stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+
+    assert output0[0] == 72.0
+    assert output1[0] == 6
+    assert output2[0] == 360
+
+
+def test_rolling_aggs_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.rolling(2, with_state=True, start=()).amount.sum().stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Bob'], 'amount': [250]})
+    stream.emit(df)
+    assert assert_eq(output0[-1][0].reset_index(drop=True), pd.Series([200, 250], name="amount"))
+    assert assert_eq(output0[-1][1].reset_index(drop=True), pd.Series([450.0], name="amount"))
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.rolling(2, with_state=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
+    stream.emit(df)
+    assert assert_eq(output1[-1][0].reset_index(drop=True), pd.Series([250, 50], name="amount"))
+    assert assert_eq(output1[-1][1].reset_index(drop=True), pd.Series([300.0], name="amount"))
+
+
+def test_window_aggs_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.window(2, with_state=True, start=None).amount.sum().stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Bob'], 'amount': [250]})
+    stream.emit(df)
+    assert output0[-1][1] == 450
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.window(2, with_state=True, start=output0[-1][0]).amount.sum().stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice'], 'amount': [50]})
+    stream.emit(df)
+    assert output1[-1][1] == 300
+
+
+def test_windowed_groupby_aggs_with_start_state(stream):
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output0 = sdf.window(5, with_state=True, start=None).groupby(['name']).amount.sum().\
+        stream.gather().sink_to_list()
+
+    df = pd.DataFrame({'name': ['Alice', 'Tom', 'Linda'], 'amount': [50, 100, 200]})
+    stream.emit(df)
+    df = pd.DataFrame({'name': ['Alice', 'Linda', 'Bob'], 'amount': [250, 300, 350]})
+    stream.emit(df)
+
+    stream = Stream()
+    example = pd.DataFrame({'name': [], 'amount': []})
+    sdf = DataFrame(stream, example=example)
+    output1 = sdf.window(5, with_state=True, start=output0[-1][0]).groupby(['name']).amount.sum().\
+        stream.gather().sink_to_list()
+    df = pd.DataFrame({'name': ['Alice', 'Linda', 'Tom', 'Bob'], 'amount': [50, 100, 150, 200]})
+    stream.emit(df)
+    out_df1 = pd.DataFrame({'name':['Alice', 'Bob', 'Linda', 'Tom'], 'amount':[50.0, 550.0, 100.0, 150.0]})
+    assert_eq(output1[-1][1].reset_index(), out_df1)

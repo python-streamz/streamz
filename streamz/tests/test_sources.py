@@ -1,9 +1,11 @@
+from flaky import flaky
 import pytest
 from streamz import Source
 from streamz.utils_test import wait_for, await_for, gen_test
 import socket
 
 
+@flaky(max_runs=3, min_passes=1)
 def test_tcp():
     port = 9876
     s = Source.from_tcp(port)
@@ -32,6 +34,7 @@ def test_tcp():
         sock2.close()
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_tcp_async():
     port = 9876
@@ -83,6 +86,7 @@ def test_http():
         requests.post('http://localhost:%i/other' % port, data=b'data2')
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_process():
     cmd = ["python", "-c", "for i in range(4): print(i)"]

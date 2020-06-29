@@ -581,7 +581,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         Examples:
         bootstrap.servers: Connection string(s) (host:port) by which to reach Kafka
         group.id: Identity of the consumer. If multiple sources share the same
-            group, each message will be passed to only one of them.
+        group, each message will be passed to only one of them.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
     npartitions: int
@@ -591,48 +591,60 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     max_batch_size: int
         The maximum number of messages per partition to be consumed per batch
     keys: bool (False)
-        Whether to extract keys along with the messages. If True, this will yield each message as a dict:
+        Whether to extract keys along with the messages.
+        If True, this will yield each message as a dict:
         {'key':msg.key(), 'value':msg.value()}
     engine: str (None)
-        If engine is set to "cudf", streamz reads data (messages must be JSON) from Kafka
-        in an accelerated manner directly into cuDF (GPU) dataframes.
+        If engine is set to "cudf", streamz reads data
+        (messages must be JSON) from Kafka in an accelerated
+        manner directly into cuDF (GPU) dataframes.
 
         Please refer to RAPIDS cudf API here:
         https://docs.rapids.ai/api/cudf/stable/
 
-        This is done using the custreamz.kafka module in cudf. custreamz.kafka has the exact
-        same API as Confluent Kafka, so it serves as a drop-in replacement with minimal duplication
-        of code. But under the hood, it reads messages from librdkafka and directly uploads them to
-        the GPU as a cuDF dataframe instead of gathering all the messages back from C++ into Python.
-        This essentially avoids the GIL issue described in the Confluent Kafka consumer:
-        https://github.com/confluentinc/confluent-kafka-python/issues/597, and hence enables reading
-        from Kafka in a faster fashion with fewer processes. This accelerated reader also adheres to
+        This is done using the custreamz.kafka module in cudf.
+        custreamz.kafka has the exact same API as Confluent Kafka,
+        so it serves as a drop-in replacement with minimal duplication
+        of code. But under the hood, it reads messages from librdkafka
+        and directly uploads them to the GPU as a cuDF dataframe instead
+        of gathering all the messages back from C++ into Python. This
+        essentially avoids the GIL issue described in the Confluent
+        Kafka consumer:
+        https://github.com/confluentinc/confluent-kafka-python/issues/597,
+        and hence enables readingfrom Kafka in a faster fashion with
+        fewer processes. This accelerated reader also adheres to
         the checkpointing mechanism in streamz.
 
-        Folks interested in trying out custreamz would benefit from this accelerated Kafka reader.
-        If one does not want to use GPUs, they can use streamz as is, with the default engine=None.
+        Folks interested in trying out custreamz would benefit from this
+        accelerated Kafka reader. If one does not want to use GPUs, they
+        can use streamz as is, with the default engine=None.
 
-        To use this option, one must install custreamz (use the appropriate CUDA version recipe) using
-        the following command, which will install all GPU dependencies, including streamz:
+        To use this option, one must install custreamz (use the
+        appropriate CUDA version recipe) using the following command,
+        which will install all GPU dependencies, including streamz:
         conda env create --name custreamz --file custreamz_dev_cuda10.1.yml
         The file custreamz_dev_cuda10.1.yml can be downloaded from:
         https://github.com/jdye64/cudf/blob/kratos/conda/environments/custreamz_dev_cuda10.1.yml
-        Instead of creating a new conda environment, one can alternatively install all the packages
-        mentioned in the .yml file. But creating a new conda environment with the .yml script installs
-        everything cleanly. Also, this is temporary (as mentioned below) until custreamz.kafka code
-        gets merged into cudf/custreamz, after which it be a single line nightly package install.
+        Instead of creating a new conda environment, one can
+        alternatively install all the packages mentioned in the .yml file.
+        But creating a new conda environment with the .yml script installs
+        everything cleanly. Also, this is temporary (as mentioned below)
+        until custreamz.kafka code gets merged into cudf/custreamz, after
+        which it be a single line nightly package install.
 
-        The accelerated Kafka datasource will soon be officially merged into RAPIDS custreamz.
-        Then, custreamz can simply be installed using: https://anaconda.org/rapidsai-nightly/custreamz,
-        instead of the command above.
+        The accelerated Kafka datasource will soon be officially merged
+        into RAPIDS custreamz. Then, custreamz can simply be installed
+        using: https://anaconda.org/rapidsai-nightly/custreamz, instead
+        of the command above.
 
         Please refer to RAPIDS custreamz.kafka API here:
         https://github.com/jdye64/cudf/blob/kratos/python/custreamz/custreamz/kafka.py
 
     Important Kafka Configurations
-    ----------
-    If 'auto.offset.reset': 'latest' is set in the consumer configs, the stream starts reading messages
-    from the latest offset. Else, if it's set to 'earliest', it will read from the start offset.
+    --------
+    If 'auto.offset.reset': 'latest' is set in the consumer configs,
+    the stream starts reading messages from the latest offset. Else,
+    if it's set to 'earliest', it will read from the start offset.
 
     Examples
     --------

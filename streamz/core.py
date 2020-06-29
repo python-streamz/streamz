@@ -110,7 +110,7 @@ class RefCounter:
 
 
 class Stream(object):
-    """ A Stream is an infinite sequence of data
+    """ A Stream is an infinite sequence of data.
 
     Streams subscribe to each other passing and transforming data between them.
     A Stream object listens for updates from upstream, reacts to these updates,
@@ -121,6 +121,8 @@ class Stream(object):
 
     Parameters
     ----------
+    stream_name: str or None
+        This is the name of the stream.
     asynchronous: boolean or None
         Whether or not this stream will be used in asynchronous functions or
         normal Python functions.  Leave as None if you don't know.
@@ -867,12 +869,16 @@ class accumulate(Stream):
         self.returns_state = returns_state
         # this is one of a few stream specific kwargs
         stream_name = kwargs.pop('stream_name', None)
+        self.with_state = kwargs.pop('with_state', False)
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None, metadata=None):
         if self.state is no_default:
             self.state = x
-            return self._emit(x, metadata=metadata)
+            if self.with_state:
+                return self._emit((self.state, x), metadata=metadata)
+            else:
+                return self._emit(x, metadata=metadata)
         else:
             try:
                 result = self.func(self.state, x, **self.kwargs)
@@ -884,7 +890,10 @@ class accumulate(Stream):
             else:
                 state = result
             self.state = state
-            return self._emit(result, metadata=metadata)
+            if self.with_state:
+                return self._emit((self.state, result), metadata=metadata)
+            else:
+                return self._emit(result, metadata=metadata)
 
 
 @Stream.register_api()
@@ -1015,7 +1024,7 @@ class sliding_window(Stream):
             metadata = [metadata]
         self.metadata_buffer.append(metadata)
         if self.partial or len(self._buffer) == self.n:
-            flat_metadata = [m for l in self.metadata_buffer for m in l]
+            flat_metadata = [m for ml in self.metadata_buffer for m in ml]
             ret = self._emit(tuple(self._buffer), flat_metadata)
             if len(self.metadata_buffer) == self.n:
                 completed = self.metadata_buffer.popleft()
@@ -1063,7 +1072,7 @@ class timed_window(Stream):
         while True:
             L, self._buffer = self._buffer, []
             metadata, self.metadata_buffer = self.metadata_buffer, []
-            m = [m for l in metadata for m in l]
+            m = [m for ml in metadata for m in ml]
             self.last = self._emit(L, m)
             self._release_refs(m)
             yield self.last
@@ -1222,7 +1231,7 @@ class zip(Stream):
             self.condition.notify_all()
             if self.literals:
                 tup = self.pack_literals(tup)
-            md = [m for l in md for m in l]
+            md = [m for ml in md for m in ml]
             ret = self._emit(tup, md)
             self._release_refs(md)
             return ret
@@ -1306,7 +1315,7 @@ class combine_latest(Stream):
         self.last[idx] = x
         if not self.missing and who in self.emit_on:
             tup = tuple(self.last)
-            md = [m for l in self.metadata for m in l]
+            md = [m for ml in self.metadata for m in ml]
             return self._emit(tup, md)
 
 
@@ -1559,7 +1568,7 @@ class zip_latest(Stream):
             L = []
             while self.lossless_buffer:
                 self.last[0], self.metadata[0] = self.lossless_buffer.popleft()
-                md = [m for l in self.metadata for m in l]
+                md = [m for ml in self.metadata for m in ml]
                 L.append(self._emit(tuple(self.last), md))
                 self._release_refs(self.metadata[0])
             return L
