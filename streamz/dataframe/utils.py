@@ -7,11 +7,11 @@ import sys
 def is_dataframe_like(df):
     """ Looks like a Pandas DataFrame. ** Borrowed from dask.dataframe.utils ** """
     typ = type(df)
-    return (all(hasattr(typ, name)
-                for name in ('groupby', 'head', 'merge', 'mean'))
-            and all(hasattr(df, name) for name in ('dtypes',))
-            and not any(hasattr(typ, name)
-                        for name in ('value_counts', 'dtype')))
+    return (
+            all(hasattr(typ, name) for name in ("groupby", "head", "merge", "mean"))
+            and all(hasattr(df, name) for name in ("dtypes", "columns"))
+            and not any(hasattr(typ, name) for name in ("name", "dtype"))
+    )
 
 
 def is_series_like(s):
