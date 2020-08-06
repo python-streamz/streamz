@@ -269,15 +269,18 @@ def test_getitem(stream):
     lambda x: x.std(),
     # pytest.mark.xfail(lambda x: x.var(ddof=0), reason="don't know")
 ])
-@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
-                                     lambda a: 'x',
-                                     lambda a: a.index % 2,
-                                     lambda a: ['x']])
-@pytest.mark.parametrize('indexer', [lambda g: g.y,
-                                     lambda g: g,
-                                     lambda g: g[['y']]
-                                     #lambda g: g[['x', 'y']]
-                                    ])
+@pytest.mark.parametrize('grouper', [
+    lambda a: a.x % 3,
+    lambda a: 'x',
+    lambda a: a.index % 2,
+    lambda a: ['x']
+])
+@pytest.mark.parametrize('indexer', [
+    lambda g: g.y,
+    lambda g: g,
+    lambda g: g[['y']]
+    # lambda g: g[['x', 'y']]
+])
 def test_groupby_aggregate(agg, grouper, indexer, stream):
     df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0, 2.0] * 5})
 
@@ -717,15 +720,18 @@ def test_windowing_n(func, n, getter):
     lambda df: df,
     lambda df: df.x,
 ])
-@pytest.mark.parametrize('grouper', [lambda a: a.x % 4,
-                                     lambda a: 'y',
-                                     lambda a: a.index,
-                                     lambda a: ['y']])
-@pytest.mark.parametrize('indexer', [lambda g: g.x,
-                                     lambda g: g,
-                                     lambda g: g[['x']],
-                                     #lambda g: g[['x', 'y']]
-                                    ])
+@pytest.mark.parametrize('grouper', [
+    lambda a: a.x % 4,
+    lambda a: 'y',
+    lambda a: a.index,
+    lambda a: ['y']
+])
+@pytest.mark.parametrize('indexer', [
+    lambda g: g.x,
+    lambda g: g,
+    lambda g: g[['x']],
+    #lambda g: g[['x', 'y']]
+])
 def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     index = pd.date_range(start='2000-01-01', end='2000-01-03', freq='1h')
     df = pd.DataFrame({'x': np.arange(len(index), dtype=float),
@@ -773,15 +779,18 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     lambda df: df,
     lambda df: df.x,
 ])
-@pytest.mark.parametrize('grouper', [lambda a: a.x % 3,
-                                     lambda a: 'y',
-                                     lambda a: a.index % 2,
-                                     lambda a: ['y']])
-@pytest.mark.parametrize('indexer', [lambda g: g.x,
-                                     lambda g: g,
-                                     lambda g: g[['x']],
-                                     #lambda g: g[['x', 'y']]
-                                    ])
+@pytest.mark.parametrize('grouper', [
+    lambda a: a.x % 3,
+    lambda a: 'y',
+    lambda a: a.index % 2,
+    lambda a: ['y']
+])
+@pytest.mark.parametrize('indexer', [
+    lambda g: g.x,
+    lambda g: g,
+    lambda g: g[['x']],
+    #lambda g: g[['x', 'y']]
+])
 def test_groupby_windowing_n(func, n, getter, grouper, indexer):
     df = pd.DataFrame({'x': np.arange(10, dtype=float), 'y': [1.0, 2.0] * 5})
 
