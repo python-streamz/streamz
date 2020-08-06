@@ -619,9 +619,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
 
     Important Kafka Configurations
     ----------
-    | If 'auto.offset.reset': 'latest' is set in the consumer configs,
-    | the stream starts reading messages from the latest offset. Else,
-    | if it's set to 'earliest', it will read from the start offset.
+    If 'auto.offset.reset': 'latest' is set in the consumer configs,
+    the stream starts reading messages from the latest offset. Else,
+    if it's set to 'earliest', it will read from the start offset.
 
 
     Examples
