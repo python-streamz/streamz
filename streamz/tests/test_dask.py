@@ -29,6 +29,28 @@ def test_map(c, s, a, b):
 
 
 @gen_cluster(client=True)
+def test_map_on_dict(c, s, a, b):
+    # dask treats dicts differently, so we have to make sure
+    # the user sees no difference in the streamz api.
+    # Regression test agains #336
+    def add_to_dict(d):
+        d["x"] = d["i"]
+        return d
+
+    source = Stream(asynchronous=True)
+    futures = source.scatter().map(add_to_dict)
+    L = futures.gather().sink_to_list()
+
+    for i in range(5):
+        yield source.emit({"i": i})
+
+    assert len(L) == 5
+    for i, item in enumerate(sorted(L, key=lambda x: x["x"])):
+        assert item["x"] == i
+        assert item["i"] == i
+
+
+@gen_cluster(client=True)
 def test_scan(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc).scan(add)
