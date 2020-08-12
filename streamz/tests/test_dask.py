@@ -32,7 +32,7 @@ def test_map(c, s, a, b):
 def test_map_on_dict(c, s, a, b):
     # dask treats dicts differently, so we have to make sure
     # the user sees no difference in the streamz api.
-    # Regression test agains #336
+    # Regression test against #336
     def add_to_dict(d):
         d["x"] = d["i"]
         return d
