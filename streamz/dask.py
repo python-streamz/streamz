@@ -109,7 +109,7 @@ class scatter(DaskStream):
         # lists and dicts. So we always use a dict here to be sure
         # we know the format exactly. The key will be taken as the
         # dask identifier of the data.
-        tokenized_x = type(x).__name__ + "-" + tokenize(x)
+        tokenized_x = f"{type(x).__name__}-{tokenize(x)}"
         future_as_dict = yield client.scatter({tokenized_x: x}, asynchronous=True)
         future = future_as_dict[tokenized_x]
         f = yield self._emit(future, metadata=metadata)
