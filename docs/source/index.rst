@@ -74,6 +74,26 @@ To install either use:
 - pip: ``pip install streamz``
 - dev: ``git clone https://github.com/python-streamz/streamz`` followed by ``pip install -e streamz/``
 
+Quickstart
+----------
+
+The streamz project offers a Docker image for the convenience of quickly trying out streamz and its features. 
+The purpose of the Dockerfile at this time is not to be used in a production 
+environment but rather for experimentation, learning, or new feature development.
+
+Its most common use would be to interact with the streamz example jupyter notebooks. Lets walk through the steps needed for this.
+
+- Build the Docker container
+.. code-block:: bash
+$ docker/build.sh
+- Run the Docker container
+.. code-block:: bash
+$ docker/run.sh
+- Interact with Jupyter Lab on the container in your browser at `JUPYTER_LAB`_.
+.. JUPYTER_LAB: http://localhost:8888/
+
+
+
 Related Work
 ------------
 
