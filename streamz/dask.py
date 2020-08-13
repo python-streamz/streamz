@@ -5,6 +5,7 @@ from operator import getitem
 from tornado import gen
 
 from dask.compatibility import apply
+from dask.base import tokenize
 from distributed.client import default_client
 
 from .core import Stream
@@ -103,7 +104,14 @@ class scatter(DaskStream):
         client = default_client()
 
         self._retain_refs(metadata)
-        future = yield client.scatter(x, asynchronous=True)
+        # We need to make sure that x is treated as it is by dask
+        # However, client.scatter works internally different for
+        # lists and dicts. So we always use a dict here to be sure
+        # we know the format exactly. The key will be taken as the
+        # dask identifier of the data.
+        tokenized_x = f"{type(x).__name__}-{tokenize(x)}"
+        future_as_dict = yield client.scatter({tokenized_x: x}, asynchronous=True)
+        future = future_as_dict[tokenized_x]
         f = yield self._emit(future, metadata=metadata)
         self._release_refs(metadata)
 
