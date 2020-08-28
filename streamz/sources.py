@@ -476,7 +476,6 @@ class FromKafkaBatched(Stream):
         def commit(_part):
             topic, part_no, _, _, offset = _part[1:]
             _tp = ck.TopicPartition(topic, part_no, offset + 1)
-            print("committing offset:" + str(offset + 1) + " in partition:" + str(part_no))
             self.consumer.commit(offsets=[_tp], asynchronous=True)
 
         @gen.coroutine
