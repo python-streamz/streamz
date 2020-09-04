@@ -168,7 +168,6 @@ def diff_iloc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
-    old = []
     n = sum(map(len, dfs)) - window
     while n > 0:
         if len(dfs[0]) <= n:
@@ -203,9 +202,9 @@ def diff_loc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
-    old = []
     mx = max(df.index.max() for df in dfs)
     mn = mx - pd.Timedelta(window)
+    old = []
     while pd.Timestamp(dfs[0].index.min()) < mn:
         o = dfs[0].loc[:mn]
         old.append(o)  # TODO: avoid copy if fully lost
@@ -334,6 +333,7 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     size_state = acc['size-state']
 
     dfs, old = diff(dfs, new, window=window)
+
     if 'groupers' in acc:
         groupers = deque(acc['groupers'])
         groupers.append(grouper)
