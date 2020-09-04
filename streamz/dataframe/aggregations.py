@@ -202,16 +202,18 @@ def diff_loc(dfs, new, window=None):
         List of dataframes to decay
     """
     dfs = deque(dfs)
-    dfs.append(new)
-    mx = max(df.index.max() for df in dfs)
-    mn = mx - pd.Timedelta(window)
+    if len(new) > 0:
+        dfs.append(new)
     old = []
-    while pd.Timestamp(dfs[0].index.min()) < mn:
-        o = dfs[0].loc[:mn]
-        old.append(o)  # TODO: avoid copy if fully lost
-        dfs[0] = dfs[0].iloc[len(o):]
-        if not len(dfs[0]):
-            dfs.popleft()
+    if len(dfs) > 0:
+        mx = max(df.index.max() for df in dfs)
+        mn = mx - pd.Timedelta(window)
+        while pd.Timestamp(dfs[0].index.min()) < mn:
+            o = dfs[0].loc[:mn - pd.Timedelta('1ns')]
+            old.append(o)  # TODO: avoid copy if fully lost
+            dfs[0] = dfs[0].iloc[len(o):]
+            if not len(dfs[0]):
+                dfs.popleft()
 
     return dfs, old
 
@@ -334,10 +336,10 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     size_state = acc['size-state']
 
     dfs, old = diff(dfs, new, window=window)
-
     if 'groupers' in acc:
         groupers = deque(acc['groupers'])
-        groupers.append(grouper)
+        if len(grouper) > 0:
+            groupers.append(grouper)
         old_groupers, groupers = diff_align(dfs, groupers)
     else:
         old_groupers = [grouper] * len(old)
