@@ -338,6 +338,7 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
     size_state = acc['size-state']
 
     dfs, old = diff(dfs, new, window=window)
+
     if 'groupers' in acc:
         groupers = deque(acc['groupers'])
         if len(grouper) > 0:
