@@ -209,9 +209,9 @@ def diff_loc(dfs, new, window=None):
     old = []
     if len(dfs) > 0:
         mx = max(df.index.max() for df in dfs)
-        mn = mx - pd.Timedelta(window)
+        mn = mx - pd.Timedelta(window) + pd.Timedelta('1ns')
         while pd.Timestamp(dfs[0].index.min()) < mn:
-            o = dfs[0].loc[:mn - pd.Timedelta('1ns')]
+            o = dfs[0].loc[:mn]
             old.append(o)  # TODO: avoid copy if fully lost
             dfs[0] = dfs[0].iloc[len(o):]
             if not len(dfs[0]):
