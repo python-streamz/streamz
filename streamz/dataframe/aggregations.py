@@ -168,6 +168,7 @@ def diff_iloc(dfs, new, window=None):
     """
     dfs = deque(dfs)
     dfs.append(new)
+    old = []
     n = sum(map(len, dfs)) - window
     while n > 0:
         if len(dfs[0]) <= n:
