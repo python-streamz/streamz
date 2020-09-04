@@ -755,11 +755,12 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     assert len(L) == 5
 
     first = df.iloc[:diff]
-    first = first[first.index.max() - value - pd.Timedelta('1ns'):]
+    lost = first[first.index.min() + value:]
+    first = first.iloc[len(lost):]
 
     assert_eq(L[0], f(first))
 
-    last = df.loc[index.max() - value - pd.Timedelta('1s'):]
+    last = df.loc[index.max() - value + pd.Timedelta('1s'):]
 
     assert_eq(L[-1], f(last))
 
