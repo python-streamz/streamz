@@ -167,18 +167,20 @@ def diff_iloc(dfs, new, window=None):
         List of dataframes to decay
     """
     dfs = deque(dfs)
-    dfs.append(new)
+    if len(new) > 0:
+        dfs.append(new)
     old = []
-    n = sum(map(len, dfs)) - window
-    while n > 0:
-        if len(dfs[0]) <= n:
-            df = dfs.popleft()
-            old.append(df)
-            n -= len(df)
-        else:
-            old.append(dfs[0].iloc[:n])
-            dfs[0] = dfs[0].iloc[n:]
-            n = 0
+    if len(dfs) > 0:
+        n = sum(map(len, dfs)) - window
+        while n > 0:
+            if len(dfs[0]) <= n:
+                df = dfs.popleft()
+                old.append(df)
+                n -= len(df)
+            else:
+                old.append(dfs[0].iloc[:n])
+                dfs[0] = dfs[0].iloc[n:]
+                n = 0
 
     return dfs, old
 
