@@ -212,7 +212,10 @@ def diff_loc(dfs, new, window=None):
         mn = mx - pd.Timedelta(window) + pd.Timedelta('1ns')
         while pd.Timestamp(dfs[0].index.min()) < mn:
             o = dfs[0].loc[:mn]
-            old.append(o)  # TODO: avoid copy if fully lost
+            if len(old) > 0:
+                old.append(o)
+            else:
+                old = [o]
             dfs[0] = dfs[0].iloc[len(o):]
             if not len(dfs[0]):
                 dfs.popleft()
