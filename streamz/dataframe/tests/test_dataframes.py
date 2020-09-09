@@ -755,12 +755,11 @@ def test_groupby_windowing_value(func, value, getter, grouper, indexer):
     assert len(L) == 5
 
     first = df.iloc[:diff]
-    lost = first[first.index.min() + value:]
-    first = first.iloc[len(lost):]
+    first = first[first.index.max() - value + pd.Timedelta('1ns'):]
 
     assert_eq(L[0], f(first))
 
-    last = df.loc[index.max() - value + pd.Timedelta('1s'):]
+    last = df.loc[index.max() - value + pd.Timedelta('1ns'):]
 
     assert_eq(L[-1], f(last))
 
@@ -813,6 +812,42 @@ def test_groupby_windowing_n(func, n, getter, grouper, indexer):
 
     last = df.iloc[len(df) - n:]
     assert_eq(L[-1], f(last))
+
+
+def test_windowing_value_empty_intermediate_index(stream):
+    def preprocess(df):
+        mask = df["amount"] == 5
+        df = df.loc[mask]
+        return df
+
+    source = stream.map(preprocess)
+
+    example = pd.DataFrame({"amount":[]})
+    sdf = DataFrame(stream=source, example=example)
+
+    output = sdf.window("2h").amount.sum().stream.gather().sink_to_list()
+
+    stream.emit(pd.DataFrame({"amount": [1, 2, 3]}, index=[pd.Timestamp("2050-01-01 00:00:00"),
+                                                           pd.Timestamp("2050-01-01 01:00:00"),
+                                                           pd.Timestamp("2050-01-01 02:00:00")]))
+
+    stream.emit(pd.DataFrame({"amount": [5, 5, 5]}, index=[pd.Timestamp("2050-01-01 03:00:00"),
+                                                           pd.Timestamp("2050-01-01 04:00:00"),
+                                                           pd.Timestamp("2050-01-01 05:00:00")]))
+
+    stream.emit(pd.DataFrame({"amount": [4, 5, 6]}, index=[pd.Timestamp("2050-01-01 06:00:00"),
+                                                           pd.Timestamp("2050-01-01 07:00:00"),
+                                                           pd.Timestamp("2050-01-01 08:00:00")]))
+
+    stream.emit(pd.DataFrame({"amount": [1, 2, 3]}, index=[pd.Timestamp("2050-01-01 09:00:00"),
+                                                           pd.Timestamp("2050-01-01 10:00:00"),
+                                                           pd.Timestamp("2050-01-01 11:00:00")]))
+
+    stream.emit(pd.DataFrame({"amount": [5, 5, 5]}, index=[pd.Timestamp("2050-01-01 12:00:00"),
+                                                           pd.Timestamp("2050-01-01 13:00:00"),
+                                                           pd.Timestamp("2050-01-01 14:00:00")]))
+
+    assert_eq(output, [0, 10, 5, 5, 10])
 
 
 def test_window_full():
