@@ -167,20 +167,18 @@ def diff_iloc(dfs, new, window=None):
         List of dataframes to decay
     """
     dfs = deque(dfs)
-    if len(new) > 0:
-        dfs.append(new)
+    dfs.append(new)
     old = []
-    if len(dfs) > 0:
-        n = sum(map(len, dfs)) - window
-        while n > 0:
-            if len(dfs[0]) <= n:
-                df = dfs.popleft()
-                old.append(df)
-                n -= len(df)
-            else:
-                old.append(dfs[0].iloc[:n])
-                dfs[0] = dfs[0].iloc[n:]
-                n = 0
+    n = sum(map(len, dfs)) - window
+    while n > 0:
+        if len(dfs[0]) <= n:
+            df = dfs.popleft()
+            old.append(df)
+            n -= len(df)
+        else:
+            old.append(dfs[0].iloc[:n])
+            dfs[0] = dfs[0].iloc[n:]
+            n = 0
 
     return dfs, old
 
@@ -204,21 +202,16 @@ def diff_loc(dfs, new, window=None):
         List of dataframes to decay
     """
     dfs = deque(dfs)
-    if len(new) > 0:
-        dfs.append(new)
+    dfs.append(new)
+    mx = max(df.index.max() for df in dfs)
+    mn = mx - pd.Timedelta(window)
     old = []
-    if len(dfs) > 0:
-        mx = max(df.index.max() for df in dfs)
-        mn = mx - pd.Timedelta(window) + pd.Timedelta('1ns')
-        while pd.Timestamp(dfs[0].index.min()) < mn:
-            o = dfs[0].loc[:mn]
-            if len(old) > 0:
-                old.append(o)
-            else:
-                old = [o]
-            dfs[0] = dfs[0].iloc[len(o):]
-            if not len(dfs[0]):
-                dfs.popleft()
+    while pd.Timestamp(dfs[0].index.min()) < mn:
+        o = dfs[0].loc[:mn]
+        old.append(o)  # TODO: avoid copy if fully lost
+        dfs[0] = dfs[0].iloc[len(o):]
+        if not len(dfs[0]):
+            dfs.popleft()
 
     return dfs, old
 
@@ -344,8 +337,7 @@ def windowed_groupby_accumulator(acc, new, diff=None, window=None, agg=None, gro
 
     if 'groupers' in acc:
         groupers = deque(acc['groupers'])
-        if len(grouper) > 0:
-            groupers.append(grouper)
+        groupers.append(grouper)
         old_groupers, groupers = diff_align(dfs, groupers)
     else:
         old_groupers = [grouper] * len(old)
