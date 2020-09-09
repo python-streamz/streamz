@@ -9,7 +9,7 @@ tests = [p + '.tests' for p in packages]
 
 
 setup(name='streamz',
-      version='0.5.5',
+      version='0.5.6',
       description='Streams',
       url='http://github.com/python-streamz/streamz/',
       maintainer='Matthew Rocklin',
