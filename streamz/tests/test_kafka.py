@@ -254,11 +254,13 @@ def test_kafka_batch_checkpointing_sync_nodes():
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j1,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j2,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
@@ -291,11 +293,13 @@ def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j1,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j2,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
@@ -330,7 +334,8 @@ def test_kafka_batch_checkpointing_async_nodes_1():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS)

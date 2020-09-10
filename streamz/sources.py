@@ -453,7 +453,7 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 max_batch_size=10000, keys=False,
+                 npartitions=None, max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
         # Override the auto-commit config to enforce custom streamz checkpointing
@@ -461,6 +461,7 @@ class FromKafkaBatched(Stream):
         if 'auto.offset.reset' not in self.consumer_params.keys():
             consumer_params['auto.offset.reset'] = 'earliest'
         self.topic = topic
+        self.npartitions = npartitions
         self.poll_interval = convert_interval(poll_interval)
         self.max_batch_size = max_batch_size
         self.keys = keys
@@ -500,10 +501,10 @@ class FromKafkaBatched(Stream):
         try:
             while not self.stopped:
                 out = []
-                kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-                self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
-                if self.npartitions > len(self.positions):
-                    self.positions.extend([0] * (self.npartitions - len(self.positions)))
+                # kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+                # self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+                # if self.npartitions > len(self.positions):
+                #     self.positions.extend([0] * (self.npartitions - len(self.positions)))
                 for partition in range(self.npartitions):
                     tp = ck.TopicPartition(self.topic, partition, 0)
                     try:
@@ -512,7 +513,8 @@ class FromKafkaBatched(Stream):
                     except (RuntimeError, ck.KafkaException):
                         continue
                     if 'auto.offset.reset' in self.consumer_params.keys():
-                        if self.consumer_params['auto.offset.reset'] == 'latest':
+                        if self.consumer_params['auto.offset.reset'] == 'latest' and \
+                                self.positions == [-1001] * self.npartitions:
                             self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
@@ -545,8 +547,9 @@ class FromKafkaBatched(Stream):
                 self.consumer = ck.Consumer(self.consumer_params)
             self.stopped = False
 
-            kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-            self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+            if self.npartitions is None:
+                kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+                self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
             self.positions = [0] * self.npartitions
 
             tp = ck.TopicPartition(self.topic, 0, 0)
@@ -558,7 +561,7 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       start=False, dask=False,
+                       npartitions=None, start=False, dask=False,
                        max_batch_size=10000, keys=False,
                        engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
@@ -591,6 +594,9 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         | group, each message will be passed to only one of them.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
+    npartitions: int (None)
+        | Number of partitions in the topic.
+        | If None, streamz will poll Kafka to get the number of partitions.
     start: bool (False)
         Whether to start polling upon instantiation
     max_batch_size: int
@@ -642,6 +648,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         kwargs['loop'] = default_client().loop
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
+                              npartitions=npartitions,
                               max_batch_size=max_batch_size,
                               keys=keys,
                               engine=engine,
