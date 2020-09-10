@@ -624,13 +624,12 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
 
         | More information at: https://rapids.ai/start.html
 
-
     Important Kafka Configurations
     ----------
-    If 'auto.offset.reset': 'latest' is set in the consumer configs,
-    the stream starts reading messages from the latest offset. Else,
-    if it's set to 'earliest', it will read from the start offset.
-
+    By default, a stream will start reading from the latest offsets
+    available. Please set 'auto.offset.reset': 'earliest' in the
+    consumer configs, if the stream needs to start processing from
+    the earliest offsets.
 
     Examples
     ----------
