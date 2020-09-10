@@ -459,7 +459,7 @@ class FromKafkaBatched(Stream):
         # Override the auto-commit config to enforce custom streamz checkpointing
         self.consumer_params['enable.auto.commit'] = 'false'
         if 'auto.offset.reset' not in self.consumer_params.keys():
-            consumer_params['auto.offset.reset'] = 'earliest'
+            consumer_params['auto.offset.reset'] = 'latest'
         self.topic = topic
         self.npartitions = npartitions
         self.poll_interval = convert_interval(poll_interval)
@@ -484,6 +484,11 @@ class FromKafkaBatched(Stream):
             ref = RefCounter(cb=lambda: commit(_part))
             yield self._emit(_part, metadata=[{'ref': ref}])
 
+        if self.npartitions is None:
+            kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+            self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+        self.positions = [0] * self.npartitions
+
         tps = []
         for partition in range(self.npartitions):
             tps.append(ck.TopicPartition(self.topic, partition))
@@ -501,10 +506,6 @@ class FromKafkaBatched(Stream):
         try:
             while not self.stopped:
                 out = []
-                # kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-                # self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
-                # if self.npartitions > len(self.positions):
-                #     self.positions.extend([0] * (self.npartitions - len(self.positions)))
                 for partition in range(self.npartitions):
                     tp = ck.TopicPartition(self.topic, partition, 0)
                     try:
@@ -546,12 +547,6 @@ class FromKafkaBatched(Stream):
             else:
                 self.consumer = ck.Consumer(self.consumer_params)
             self.stopped = False
-
-            if self.npartitions is None:
-                kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-                self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
-            self.positions = [0] * self.npartitions
-
             tp = ck.TopicPartition(self.topic, 0, 0)
 
             # blocks for consumer thread to come up
@@ -597,6 +592,8 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     npartitions: int (None)
         | Number of partitions in the topic.
         | If None, streamz will poll Kafka to get the number of partitions.
+        | As of now, streamz does not support changing number of partitions on the fly.
+        | It is recommended to restart the stream after changing the number of partitions.
     start: bool (False)
         Whether to start polling upon instantiation
     max_batch_size: int

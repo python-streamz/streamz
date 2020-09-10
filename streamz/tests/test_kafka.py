@@ -223,6 +223,7 @@ def test_kafka_batch():
         stream.upstream.stopped = True
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_cluster(client=True, timeout=60)
 def test_kafka_dask_batch(c, s, w1, w2):
     j = random.randint(0, 10000)
@@ -334,8 +335,7 @@ def test_kafka_batch_checkpointing_async_nodes_1():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j,
-            'enable.auto.commit': False,
-            'auto.offset.reset': 'earliest'}
+            'enable.auto.commit': False}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS)
