@@ -802,7 +802,13 @@ class WindowedGroupBy(GroupBy):
         return Streaming(outstream, example, stream_type=stream_type)
 
 
-def _random_df(tup):
+def random_datapoint(_):
+    """Example of querying a single current value. Ignores last/now/freq args."""
+    return pd.DataFrame(
+        {'a': np.random.random(1)}, index=[pd.Timestamp.now()])
+
+def random_datablock(tup):
+    """Example of querying over a range since last update"""
     last, now, freq = tup
     index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
                           end=now * 1e9, freq=freq)
@@ -813,15 +819,8 @@ def _random_df(tup):
                       index=index)
     return df
 
-
-class Random(DataFrame):
-    """ A streaming dataframe of random data
-
-    The x column is uniformly distributed.
-    The y column is poisson distributed.
-    The z column is normally distributed.
-
-    This class is experimental and will likely be removed in the future
+class PeriodicDataFrame(DataFrame):
+    """A streaming dataframe using the Tornado ioloop to poll a callback fn
 
     Parameters
     ----------
@@ -830,13 +829,20 @@ class Random(DataFrame):
     interval: timedelta
         The time interval between new dataframes, should be significantly
         larger than freq
+    dask: boolean
+        If true, uses a DaskStream instead of a regular Source
+    datafn: callable
+        Callback function that will be given a tuple last, now, freq
+        specifying the last time it was invoked, the current time now,
+        and the interval between records
 
     Example
     -------
-    >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
+    >>> df = PeriodicDataFrame(interval='1s', datafn=random_datapoint)  # doctest: +SKIP
     """
 
-    def __init__(self, freq='100ms', interval='500ms', dask=False):
+    def __init__(self, freq='100ms', interval='500ms', dask=False,
+                  datafn=random_datablock):
         if dask:
             from streamz.dask import DaskStream
             source = DaskStream()
@@ -849,10 +855,10 @@ class Random(DataFrame):
         self.source = source
         self.continue_ = [True]
 
-        stream = self.source.map(_random_df)
-        example = _random_df((time(), time(), self.freq))
+        stream = self.source.map(datafn)
+        example = datafn((time(), time(), self.freq))
 
-        super(Random, self).__init__(stream, example)
+        super(PeriodicDataFrame, self).__init__(stream, example)
 
         loop.add_callback(self._cb, self.interval, self.freq, self.source,
                           self.continue_)
@@ -874,6 +880,22 @@ class Random(DataFrame):
             last = now
 
 
+class Random(PeriodicDataFrame):
+    """Same as PeriodicDataFrame, but initialized with 3 random streams
+    (Kept for backwards compatibility and examples; otherwise not useful.)
+
+    The x column is uniformly distributed.
+    The y column is poisson distributed.
+    The z column is normally distributed.
+
+    Example
+    -------
+    >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
+    """
+    def __init__(self, freq='100ms', interval='500ms', dask=False):
+        super(Random, self).__init__(freq, interval, dask, datafn=random_datablock)
+
+            
 _stream_types['streaming'].append((is_dataframe_like, DataFrame))
 _stream_types['streaming'].append((is_index_like, Index))
 _stream_types['streaming'].append((is_series_like, Series))
