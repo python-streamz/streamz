@@ -807,6 +807,7 @@ def random_datapoint(_):
     return pd.DataFrame(
         {'a': np.random.random(1)}, index=[pd.Timestamp.now()])
 
+
 def random_datablock(tup):
     """Example of querying over a range since last update"""
     last, now, freq = tup
@@ -818,6 +819,7 @@ def random_datablock(tup):
                        'z': np.random.normal(0, 1, size=len(index))},
                       index=index)
     return df
+
 
 class PeriodicDataFrame(DataFrame):
     """A streaming dataframe using the Tornado ioloop to poll a callback fn
@@ -895,7 +897,7 @@ class Random(PeriodicDataFrame):
     def __init__(self, freq='100ms', interval='500ms', dask=False):
         super(Random, self).__init__(freq, interval, dask, datafn=random_datablock)
 
-            
+
 _stream_types['streaming'].append((is_dataframe_like, DataFrame))
 _stream_types['streaming'].append((is_index_like, Index))
 _stream_types['streaming'].append((is_series_like, Series))
