@@ -36,7 +36,7 @@ Then start a local Dask cluster
    from dask.distributed import Client
    client = Client()
 
-This operates on a local processes or threads.  If you have Bokeh installed
+This operates on local processes or threads.  If you have Bokeh installed
 then this will also start a diagnostics web server at
 http://localhost:8787/status which you may want to open to get a real-time view
 of execution.
@@ -49,7 +49,7 @@ Sequential Execution
    map
    sink
 
-Before we build a parallel stream, lets build a sequential stream that maps a
+Before we build a parallel stream, let's build a sequential stream that maps a
 simple function across data, and then prints those results.  We use the core
 ``Stream`` object.
 
@@ -69,7 +69,7 @@ simple function across data, and then prints those results.  We use the core
    for i in range(10):
        source.emit(i)
 
-This should take ten seconds we call the ``inc`` function ten times
+This should take ten seconds because we call the ``inc`` function ten times
 sequentially.
 
 Parallel Execution
@@ -101,7 +101,7 @@ You may want to look at http://localhost:8787/status during execution to get a
 sense of the parallel execution.
 
 This should have run much more quickly depending on how many cores you have on
-your machine.  We added a few extra nodes to our stream, lets look at what they
+your machine.  We added a few extra nodes to our stream; let's look at what they
 did.
 
 -   ``scatter``: Converted our Stream into a DaskStream.  The elements that we
@@ -123,7 +123,7 @@ Gotchas
 +++++++
 
 
-An important gotcha with ``DaskStream`` is that it is a subclass ``Stream``, and so can be used as an input 
+An important gotcha with ``DaskStream`` is that it is a subclass of ``Stream``, and so can be used as an input 
 to any function expecting a ``Stream``. If there is no intervening ``.gather()``, then the downstream node will
 receive Dask futures instead of the data they represent::
 
