@@ -111,6 +111,7 @@ data streaming systems like `Apache Flink <https://flink.apache.org/>`_,
 
    core.rst
    dataframes.rst
+   gpu-dataframes.rst
    dask.rst
    collections.rst
    api.rst

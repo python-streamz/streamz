@@ -48,7 +48,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Streamz'
-copyright = '2017, Matthew Rocklin'
+copyright = '2017-2020, Matthew Rocklin'
 author = 'Matthew Rocklin'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -160,7 +160,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'Streamz', 'Streamz Documentation',
-     author, 'Streamz', 'One line description of project.',
+     author, 'Streamz', 'Support for pipelines managing continuous streams of data.',
      'Miscellaneous'),
 ]
 
