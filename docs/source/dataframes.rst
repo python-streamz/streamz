@@ -221,7 +221,7 @@ results of system calls or other isolated actions, but any number of
 entries can be returned by the dataframe in a single batch. To
 facilitate collecting such batches, the callback is invoked with
 ``last`` (the time of the previous invocation) and ``now`` (the
-time of the current invocation. The callback can then generate or
+time of the current invocation). The callback can then generate or
 query for just the values in that time range.
 
 Arbitrary keyword arguments can be provided to the PeriodicDataFrame
@@ -252,4 +252,3 @@ Once you have a PeriodicDataFrame defined using such callbacks, you
 can then use all the rest of the functionality supported by streamz,
 including aggregations, rolling windows, etc., and streaming
 `visualization. <plotting>`_
-
