@@ -41,11 +41,11 @@ def test_periodic_dataframes():
     pd = pytest.importorskip('pandas')
     from streamz.dataframe import PeriodicDataFrame
     from streamz.dataframe.core import random_datapoint
-    df = random_datapoint()
+    df = random_datapoint(now=pd.Timestamp.now())
     assert len(df) == 1
 
-    def callback(**kwargs):
-        return pd.DataFrame(dict(x=50, index=[pd.Timestamp.now()]))
+    def callback(now, **kwargs):
+        return pd.DataFrame(dict(x=50, index=[now]))
 
     df = PeriodicDataFrame(callback, interval='20ms')
     assert df.tail(0).x == 50

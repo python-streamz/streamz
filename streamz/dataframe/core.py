@@ -2,7 +2,6 @@ from __future__ import division, print_function
 
 import operator
 from collections import OrderedDict
-from time import time
 import numpy as np
 import pandas as pd
 import toolz
@@ -802,10 +801,10 @@ class WindowedGroupBy(GroupBy):
         return Streaming(outstream, example, stream_type=stream_type)
 
 
-def random_datapoint(**kwargs):
-    """Example of querying a single current value. Ignores kwargs"""
+def random_datapoint(now, **kwargs):
+    """Example of querying a single current value"""
     return pd.DataFrame(
-        {'a': np.random.random(1)}, index=[pd.Timestamp.now()])
+        {'a': np.random.random(1)}, index=[now])
 
 
 def random_datablock(last, now, **kwargs):
@@ -814,11 +813,11 @@ def random_datablock(last, now, **kwargs):
 
     Parameters
     ----------
-    last: time
+    last: pd.Timestamp
         Time of previous call to this function.
-    now: time
+    now: pd.Timestamp
         Current time.
-    freq: timedelta, optional
+    freq: pd.Timedelta, optional
         The time interval between individual records to be returned.
         For good throughput, should be much smaller than the
         interval at which this function is called.
@@ -829,9 +828,8 @@ def random_datablock(last, now, **kwargs):
     The y column is Poisson distributed.
     The z column is normally distributed.
     """
-    freq = pd.Timedelta(kwargs.get("freq", "100ms"))
-    index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
-                          end=now * 1e9, freq=freq)
+    freq = kwargs.get("freq", pd.Timedelta("100ms"))
+    index = pd.date_range(start=last + freq, end=now, freq=freq)
 
     df = pd.DataFrame({'x': np.random.random(len(index)),
                        'y': np.random.poisson(size=len(index)),
@@ -879,7 +877,7 @@ class PeriodicDataFrame(DataFrame):
         self.kwargs = kwargs
 
         stream = self.source.map(lambda x: datafn(**x, **kwargs))
-        example = datafn(last=time(), now=time(), **kwargs)
+        example = datafn(last=pd.Timestamp.now(), now=pd.Timestamp.now(), **kwargs)
 
         super(PeriodicDataFrame, self).__init__(stream, example)
 
@@ -895,10 +893,10 @@ class PeriodicDataFrame(DataFrame):
     @staticmethod
     @gen.coroutine
     def _cb(interval, source, continue_):
-        last = time()
+        last = pd.Timestamp.now()
         while continue_[0]:
             yield gen.sleep(interval)
-            now = time()
+            now = pd.Timestamp.now()
             yield source._emit(dict(last=last, now=now))
             last = now
 
@@ -906,7 +904,10 @@ class PeriodicDataFrame(DataFrame):
 class Random(PeriodicDataFrame):
     """PeriodicDataFrame providing random values by default
 
-    Accepts same parameters as PeriodicDataFrame.
+    Accepts same parameters as PeriodicDataFrame, plus
+    `freq`, a string that will be converted to a pd.Timedelta
+    and passed to the 'datafn'.
+
     Useful mainly for examples and docs.
 
     Example
@@ -916,7 +917,7 @@ class Random(PeriodicDataFrame):
 
     def __init__(self, freq='100ms', interval='500ms', dask=False,
                  datafn=random_datablock):
-        super(Random, self).__init__(datafn, interval, dask, freq=freq)
+        super(Random, self).__init__(datafn, interval, dask, freq=pd.Timedelta(freq))
 
 
 _stream_types['streaming'].append((is_dataframe_like, DataFrame))
