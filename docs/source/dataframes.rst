@@ -226,7 +226,7 @@ objects. The callback can then generate or query for just the values
 in that time range.
 
 Arbitrary keyword arguments can be provided to the PeriodicDataFrame
-constructor, which will be passed into the callback that its behavior
+constructor, which will be passed into the callback so that its behavior
 can be parameterized.
 
 For instance, you can write a callback to return a suitable number of
