@@ -201,7 +201,7 @@ a callback function like:
 
    import numpy as np
 
-   def random_datapoint(_):
+   def random_datapoint(**kwargs):
       return pd.DataFrame({'a': np.random.random(1)}, index=[pd.Timestamp.now()])
 
 You can then make a streaming dataframe to poll this function
@@ -217,31 +217,30 @@ returns a DataFrame.
 
 Here we returned only a single point, appropriate for streaming the
 results of system calls or other isolated actions, but any number of
-entries can be returned by the dataframe in a single batch.
+entries can be returned by the dataframe in a single batch. To
+facilitate collecting such batches, the callback is invoked with
+``last`` (the time of the previous invocation) and ``now`` (the
+time of the current invocation. The callback can then generate or
+query for just the values in that time range.
 
-More complex callbacks are also supported to cover cases where you
-need to add batch updates from some external data source without
-duplicating values. The callback is actually invoked with a tuple of
-arguments `last, now, freq` that provide the time the callback was
-`last` invoked, the current time `now`, and the expected `freq`
-(actually the interval duration between datapoints). Callbacks can use
-this information to query just the range of values needed since the
-last invocation, returning a dataframe with the results.
+Arbitrary keyword arguments can be provided to the PeriodicDataFrame
+constructor, which will be passed into the `datafn` when it is
+called so that its behavior can be parameterized.
 
 For instance, you can write a callback to return a suitable number of
 datapoints to keep a regularly updating stream, generated randomly
-as a batch since the last call
+as a batch since the last call:
 
 .. code-block:: python
 
-   def random_datablock(tup):
-       last, now, freq = tup
+   def random_datablock(last, now, **kwargs):
+       freq = pd.Timedelta(kwargs.get("freq", "100ms"))
        index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
                              end=now * 1e9, freq=freq)
-   
+        
        return pd.DataFrame({'x': np.random.random(len(index))}, index=index)
 
-   df = PeriodicDataFrame(freq='50ms', interval='300ms', datafn=random_datablock)
+   df = PeriodicDataFrame(random_datablock, interval='300ms', freq='50ms')
 
 The callback will now be invoked every 300ms, each time generating datapoints
 at a rate of 1 every 50ms, returned as a batch. Similar code could e.g. query
