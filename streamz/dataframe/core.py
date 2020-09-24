@@ -802,15 +802,34 @@ class WindowedGroupBy(GroupBy):
         return Streaming(outstream, example, stream_type=stream_type)
 
 
-def random_datapoint(_):
-    """Example of querying a single current value. Ignores last/now/freq args."""
+def random_datapoint(**kwargs):
+    """Example of querying a single current value. Ignores kwargs"""
     return pd.DataFrame(
         {'a': np.random.random(1)}, index=[pd.Timestamp.now()])
 
 
-def random_datablock(tup):
-    """Example of querying over a range since last update"""
-    last, now, freq = tup
+def random_datablock(last, now, **kwargs):
+    """
+    Example of querying over a time range since last update
+
+    Parameters
+    ----------
+    last: time
+        Time of previous call to this function.
+    now: time
+        Current time.
+    freq: timedelta, optional
+        The time interval between individual records to be returned.
+        For good throughput, should be much smaller than the 
+        interval at which this function is called.
+
+    Returns a pd.DataFrame with random values where:
+
+    The x column is uniformly distributed.
+    The y column is Poisson distributed.
+    The z column is normally distributed.
+    """
+    freq = pd.Timedelta(kwargs.get("freq", "100ms"))
     index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
                           end=now * 1e9, freq=freq)
 
@@ -826,25 +845,27 @@ class PeriodicDataFrame(DataFrame):
 
     Parameters
     ----------
-    freq: timedelta
-        The time interval between records
-    interval: timedelta
-        The time interval between new dataframes, should be significantly
-        larger than freq
-    dask: boolean
-        If true, uses a DaskStream instead of a regular Source
     datafn: callable
-        Callback function that will be given a tuple last, now, freq
-        specifying the last time it was invoked, the current time now,
-        and the interval between records
+        Callback function accepting **kwargs and returning a
+        pd.DataFrame.  kwargs will include at least 
+        'last' (time.time() datafn was last invoked), and 
+        'now' (current time.time()).
+    interval: timedelta
+        The time interval between new dataframes.
+    dask: boolean
+        If true, uses a DaskStream instead of a regular Source.
+    **kwargs:
+        Optional keyword arguments to be passed into the callback function.
+
+    By default, returns a three-column random pd.DataFrame generated
+    by the 'random_datablock' function.
 
     Example
     -------
     >>> df = PeriodicDataFrame(interval='1s', datafn=random_datapoint)  # doctest: +SKIP
     """
 
-    def __init__(self, freq='100ms', interval='500ms', dask=False,
-                  datafn=random_datablock):
+    def __init__(self, datafn=random_datablock, interval='500ms', dask=False, **kwargs):
         if dask:
             from streamz.dask import DaskStream
             source = DaskStream()
@@ -852,17 +873,17 @@ class PeriodicDataFrame(DataFrame):
         else:
             source = Source()
             loop = IOLoop.current()
-        self.freq = pd.Timedelta(freq)
         self.interval = pd.Timedelta(interval).total_seconds()
         self.source = source
         self.continue_ = [True]
+        self.kwargs = kwargs
 
-        stream = self.source.map(datafn)
-        example = datafn((time(), time(), self.freq))
+        stream = self.source.map(lambda x: datafn(**x, **kwargs))
+        example = datafn(last=time(), now=time(), **kwargs)
 
         super(PeriodicDataFrame, self).__init__(stream, example)
 
-        loop.add_callback(self._cb, self.interval, self.freq, self.source,
+        loop.add_callback(self._cb, self.interval, self.source,
                           self.continue_)
 
     def __del__(self):
@@ -873,29 +894,29 @@ class PeriodicDataFrame(DataFrame):
 
     @staticmethod
     @gen.coroutine
-    def _cb(interval, freq, source, continue_):
+    def _cb(interval, source, continue_):
         last = time()
         while continue_[0]:
             yield gen.sleep(interval)
             now = time()
-            yield source._emit((last, now, freq))
+            yield source._emit(dict(last=last, now=now))
             last = now
 
 
 class Random(PeriodicDataFrame):
-    """Same as PeriodicDataFrame, but initialized with 3 random streams
-    (Kept for backwards compatibility and examples; otherwise not useful.)
+    """PeriodicDataFrame providing random values by default
 
-    The x column is uniformly distributed.
-    The y column is poisson distributed.
-    The z column is normally distributed.
+    Accepts same parameters as PeriodicDataFrame.
+    Useful mainly for examples and docs. 
 
     Example
     -------
     >>> source = Random(freq='100ms', interval='1s')  # doctest: +SKIP
     """
-    def __init__(self, freq='100ms', interval='500ms', dask=False):
-        super(Random, self).__init__(freq, interval, dask, datafn=random_datablock)
+
+    def __init__(self, freq='100ms', interval='500ms', dask=False,
+                 datafn=random_datablock):
+        super(Random, self).__init__(datafn, interval, dask, freq=freq)
 
 
 _stream_types['streaming'].append((is_dataframe_like, DataFrame))
