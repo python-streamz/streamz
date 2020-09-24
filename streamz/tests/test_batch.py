@@ -37,6 +37,21 @@ def test_dataframes():
     assert result.z.tolist() == [3 * i for i in range(10)]
 
 
+def test_periodic_dataframes():
+    pd = pytest.importorskip('pandas')
+    from streamz.dataframe import PeriodicDataFrame
+    from streamz.dataframe.core import random_datapoint
+    df = random_datapoint()
+    assert len(df)==1
+    
+    def callback(**kwargs):
+        return pd.DataFrame(dict(x=50, index=[pd.Timestamp.now()]))
+
+    df = PeriodicDataFrame(callback, interval='20ms')
+    assert df.tail(0).x==50
+    df.stop()
+
+
 def test_filter():
     a = Batch()
     f = a.filter(lambda x: x % 2 == 0)
