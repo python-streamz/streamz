@@ -820,7 +820,7 @@ def random_datablock(last, now, **kwargs):
         Current time.
     freq: timedelta, optional
         The time interval between individual records to be returned.
-        For good throughput, should be much smaller than the 
+        For good throughput, should be much smaller than the
         interval at which this function is called.
 
     Returns a pd.DataFrame with random values where:
@@ -847,8 +847,8 @@ class PeriodicDataFrame(DataFrame):
     ----------
     datafn: callable
         Callback function accepting **kwargs and returning a
-        pd.DataFrame.  kwargs will include at least 
-        'last' (time.time() datafn was last invoked), and 
+        pd.DataFrame.  kwargs will include at least
+        'last' (time.time() datafn was last invoked), and
         'now' (current time.time()).
     interval: timedelta
         The time interval between new dataframes.
@@ -907,7 +907,7 @@ class Random(PeriodicDataFrame):
     """PeriodicDataFrame providing random values by default
 
     Accepts same parameters as PeriodicDataFrame.
-    Useful mainly for examples and docs. 
+    Useful mainly for examples and docs.
 
     Example
     -------
