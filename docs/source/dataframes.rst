@@ -210,7 +210,7 @@ e.g. every 300 milliseconds:
 
 .. code-block:: python
 
-   df = PeriodicDataFrame(interval='300ms', datafn=random_datapoint)
+   df = PeriodicDataFrame(random_datapoint, interval='300ms')
 
 ``df`` will now be a steady stream of whatever values are returned by
 the `datafn`, which can of course be any Python code as long as it
@@ -220,13 +220,14 @@ Here we returned only a single point, appropriate for streaming the
 results of system calls or other isolated actions, but any number of
 entries can be returned by the dataframe in a single batch. To
 facilitate collecting such batches, the callback is invoked with
-``last`` (the time of the previous invocation) and ``now`` (the
-time of the current invocation). The callback can then generate or
-query for just the values in that time range.
+keyword arguments ``last`` (the time of the previous invocation) and
+``now`` (the time of the current invocation) as Pandas Timestamp
+objects. The callback can then generate or query for just the values
+in that time range.
 
 Arbitrary keyword arguments can be provided to the PeriodicDataFrame
-constructor, which will be passed into the `datafn` when it is
-called so that its behavior can be parameterized.
+constructor, which will be passed into the callback that its behavior
+can be parameterized.
 
 For instance, you can write a callback to return a suitable number of
 datapoints to keep a regularly updating stream, generated randomly
@@ -234,19 +235,20 @@ as a batch since the last call:
 
 .. code-block:: python
 
-   def random_datablock(last, now, **kwargs):
-       freq = pd.Timedelta(kwargs.get("freq", "100ms"))
-       index = pd.date_range(start=(last + freq.total_seconds()) * 1e9,
-                             end=now * 1e9, freq=freq)
-        
+   def datablock(last, now, **kwargs):
+       freq = kwargs.get("freq", pd.Timedelta("50ms"))
+       index = pd.date_range(start=last + freq, end=now, freq=freq)
        return pd.DataFrame({'x': np.random.random(len(index))}, index=index)
 
-   df = PeriodicDataFrame(random_datablock, interval='300ms', freq='50ms')
+   df = PeriodicDataFrame(datablock, interval='300ms')
 
-The callback will now be invoked every 300ms, each time generating datapoints
-at a rate of 1 every 50ms, returned as a batch. Similar code could e.g. query
-an external database for the time range since the last update, returning all
-datapoints since then.
+The callback will now be invoked every 300ms, each time generating
+datapoints at a rate of 1 every 50ms, returned as a batch. If you
+wished, you could override the 50ms value by passing
+`freq=pd.Timedelta("100ms")` to the PeriodicDataFrame constructor.
+
+Similar code could e.g. query an external database for the time range
+since the last update, returning all datapoints since then.
 
 Once you have a PeriodicDataFrame defined using such callbacks, you
 can then use all the rest of the functionality supported by streamz,
