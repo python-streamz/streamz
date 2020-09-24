@@ -846,8 +846,8 @@ class PeriodicDataFrame(DataFrame):
     datafn: callable
         Callback function accepting **kwargs and returning a
         pd.DataFrame.  kwargs will include at least
-        'last' (time.time() datafn was last invoked), and
-        'now' (current time.time()).
+        'last' (pd.Timestamp.now() when datafn was last invoked), and
+        'now' (current pd.Timestamp.now()).
     interval: timedelta
         The time interval between new dataframes.
     dask: boolean
