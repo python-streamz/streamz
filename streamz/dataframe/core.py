@@ -841,7 +841,7 @@ def random_datablock(last, now, **kwargs):
 
 
 class PeriodicDataFrame(DataFrame):
-    """A streaming dataframe using the Tornado ioloop to poll a callback fn
+    """A streaming dataframe using the asyncio ioloop to poll a callback fn
 
     Parameters
     ----------

@@ -190,7 +190,8 @@ events, and topologies, but what if you simply want to run some Python
 function periodically and collect or plot the results?
 
 streamz provides a high-level convenience class for this purpose, called
-a PeriodicDataFrame. A PeriodicDataFrame uses Tornado's event loop to
+a PeriodicDataFrame. A PeriodicDataFrame uses Python's asyncio event loop
+(used as part of Tornado in Jupyter and other interactive frameworks) to
 call a user-provided function at a regular interval, collecting the results
 and making them available for later processing.
 
