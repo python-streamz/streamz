@@ -4,7 +4,7 @@ DataFrames
 When handling large volumes of streaming tabular data it is often more
 efficient to pass around larger Pandas dataframes with many rows each rather
 than pass around individual Python tuples or dicts.  Handling and computing on
-data with Pandas can be much faster than operating on Python objects.
+data with Pandas can be much faster than operating on individual Python objects.
 
 So one could imagine building streaming dataframe pipelines using the ``.map``
 and ``.accumulate`` streaming operators with functions that consume and produce
@@ -178,5 +178,79 @@ and ``DaskStream`` objects.
 Not Yet Supported
 -----------------
 
-Streaming dataframes algorithms do not currently pay special attention to data
+Streaming dataframe algorithms do not currently pay special attention to data
 arriving out-of-order.
+
+
+PeriodicDataFrame
+-----------------
+
+As you have seen above, Streamz can handle arbitrarily complex pipelines,
+events, and topologies, but what if you simply want to run some Python
+function periodically and collect or plot the results?
+
+streamz provides a high-level convenience class for this purpose, called
+a PeriodicDataFrame. A PeriodicDataFrame uses Python's asyncio event loop
+(used as part of Tornado in Jupyter and other interactive frameworks) to
+call a user-provided function at a regular interval, collecting the results
+and making them available for later processing.
+
+In the simplest case, you can use a PeriodicDataFrame by first writing
+a callback function like:
+
+.. code-block:: python
+
+   import numpy as np
+
+   def random_datapoint(**kwargs):
+      return pd.DataFrame({'a': np.random.random(1)}, index=[pd.Timestamp.now()])
+
+You can then make a streaming dataframe to poll this function
+e.g. every 300 milliseconds:
+
+.. code-block:: python
+
+   df = PeriodicDataFrame(random_datapoint, interval='300ms')
+
+``df`` will now be a steady stream of whatever values are returned by
+the `datafn`, which can of course be any Python code as long as it
+returns a DataFrame. 
+
+Here we returned only a single point, appropriate for streaming the
+results of system calls or other isolated actions, but any number of
+entries can be returned by the dataframe in a single batch. To
+facilitate collecting such batches, the callback is invoked with
+keyword arguments ``last`` (the time of the previous invocation) and
+``now`` (the time of the current invocation) as Pandas Timestamp
+objects. The callback can then generate or query for just the values
+in that time range.
+
+Arbitrary keyword arguments can be provided to the PeriodicDataFrame
+constructor, which will be passed into the callback so that its behavior
+can be parameterized.
+
+For instance, you can write a callback to return a suitable number of
+datapoints to keep a regularly updating stream, generated randomly
+as a batch since the last call:
+
+.. code-block:: python
+
+   def datablock(last, now, **kwargs):
+       freq = kwargs.get("freq", pd.Timedelta("50ms"))
+       index = pd.date_range(start=last + freq, end=now, freq=freq)
+       return pd.DataFrame({'x': np.random.random(len(index))}, index=index)
+
+   df = PeriodicDataFrame(datablock, interval='300ms')
+
+The callback will now be invoked every 300ms, each time generating
+datapoints at a rate of 1 every 50ms, returned as a batch. If you
+wished, you could override the 50ms value by passing
+`freq=pd.Timedelta("100ms")` to the PeriodicDataFrame constructor.
+
+Similar code could e.g. query an external database for the time range
+since the last update, returning all datapoints since then.
+
+Once you have a PeriodicDataFrame defined using such callbacks, you
+can then use all the rest of the functionality supported by streamz,
+including aggregations, rolling windows, etc., and streaming
+`visualization. <plotting>`_

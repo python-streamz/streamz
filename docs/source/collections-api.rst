@@ -87,6 +87,9 @@ Dataframes
    Rolling.var
 
 .. autosummary::
+   PeriodicDataFrame
+
+.. autosummary::
    Random
 
 Details
