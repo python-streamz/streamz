@@ -336,7 +336,7 @@ class Stream(object):
     def _ipython_display_(self, **kwargs):
         try:
             from ipywidgets import Output
-            import IPython
+            from IPython.core.interactiveshell import InteractiveShell
         except ImportError:
             if hasattr(self, '_repr_html_'):
                 return self._repr_html_()
@@ -350,8 +350,11 @@ class Stream(object):
             if output is None:
                 return
             with output:
-                IPython.display.clear_output(wait=True)
-                IPython.display.display(val)
+                content, *_ = InteractiveShell.instance(
+                    ).display_formatter.format(val)
+                output.outputs = ({'output_type': 'display_data',
+                      'data': content,
+                      'metadata': {}},)
 
         s = self.map(update_cell)
         _html_update_streams.add(s)
