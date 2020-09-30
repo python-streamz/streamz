@@ -333,7 +333,7 @@ class Stream(object):
 
     __repr__ = __str__
 
-    def _ipython_display_(self, **kwargs):  # pragma no cover
+    def _ipython_display_(self, **kwargs):  # pragma: no cover
         try:
             from ipywidgets import Output
             from IPython.core.interactiveshell import InteractiveShell
