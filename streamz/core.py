@@ -350,8 +350,7 @@ class Stream(object):
             if output is None:
                 return
             with output:
-                content, *_ = InteractiveShell.instance(
-                    ).display_formatter.format(val)
+                content, *_ = InteractiveShell.instance().display_formatter.format(val)
                 output.outputs = ({'output_type': 'display_data',
                       'data': content,
                       'metadata': {}},)
