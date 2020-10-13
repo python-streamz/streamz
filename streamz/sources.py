@@ -486,7 +486,10 @@ class FromKafkaBatched(Stream):
 
         if self.npartitions is None:
             kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-            self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+            if self.engine == "cudf":  # pragma: no cover
+                self.npartitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
+            else:
+                self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
         self.positions = [0] * self.npartitions
 
         tps = []
