@@ -4,7 +4,6 @@ from flaky import flaky
 import os
 import pytest
 import random
-import requests
 import shlex
 import subprocess
 import time
@@ -257,7 +256,7 @@ def test_kafka_batch_npartitions():
         time.sleep(5)
 
         for i in range(10):
-            if i%2 == 0:
+            if i % 2 == 0:
                 kafka.produce(TOPIC, b'value-%d' % i, partition=0)
             else:
                 kafka.produce(TOPIC, b'value-%d' % i, partition=1)
