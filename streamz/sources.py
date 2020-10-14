@@ -462,6 +462,8 @@ class FromKafkaBatched(Stream):
             consumer_params['auto.offset.reset'] = 'latest'
         self.topic = topic
         self.npartitions = npartitions
+        if self.npartitions is not None and self.npartitions <= 0:
+            raise ValueError("Number of Kafka topic partitions must be > 0.")
         self.poll_interval = convert_interval(poll_interval)
         self.max_batch_size = max_batch_size
         self.keys = keys

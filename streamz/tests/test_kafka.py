@@ -22,16 +22,6 @@ LAUNCH_KAFKA = os.environ.get('STREAMZ_LAUNCH_KAFKA', '') == 'true'
 ck = pytest.importorskip('confluent_kafka')
 
 
-def download_kafka(target):
-    r = requests.get('http://apache.mirror.globo.tech/kafka/1.0.0/'
-                     '%s.tgz' % KAFKA_FILE, stream=True)
-    with open(target, 'wb') as f:
-        for chunk in r.iter_content(2 ** 20):
-            f.write(chunk)
-    subprocess.check_call(['tar', 'xzf', KAFKA_FILE],
-                          cwd=os.path.dirname(target))
-
-
 def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
     """Stop docker container with given name tag
 
@@ -61,6 +51,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 
 def launch_kafka():
     stop_docker(let_fail=True)
+    os.system("docker pull spotify/kafka")
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
            "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
@@ -223,7 +214,6 @@ def test_kafka_batch():
         stream.upstream.stopped = True
 
 
-@flaky(max_runs=3, min_passes=1)
 @gen_cluster(client=True, timeout=60)
 def test_kafka_dask_batch(c, s, w1, w2):
     j = random.randint(0, 10000)
@@ -243,6 +233,63 @@ def test_kafka_dask_batch(c, s, w1, w2):
         yield await_for(lambda: any(out), 10, period=0.2)
         assert {'key':None, 'value':b'value-1'} in out[0]
         stream.upstream.stopped = True
+
+
+def test_kafka_batch_npartitions():
+    j1 = random.randint(0, 10000)
+    ARGS1 = {'bootstrap.servers': 'localhost:9092',
+             'group.id': 'streamz-test%i' % j1,
+             'enable.auto.commit': False,
+             'auto.offset.reset': 'earliest'}
+    j2 = j1 + 1
+    ARGS2 = {'bootstrap.servers': 'localhost:9092',
+             'group.id': 'streamz-test%i' % j2,
+             'enable.auto.commit': False,
+             'auto.offset.reset': 'earliest'}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+
+        TOPIC = "test-partitions"
+        os.system("docker exec streamz-kafka ls /opt")
+        os.system("docker exec streamz-kafka /opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                  "--create --zookeeper localhost:2181 "
+                  "--replication-factor 1 --partitions 2 --topic test-partitions")
+        time.sleep(5)
+
+        for i in range(10):
+            if i%2 == 0:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=0)
+            else:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=1)
+        kafka.flush()
+
+        try:
+            stream1 = Stream.from_kafka_batched(TOPIC, ARGS1,
+                                                asynchronous=True,
+                                                npartitions=0)
+            stream1.gather().sink_to_list()
+            stream1.start()
+        except ValueError as e:
+            assert type(e) is ValueError
+            pass
+
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS1,
+                                            asynchronous=True,
+                                            npartitions=1)
+        out2 = stream2.gather().sink_to_list()
+        stream2.start()
+        time.sleep(5)
+        assert (len(out2) == 1 and len(out2[0]) == 5)
+        stream2.upstream.stopped = True
+
+        stream3 = Stream.from_kafka_batched(TOPIC, ARGS2,
+                                            asynchronous=True,
+                                            npartitions=4)
+        out3 = stream3.gather().sink_to_list()
+        stream3.start()
+        time.sleep(5)
+        assert (len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10)
+        stream3.upstream.stopped = True
 
 
 def test_kafka_batch_checkpointing_sync_nodes():
