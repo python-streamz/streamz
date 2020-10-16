@@ -298,12 +298,12 @@ def test_kafka_refresh_cycles():
             'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        TOPIC = "test-partitions"
+        TOPIC = "test-refresh-partitions"
         subprocess.call(shlex.split("docker exec streamz-kafka "
                                     "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 2 "
-                                    "--topic test-partitions"))
+                                    "--topic test-refresh-partitions"))
         time.sleep(2)
 
         for i in range(10):
@@ -325,7 +325,7 @@ def test_kafka_refresh_cycles():
         subprocess.call(shlex.split("docker exec streamz-kafka "
                                     "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
                                     "--alter --zookeeper localhost:2181 "
-                                    "--topic test-partitions --partitions 4"))
+                                    "--topic test-refresh-partitions --partitions 4"))
         time.sleep(5)
 
         for i in range(10,20):
