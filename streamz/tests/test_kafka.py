@@ -336,7 +336,8 @@ def test_kafka_refresh_cycles():
         kafka.flush()
         time.sleep(5)
 
-        assert (len(out) == 4 and (len(out[2]) + len(out[3])) == 10)
+        assert (len(out) == 4 and (len(out[2]) + len(out[3])) == 10
+                and out[3][4] == b'value-19')
         stream.upstream.stopped = True
 
 
