@@ -50,7 +50,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 
 def launch_kafka():
     stop_docker(let_fail=True)
-    os.system("docker pull spotify/kafka")
+    subprocess.call(shlex.split("docker pull spotify/kafka"))
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
            "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
@@ -249,10 +249,11 @@ def test_kafka_batch_npartitions():
         kafka, TOPIC = kafka
 
         TOPIC = "test-partitions"
-        os.system("docker exec streamz-kafka ls /opt")
-        os.system("docker exec streamz-kafka /opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
-                  "--create --zookeeper localhost:2181 "
-                  "--replication-factor 1 --partitions 2 --topic test-partitions")
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--create --zookeeper localhost:2181 "
+                                    "--replication-factor 1 --partitions 2 "
+                                    "--topic test-partitions"))
         time.sleep(5)
 
         for i in range(10):
@@ -262,15 +263,12 @@ def test_kafka_batch_npartitions():
                 kafka.produce(TOPIC, b'value-%d' % i, partition=1)
         kafka.flush()
 
-        try:
+        with pytest.raises(ValueError):
             stream1 = Stream.from_kafka_batched(TOPIC, ARGS1,
                                                 asynchronous=True,
                                                 npartitions=0)
             stream1.gather().sink_to_list()
             stream1.start()
-        except ValueError as e:
-            assert type(e) is ValueError
-            pass
 
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS1,
                                             asynchronous=True,
