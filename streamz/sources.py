@@ -453,7 +453,8 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=None, max_batch_size=10000, keys=False,
+                 npartitions=None, refresh_cycles=None,
+                 max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
         # Override the auto-commit config to enforce custom streamz checkpointing
@@ -462,6 +463,7 @@ class FromKafkaBatched(Stream):
             consumer_params['auto.offset.reset'] = 'latest'
         self.topic = topic
         self.npartitions = npartitions
+        self.refresh_cycles = refresh_cycles
         if self.npartitions is not None and self.npartitions <= 0:
             raise ValueError("Number of Kafka topic partitions must be > 0.")
         self.poll_interval = convert_interval(poll_interval)
@@ -509,8 +511,21 @@ class FromKafkaBatched(Stream):
                 break
 
         try:
+            if self.refresh_cycles is not None:
+                cycles = 0
             while not self.stopped:
                 out = []
+
+                if self.refresh_cycles is not None and cycles == 0:
+                    kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+                    if self.engine == "cudf":  # pragma: no cover
+                        new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
+                    else:
+                        new_partitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+                    if new_partitions > self.npartitions:
+                        self.positions.extend([-1001] * (new_partitions - self.npartitions))
+                        self.npartitions = new_partitions
+
                 for partition in range(self.npartitions):
                     tp = ck.TopicPartition(self.topic, partition, 0)
                     try:
@@ -532,6 +547,9 @@ class FromKafkaBatched(Stream):
                                     self.keys, lowest, high - 1))
                         self.positions[partition] = high
                 self.consumer_params['auto.offset.reset'] = 'earliest'
+
+                if self.refresh_cycles is not None:
+                    cycles = (cycles + 1) % self.refresh_cycles
 
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
@@ -562,7 +580,8 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=None, start=False, dask=False,
+                       npartitions=None, refresh_cycles=None,
+                       start=False, dask=False,
                        max_batch_size=10000, keys=False,
                        engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
@@ -598,8 +617,14 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     npartitions: int (None)
         | Number of partitions in the topic.
         | If None, streamz will poll Kafka to get the number of partitions.
-        | As of now, streamz does not support changing number of partitions on the fly.
-        | It is recommended to restart the stream after changing the number of partitions.
+     refresh_cycles: int (None)
+        | Useful if the user expects to increase the number of partitions on the fly,
+        | maybe to handle spikes in load, etc. Streamz polls Kafka after every
+        | 'refresh cycles' number of batches to determine the current number of topic
+        | partitions. If partitions have been added, streamz will automatically start
+        | reading data from the new partitions as well.
+        | If set to None, streamz will not accommodate changing partitions on the fly.
+        | It is recommended to restart the stream after decreasing the number of partitions.
     start: bool (False)
         Whether to start polling upon instantiation
     max_batch_size: int
@@ -631,7 +656,6 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         | More information at: https://rapids.ai/start.html
 
     Important Kafka Configurations
-    ----------
     By default, a stream will start reading from the latest offsets
     available. Please set 'auto.offset.reset': 'earliest' in the
     consumer configs, if the stream needs to start processing from
@@ -651,6 +675,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
                               npartitions=npartitions,
+                              refresh_cycles=refresh_cycles,
                               max_batch_size=max_batch_size,
                               keys=keys,
                               engine=engine,

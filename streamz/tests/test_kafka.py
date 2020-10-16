@@ -87,7 +87,8 @@ def kafka_service():
                 "Kafka not available. "
                 "To launch kafka use `export STREAMZ_LAUNCH_KAFKA=true`")
 
-        producer = ck.Producer({'bootstrap.servers': 'localhost:9092'})
+        producer = ck.Producer({'bootstrap.servers': 'localhost:9092',
+                                'topic.metadata.refresh.interval.ms': '5000'})
         producer.produce('test-start-kafka', b'test')
         out = producer.flush(10)
         if out > 0:
@@ -287,6 +288,56 @@ def test_kafka_batch_npartitions():
         time.sleep(5)
         assert (len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10)
         stream3.upstream.stopped = True
+
+
+def test_kafka_refresh_cycles():
+    j1 = random.randint(0, 10000)
+    ARGS = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j1,
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        TOPIC = "test-partitions"
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--create --zookeeper localhost:2181 "
+                                    "--replication-factor 1 --partitions 2 "
+                                    "--topic test-partitions"))
+        time.sleep(2)
+
+        for i in range(10):
+            if i % 2 == 0:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=0)
+            else:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=1)
+        kafka.flush()
+
+        stream = Stream.from_kafka_batched(TOPIC, ARGS,
+                                           asynchronous=True,
+                                           refresh_cycles=1,
+                                           poll_interval='2s')
+        out = stream.gather().sink_to_list()
+        stream.start()
+        time.sleep(5)
+        assert (len(out) == 2 and (len(out[0]) + len(out[1])) == 10)
+
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--alter --zookeeper localhost:2181 "
+                                    "--topic test-partitions --partitions 4"))
+        time.sleep(5)
+
+        for i in range(10,20):
+            if i % 2 == 0:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=2)
+            else:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=3)
+        kafka.flush()
+        time.sleep(5)
+
+        assert (len(out) == 4 and (len(out[2]) + len(out[3])) == 10)
+        stream.upstream.stopped = True
 
 
 def test_kafka_batch_checkpointing_sync_nodes():
