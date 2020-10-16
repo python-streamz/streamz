@@ -453,16 +453,17 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=1, max_batch_size=10000, keys=False,
+                 npartitions=None, max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
         # Override the auto-commit config to enforce custom streamz checkpointing
         self.consumer_params['enable.auto.commit'] = 'false'
         if 'auto.offset.reset' not in self.consumer_params.keys():
-            consumer_params['auto.offset.reset'] = 'earliest'
+            consumer_params['auto.offset.reset'] = 'latest'
         self.topic = topic
         self.npartitions = npartitions
-        self.positions = [0] * npartitions
+        if self.npartitions is not None and self.npartitions <= 0:
+            raise ValueError("Number of Kafka topic partitions must be > 0.")
         self.poll_interval = convert_interval(poll_interval)
         self.max_batch_size = max_batch_size
         self.keys = keys
@@ -484,6 +485,14 @@ class FromKafkaBatched(Stream):
         def checkpoint_emit(_part):
             ref = RefCounter(cb=lambda: commit(_part))
             yield self._emit(_part, metadata=[{'ref': ref}])
+
+        if self.npartitions is None:
+            kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+            if self.engine == "cudf":  # pragma: no cover
+                self.npartitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
+            else:
+                self.npartitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+        self.positions = [0] * self.npartitions
 
         tps = []
         for partition in range(self.npartitions):
@@ -510,7 +519,9 @@ class FromKafkaBatched(Stream):
                     except (RuntimeError, ck.KafkaException):
                         continue
                     if 'auto.offset.reset' in self.consumer_params.keys():
-                        if self.consumer_params['auto.offset.reset'] == 'latest':
+                        if self.consumer_params['auto.offset.reset'] == 'latest' and \
+                                (self.positions == [-1001] * self.npartitions
+                                 or self.positions == [0] * self.npartitions):
                             self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
@@ -551,7 +562,7 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=1, start=False, dask=False,
+                       npartitions=None, start=False, dask=False,
                        max_batch_size=10000, keys=False,
                        engine=None, **kwargs):
     """ Get messages and keys (optional) from Kafka in batches
@@ -584,8 +595,11 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
         | group, each message will be passed to only one of them.
     poll_interval: number
         Seconds that elapse between polling Kafka for new messages
-    npartitions: int
-        Number of partitions in the topic
+    npartitions: int (None)
+        | Number of partitions in the topic.
+        | If None, streamz will poll Kafka to get the number of partitions.
+        | As of now, streamz does not support changing number of partitions on the fly.
+        | It is recommended to restart the stream after changing the number of partitions.
     start: bool (False)
         Whether to start polling upon instantiation
     max_batch_size: int
@@ -616,20 +630,19 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
 
         | More information at: https://rapids.ai/start.html
 
-
     Important Kafka Configurations
     ----------
-    If 'auto.offset.reset': 'latest' is set in the consumer configs,
-    the stream starts reading messages from the latest offset. Else,
-    if it's set to 'earliest', it will read from the start offset.
-
+    By default, a stream will start reading from the latest offsets
+    available. Please set 'auto.offset.reset': 'earliest' in the
+    consumer configs, if the stream needs to start processing from
+    the earliest offsets.
 
     Examples
     ----------
 
     >>> source = Stream.from_kafka_batched('mytopic',
     ...           {'bootstrap.servers': 'localhost:9092',
-    ...            'group.id': 'streamz'}, npartitions=4)  # doctest: +SKIP
+    ...            'group.id': 'streamz'})  # doctest: +SKIP
 
     """
     if dask:

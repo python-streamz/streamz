@@ -4,7 +4,6 @@ from flaky import flaky
 import os
 import pytest
 import random
-import requests
 import shlex
 import subprocess
 import time
@@ -20,16 +19,6 @@ from distributed.utils_test import gen_cluster  # flake8: noqa
 KAFKA_FILE = 'kafka_2.11-1.0.0'
 LAUNCH_KAFKA = os.environ.get('STREAMZ_LAUNCH_KAFKA', '') == 'true'
 ck = pytest.importorskip('confluent_kafka')
-
-
-def download_kafka(target):
-    r = requests.get('http://apache.mirror.globo.tech/kafka/1.0.0/'
-                     '%s.tgz' % KAFKA_FILE, stream=True)
-    with open(target, 'wb') as f:
-        for chunk in r.iter_content(2 ** 20):
-            f.write(chunk)
-    subprocess.check_call(['tar', 'xzf', KAFKA_FILE],
-                          cwd=os.path.dirname(target))
 
 
 def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
@@ -61,6 +50,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 
 def launch_kafka():
     stop_docker(let_fail=True)
+    subprocess.call(shlex.split("docker pull spotify/kafka"))
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
            "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
@@ -244,6 +234,61 @@ def test_kafka_dask_batch(c, s, w1, w2):
         stream.upstream.stopped = True
 
 
+def test_kafka_batch_npartitions():
+    j1 = random.randint(0, 10000)
+    ARGS1 = {'bootstrap.servers': 'localhost:9092',
+             'group.id': 'streamz-test%i' % j1,
+             'enable.auto.commit': False,
+             'auto.offset.reset': 'earliest'}
+    j2 = j1 + 1
+    ARGS2 = {'bootstrap.servers': 'localhost:9092',
+             'group.id': 'streamz-test%i' % j2,
+             'enable.auto.commit': False,
+             'auto.offset.reset': 'earliest'}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+
+        TOPIC = "test-partitions"
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--create --zookeeper localhost:2181 "
+                                    "--replication-factor 1 --partitions 2 "
+                                    "--topic test-partitions"))
+        time.sleep(5)
+
+        for i in range(10):
+            if i % 2 == 0:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=0)
+            else:
+                kafka.produce(TOPIC, b'value-%d' % i, partition=1)
+        kafka.flush()
+
+        with pytest.raises(ValueError):
+            stream1 = Stream.from_kafka_batched(TOPIC, ARGS1,
+                                                asynchronous=True,
+                                                npartitions=0)
+            stream1.gather().sink_to_list()
+            stream1.start()
+
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS1,
+                                            asynchronous=True,
+                                            npartitions=1)
+        out2 = stream2.gather().sink_to_list()
+        stream2.start()
+        time.sleep(5)
+        assert (len(out2) == 1 and len(out2[0]) == 5)
+        stream2.upstream.stopped = True
+
+        stream3 = Stream.from_kafka_batched(TOPIC, ARGS2,
+                                            asynchronous=True,
+                                            npartitions=4)
+        out3 = stream3.gather().sink_to_list()
+        stream3.start()
+        time.sleep(5)
+        assert (len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10)
+        stream3.upstream.stopped = True
+
+
 def test_kafka_batch_checkpointing_sync_nodes():
     '''
     Streams 1 and 3 have different consumer groups, while Stream 2
@@ -254,11 +299,13 @@ def test_kafka_batch_checkpointing_sync_nodes():
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j1,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j2,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
@@ -291,11 +338,13 @@ def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
     j1 = random.randint(0, 10000)
     ARGS1 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j1,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     j2 = j1 + 1
     ARGS2 = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j2,
-            'enable.auto.commit': False}
+            'enable.auto.commit': False,
+            'auto.offset.reset': 'earliest'}
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
         for i in range(10):
