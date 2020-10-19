@@ -290,7 +290,7 @@ def test_kafka_batch_npartitions():
         stream3.upstream.stopped = True
 
 
-def test_kafka_refresh_cycles():
+def test_kafka_check_npartitions_every():
     j1 = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j1,
@@ -315,7 +315,7 @@ def test_kafka_refresh_cycles():
 
         stream = Stream.from_kafka_batched(TOPIC, ARGS,
                                            asynchronous=True,
-                                           refresh_cycles=1,
+                                           check_npartitions_every=1,
                                            poll_interval='2s')
         out = stream.gather().sink_to_list()
         stream.start()
