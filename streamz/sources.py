@@ -453,7 +453,7 @@ class from_kafka(Source):
 class FromKafkaBatched(Stream):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
-                 npartitions=None, check_npartitions_every=None,
+                 npartitions=None, refresh_partitions=False,
                  max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
@@ -463,7 +463,7 @@ class FromKafkaBatched(Stream):
             consumer_params['auto.offset.reset'] = 'latest'
         self.topic = topic
         self.npartitions = npartitions
-        self.check_npartitions_every = check_npartitions_every
+        self.refresh_partitions = refresh_partitions
         if self.npartitions is not None and self.npartitions <= 0:
             raise ValueError("Number of Kafka topic partitions must be > 0.")
         self.poll_interval = convert_interval(poll_interval)
@@ -511,12 +511,10 @@ class FromKafkaBatched(Stream):
                 break
 
         try:
-            if self.check_npartitions_every is not None:
-                cycles = 0
             while not self.stopped:
                 out = []
 
-                if self.check_npartitions_every is not None and cycles == 0:
+                if self.refresh_partitions:
                     kafka_cluster_metadata = self.consumer.list_topics(self.topic)
                     if self.engine == "cudf":  # pragma: no cover
                         new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
@@ -548,9 +546,6 @@ class FromKafkaBatched(Stream):
                         self.positions[partition] = high
                 self.consumer_params['auto.offset.reset'] = 'earliest'
 
-                if self.check_npartitions_every is not None:
-                    cycles = (cycles + 1) % self.check_npartitions_every
-
                 for part in out:
                     yield self.loop.add_callback(checkpoint_emit, part)
 
@@ -580,7 +575,7 @@ class FromKafkaBatched(Stream):
 
 @Stream.register_api(staticmethod)
 def from_kafka_batched(topic, consumer_params, poll_interval='1s',
-                       npartitions=None, check_npartitions_every=None,
+                       npartitions=None, refresh_partitions=False,
                        start=False, dask=False,
                        max_batch_size=10000, keys=False,
                        engine=None, **kwargs):
@@ -617,13 +612,12 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     npartitions: int (None)
         | Number of partitions in the topic.
         | If None, streamz will poll Kafka to get the number of partitions.
-     check_npartitions_every: int (None)
-        | Useful if the user expects to increase the number of partitions on the fly,
-        | maybe to handle spikes in load, etc. Streamz polls Kafka after every
-        | 'check_npartitions_every' number of batches/cycles to determine the current
-        | number of topic partitions. If partitions have been added, streamz will
-        | automatically start reading data from the new partitions as well.
-        | If set to None, streamz will not accommodate changing partitions on the fly.
+     refresh_partitions: bool (False)
+        | Useful if the user expects to increase the number of topic partitions on the
+        | fly, maybe to handle spikes in load. Streamz polls Kafka in every batch to
+        | determine the current number of partitions. If partitions have been added,
+        | streamz will automatically start reading data from the new partitions as well.
+        | If set to False, streamz will not accommodate adding partitions on the fly.
         | It is recommended to restart the stream after decreasing the number of partitions.
     start: bool (False)
         Whether to start polling upon instantiation
@@ -675,7 +669,7 @@ def from_kafka_batched(topic, consumer_params, poll_interval='1s',
     source = FromKafkaBatched(topic, consumer_params,
                               poll_interval=poll_interval,
                               npartitions=npartitions,
-                              check_npartitions_every=check_npartitions_every,
+                              refresh_partitions=refresh_partitions,
                               max_batch_size=max_batch_size,
                               keys=keys,
                               engine=engine,
