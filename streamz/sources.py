@@ -533,8 +533,7 @@ class FromKafkaBatched(Stream):
                         continue
                     if 'auto.offset.reset' in self.consumer_params.keys():
                         if self.consumer_params['auto.offset.reset'] == 'latest' and \
-                                (self.positions == [-1001] * self.npartitions
-                                 or self.positions == [0] * self.npartitions):
+                                self.positions[partition] == -1001:
                             self.positions[partition] = high
                     current_position = self.positions[partition]
                     lowest = max(current_position, low)
