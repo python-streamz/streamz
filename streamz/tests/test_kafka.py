@@ -553,3 +553,75 @@ def test_kafka_batch_checkpointing_async_nodes_2():
         assert committed2[1].offset == 2
         assert committed3[0].offset == 1
         assert committed3[1].offset == 1
+
+
+def test_kafka_checkpointing_auto_offset_reset_latest():
+    '''
+    Testing whether checkpointing works as expected with multiple topic partitions and
+    with auto.offset.reset configuration set to latest (also default).
+    '''
+    j = random.randint(0, 10000)
+    ARGS = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j,
+            'auto.offset.reset': 'latest'}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        TOPIC = "test-checkpointing-offset-reset-latest"
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--create --zookeeper localhost:2181 "
+                                    "--replication-factor 1 --partitions 3 "
+                                    "--topic test-checkpointing-offset-reset-latest"))
+        time.sleep(2)
+
+        '''
+        Since the stream has not started yet, these messages are not read because
+        the stream has auto.offset.reset set to latest.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        stream1 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
+        out1 = stream1.map(split).gather().sink_to_list()
+        stream1.start()
+        time.sleep(5)
+
+        '''
+        Stream has started, so these are read.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+
+        assert (len(out1) == 3 and (len(out1[0]) + len(out1[1]) + len(out1[2])) == 30)
+        '''
+        Stream stops but checkpoint has been created.
+        '''
+        stream1.upstream.stopped = True
+
+        '''
+        When the stream is restarted, these messages are read, because the checkpoint
+        overrrides the auto.offset.reset:latest config this time around as expected.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
+        out2 = stream2.map(split).gather().sink_to_list()
+
+        '''
+        Stream restarts here.
+        '''
+        stream2.start()
+        time.sleep(5)
+
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+        time.sleep(5)
+
+        assert (len(out2) == 6 and (len(out2[3]) + len(out2[4]) + len(out2[5])) == 30)
+        stream2.upstream.stopped = True
