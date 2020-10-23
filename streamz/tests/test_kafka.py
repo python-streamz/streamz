@@ -255,7 +255,6 @@ def test_kafka_batch_npartitions():
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 2 "
                                     "--topic test-partitions"))
-        time.sleep(5)
 
         for i in range(10):
             if i % 2 == 0:
@@ -304,7 +303,6 @@ def test_kafka_refresh_partitions():
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 2 "
                                     "--topic test-refresh-partitions"))
-        time.sleep(2)
 
         for i in range(10):
             if i % 2 == 0:
@@ -327,7 +325,6 @@ def test_kafka_refresh_partitions():
                                     "--alter --zookeeper localhost:2181 "
                                     "--topic test-refresh-partitions --partitions 4"))
         time.sleep(5)
-
         for i in range(10,20):
             if i % 2 == 0:
                 kafka.produce(TOPIC, b'value-%d' % i, partition=2)
@@ -572,7 +569,6 @@ def test_kafka_checkpointing_auto_offset_reset_latest():
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 3 "
                                     "--topic test-checkpointing-offset-reset-latest"))
-        time.sleep(2)
 
         '''
         Since the stream has not started yet, these messages are not read because
