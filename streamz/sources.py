@@ -471,6 +471,7 @@ class FromKafkaBatched(Stream):
         self.keys = keys
         self.engine = engine
         self.stopped = True
+        self.started = False
 
         super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
 
@@ -531,6 +532,7 @@ class FromKafkaBatched(Stream):
                             tp, timeout=0.1)
                     except (RuntimeError, ck.KafkaException):
                         continue
+                    self.started = True
                     if 'auto.offset.reset' in self.consumer_params.keys():
                         if self.consumer_params['auto.offset.reset'] == 'latest' and \
                                 self.positions[partition] == -1001:
