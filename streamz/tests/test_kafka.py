@@ -202,7 +202,7 @@ def test_kafka_batch():
         stream = Stream.from_kafka_batched(TOPIC, ARGS, max_batch_size=4, keys=True)
         out = stream.sink_to_list()
         stream.start()
-        time.sleep(5)
+        wait_for(lambda: stream.upstream.started, 10, 0.1)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()
@@ -275,8 +275,8 @@ def test_kafka_batch_npartitions():
                                             npartitions=1)
         out2 = stream2.gather().sink_to_list()
         stream2.start()
-        time.sleep(5)
-        assert (len(out2) == 1 and len(out2[0]) == 5)
+        wait_for(lambda: stream2.upstream.started, 10, 0.1)
+        wait_for(lambda: len(out2) == 1 and len(out2[0]) == 5, 10, 0.1)
         stream2.upstream.stopped = True
 
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS2,
@@ -284,8 +284,8 @@ def test_kafka_batch_npartitions():
                                             npartitions=4)
         out3 = stream3.gather().sink_to_list()
         stream3.start()
-        time.sleep(5)
-        assert (len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10)
+        wait_for(lambda: stream3.upstream.started, 10, 0.1)
+        wait_for(lambda: len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10, 10, 0.1)
         stream3.upstream.stopped = True
 
 
