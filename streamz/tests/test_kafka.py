@@ -202,7 +202,7 @@ def test_kafka_batch():
         stream = Stream.from_kafka_batched(TOPIC, ARGS, max_batch_size=4, keys=True)
         out = stream.sink_to_list()
         stream.start()
-        time.sleep(5)
+        wait_for(lambda: stream.upstream.started, 10, 0.1)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i, b'%d' % i)
         kafka.flush()
@@ -255,7 +255,6 @@ def test_kafka_batch_npartitions():
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 2 "
                                     "--topic test-partitions"))
-        time.sleep(5)
 
         for i in range(10):
             if i % 2 == 0:
@@ -276,8 +275,8 @@ def test_kafka_batch_npartitions():
                                             npartitions=1)
         out2 = stream2.gather().sink_to_list()
         stream2.start()
-        time.sleep(5)
-        assert (len(out2) == 1 and len(out2[0]) == 5)
+        wait_for(lambda: stream2.upstream.started, 10, 0.1)
+        wait_for(lambda: len(out2) == 1 and len(out2[0]) == 5, 10, 0.1)
         stream2.upstream.stopped = True
 
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS2,
@@ -285,8 +284,8 @@ def test_kafka_batch_npartitions():
                                             npartitions=4)
         out3 = stream3.gather().sink_to_list()
         stream3.start()
-        time.sleep(5)
-        assert (len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10)
+        wait_for(lambda: stream3.upstream.started, 10, 0.1)
+        wait_for(lambda: len(out3) == 2 and (len(out3[0]) + len(out3[1])) == 10, 10, 0.1)
         stream3.upstream.stopped = True
 
 
@@ -304,7 +303,6 @@ def test_kafka_refresh_partitions():
                                     "--create --zookeeper localhost:2181 "
                                     "--replication-factor 1 --partitions 2 "
                                     "--topic test-refresh-partitions"))
-        time.sleep(2)
 
         for i in range(10):
             if i % 2 == 0:
@@ -319,25 +317,23 @@ def test_kafka_refresh_partitions():
                                            poll_interval='2s')
         out = stream.gather().sink_to_list()
         stream.start()
-        time.sleep(5)
-        assert (len(out) == 2 and (len(out[0]) + len(out[1])) == 10)
+        wait_for(lambda: stream.upstream.started, 10, 0.1)
+        wait_for(lambda: len(out) == 2 and (len(out[0]) + len(out[1])) == 10, 10, 0.1)
 
         subprocess.call(shlex.split("docker exec streamz-kafka "
                                     "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
                                     "--alter --zookeeper localhost:2181 "
                                     "--topic test-refresh-partitions --partitions 4"))
         time.sleep(5)
-
         for i in range(10,20):
             if i % 2 == 0:
                 kafka.produce(TOPIC, b'value-%d' % i, partition=2)
             else:
                 kafka.produce(TOPIC, b'value-%d' % i, partition=3)
         kafka.flush()
-        time.sleep(5)
 
-        assert (len(out) == 4 and (len(out[2]) + len(out[3])) == 10
-                and out[3][4] == b'value-19')
+        wait_for(lambda: len(out) == 4 and (len(out[2]) + len(out[3])) == 10
+                         and out[3][4] == b'value-19', 10, 0.1)
         stream.upstream.stopped = True
 
 
@@ -448,7 +444,7 @@ def test_kafka_batch_checkpointing_async_nodes_1():
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS)
         out2 = stream2.partition(2).sliding_window(2, return_partial=False).sink_to_list()
         stream2.start()
-        time.sleep(2)
+        wait_for(lambda: stream2.upstream.started, 10, 0.1)
         for i in range(2,6):
             kafka.produce(TOPIC, b'value-%d' % i)
             kafka.flush()
@@ -461,9 +457,9 @@ def test_kafka_batch_checkpointing_async_nodes_1():
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS)
         out3 = stream3.sink_to_list()
         stream3.start()
-        time.sleep(2)
+        wait_for(lambda: stream3.upstream.started, 10, 0.1)
         #Stream picks up from where it left before, i.e., from the last committed offset.
-        assert len(out3) == 1 and out3[0] == [b'value-3', b'value-4', b'value-5']
+        wait_for(lambda: len(out3) == 1 and out3[0] == [b'value-3', b'value-4', b'value-5'], 10, 0.1)
         stream3.upstream.stopped = True
         stream3.destroy()
 
@@ -553,3 +549,72 @@ def test_kafka_batch_checkpointing_async_nodes_2():
         assert committed2[1].offset == 2
         assert committed3[0].offset == 1
         assert committed3[1].offset == 1
+
+
+def test_kafka_checkpointing_auto_offset_reset_latest():
+    '''
+    Testing whether checkpointing works as expected with multiple topic partitions and
+    with auto.offset.reset configuration set to latest (also default).
+    '''
+    j = random.randint(0, 10000)
+    ARGS = {'bootstrap.servers': 'localhost:9092',
+            'group.id': 'streamz-test%i' % j,
+            'auto.offset.reset': 'latest'}
+    with kafka_service() as kafka:
+        kafka, TOPIC = kafka
+        TOPIC = "test-checkpointing-offset-reset-latest"
+        subprocess.call(shlex.split("docker exec streamz-kafka "
+                                    "/opt/kafka_2.11-0.10.1.0/bin/kafka-topics.sh "
+                                    "--create --zookeeper localhost:2181 "
+                                    "--replication-factor 1 --partitions 3 "
+                                    "--topic test-checkpointing-offset-reset-latest"))
+
+        '''
+        Since the stream has not started yet, these messages are not read because
+        the stream has auto.offset.reset set to latest.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        stream1 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
+        out1 = stream1.map(split).gather().sink_to_list()
+        stream1.start()
+        wait_for(lambda: stream1.upstream.started, 10, 0.1)
+
+        '''
+        Stream has started, so these are read.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        wait_for(lambda: len(out1) == 3 and (len(out1[0]) + len(out1[1]) + len(out1[2])) == 30, 10, 0.1)
+        '''
+        Stream stops but checkpoint has been created.
+        '''
+        stream1.upstream.stopped = True
+
+        '''
+        When the stream is restarted, these messages are read, because the checkpoint
+        overrrides the auto.offset.reset:latest config this time around as expected.
+        '''
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        stream2 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
+        out2 = stream2.map(split).gather().sink_to_list()
+
+        '''
+        Stream restarts here.
+        '''
+        stream2.start()
+        wait_for(lambda: stream2.upstream.started, 10, 0.1)
+
+        for i in range(30):
+            kafka.produce(TOPIC, b'value-%d' % i)
+        kafka.flush()
+
+        wait_for(lambda: len(out2) == 6 and (len(out2[3]) + len(out2[4]) + len(out2[5])) == 30, 10, 0.1)
+        stream2.upstream.stopped = True
