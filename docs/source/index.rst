@@ -84,14 +84,18 @@ environment but rather for experimentation, learning, or new feature development
 Its most common use would be to interact with the streamz example jupyter notebooks. Lets walk through the steps needed for this.
 
 - Build the Docker container
-.. code-block:: bash
-$ docker/build.sh
-- Run the Docker container
-.. code-block:: bash
-$ docker/run.sh
-- Interact with Jupyter Lab on the container in your browser at `JUPYTER_LAB`_.
-.. JUPYTER_LAB: http://localhost:8888/
 
+  .. code-block:: bash
+
+      $ docker/build.sh
+
+- Run the Docker container
+
+  .. code-block:: bash
+
+      $ docker/run.sh
+
+- Interact with Jupyter Lab on the container in your browser at `http://localhost:8888/ <http://localhost:8888/>`_.
 
 
 Related Work
