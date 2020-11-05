@@ -245,7 +245,7 @@ class _DataFrameMixin(object):
         o = set(dir(type(self)))
         o.update(self.__dict__)
         o.update(c for c in self.columns
-                 if (isinstance(c, pd.compat.string_types) and pd.compat.isidentifier(c)))
+                 if (isinstance(c, str) and c.isidentifier()))
         return list(o)
 
     def assign(self, **kwargs):
