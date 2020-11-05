@@ -164,6 +164,56 @@ def test_partition():
     assert L == [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]
 
 
+def test_partition_timeout():
+    source = Stream()
+    L = source.partition(10, timeout=0.01).sink_to_list()
+
+    for i in range(5):
+        source.emit(i)
+
+    sleep(0.1)
+
+    assert L == [(0, 1, 2, 3, 4)]
+
+
+def test_partition_timeout_cancel():
+    source = Stream()
+    L = source.partition(3, timeout=0.1).sink_to_list()
+
+    for i in range(3):
+        source.emit(i)
+
+    sleep(0.09)
+    source.emit(3)
+    sleep(0.02)
+
+    assert L == [(0, 1, 2)]
+
+    sleep(0.09)
+
+    assert L == [(0, 1, 2), (3,)]
+
+
+def test_partition_key():
+    source = Stream()
+    L = source.partition(2, key=0).sink_to_list()
+
+    for i in range(4):
+        source.emit((i % 2, i))
+
+    assert L == [((0, 0), (0, 2)), ((1, 1), (1, 3))]
+
+
+def test_partition_key_callable():
+    source = Stream()
+    L = source.partition(2, key=lambda x: x % 2).sink_to_list()
+
+    for i in range(10):
+        source.emit(i)
+
+    assert L == [(0, 2), (1, 3), (4, 6), (5, 7)]
+
+
 def test_sliding_window():
     source = Stream()
     L = source.sliding_window(2).sink_to_list()
