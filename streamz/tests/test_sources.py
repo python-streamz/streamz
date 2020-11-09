@@ -1,6 +1,6 @@
 from flaky import flaky
 import pytest
-from streamz import Source
+from streamz import Source, Stream
 from streamz.utils_test import wait_for, await_for, gen_test
 import socket
 
@@ -95,3 +95,38 @@ def test_process():
     s.start()
     yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)
     s.stop()
+
+
+def test_backpressure_connect_empty_stream():
+    from tornado import gen
+
+    @Stream.register_api()
+    class from_list(Stream):
+
+        def __init__(self, source, **kwargs):
+            self.data = source
+            self.stopped = True
+            super().__init__(ensure_io_loop=True, **kwargs)
+
+        def start(self):
+            self.stopped = False
+            self.loop.add_callback(self.run)
+
+        @gen.coroutine
+        def run(self):
+            while not self.stopped and len(self.data) > 0:
+                yield self._emit(self.data.pop(0))
+            self.stopped = True
+
+    source_list = [0, 1, 2, 3, 4]
+
+    source = Stream.from_list(source_list)
+    L = source.rate_limit(1).sink_to_list()
+
+    sout = Stream()
+    L2 = sout.sink_to_list()
+    source.connect(sout)
+    source.start()
+
+    wait_for(lambda: L == [0], timeout=2)
+    assert len(source_list) > 0
