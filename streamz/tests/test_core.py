@@ -214,6 +214,15 @@ def test_partition_key_callable():
     assert L == [(0, 2), (1, 3), (4, 6), (5, 7)]
 
 
+def test_partition_size_one():
+    source = Stream()
+
+    source.partition(1, timeout=.01).sink(lambda x: None)
+
+    for i in range(10):
+        source.emit(i)
+
+
 def test_sliding_window():
     source = Stream()
     L = source.sliding_window(2).sink_to_list()

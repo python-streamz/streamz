@@ -1025,14 +1025,15 @@ class partition(Stream):
             metadata_buffer.extend(metadata)
         else:
             metadata_buffer.append(metadata)
+        if len(buffer) == self.n:
+            if self._timeout is not None and self.n > 1:
+                self._callbacks[key].cancel()
+            yield self._flush(key)
+            return
         if len(buffer) == 1 and self._timeout is not None:
             self._callbacks[key] = self.loop.call_later(
                 self._timeout, self._flush, key
             )
-        if len(buffer) == self.n:
-            if self._timeout is not None:
-                self._callbacks[key].cancel()
-            yield self._flush(key)
 
 
 @Stream.register_api()
