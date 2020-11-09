@@ -957,12 +957,12 @@ class partition(Stream):
         Maximum partition size
     timeout: int or float, optional
         Number of seconds after which a partition will be emitted,
-        even if it's size is less than ``n``. If ``None`` (default),
-        a partition will be emitted only when it's size reaches ``n``.
+        even if its size is less than ``n``. If ``None`` (default),
+        a partition will be emitted only when its size reaches ``n``.
     key: hashable or callable, optional
         Emit items with the same key together as a separate partition.
         If ``key`` is callable, partition will be identified by ``key(x)``,
-        otherwise by ``key[x]``. Defaults to ``None``.
+        otherwise by ``x[key]``. Defaults to ``None``.
 
     Examples
     --------
