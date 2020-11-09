@@ -1008,9 +1008,9 @@ def test_windowed_groupby_aggs_with_start_state(stream):
     out_df1 = pd.DataFrame({'name':['Alice', 'Bob', 'Linda', 'Tom'], 'amount':[50.0, 550.0, 100.0, 150.0]})
     assert_eq(output1[-1][1].reset_index(), out_df1)
 
-    
+
 def test_dir(stream):
     example = pd.DataFrame({'name': [], 'amount': []})
     sdf = DataFrame(stream, example=example)
     assert 'name' in dir(sdf)
-    assert 'amount' in dir(sdf)    
+    assert 'amount' in dir(sdf)
