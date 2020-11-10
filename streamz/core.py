@@ -260,7 +260,7 @@ class Stream(object):
             self.upstreams.remove(upstream)
 
     @classmethod
-    def register_api(cls, modifier=identity):
+    def register_api(cls, modifier=identity, attribute_name=None):
         """ Add callable to Stream API
 
         This allows you to register a new method onto this class.  You can use
@@ -290,9 +290,20 @@ class Stream(object):
             @functools.wraps(func)
             def wrapped(*args, **kwargs):
                 return func(*args, **kwargs)
-            setattr(cls, func.__name__, modifier(wrapped))
+            name = attribute_name if attribute_name else func.__name__
+            setattr(cls, name, modifier(wrapped))
             return func
         return _
+
+    @classmethod
+    def register_plugin_entry_point(cls, entry_point, modifier=identity):
+        def stub(*args, **kwargs):
+            attribute = entry_point.load()
+            cls.register_api(
+                modifier=modifier, attribute_name=entry_point.name
+            )(attribute)
+            return attribute(*args, **kwargs)
+        cls.register_api(modifier=modifier, attribute_name=entry_point.name)(stub)
 
     def start(self):
         """ Start any upstream sources """

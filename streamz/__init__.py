@@ -5,7 +5,7 @@ from .graph import *
 from .sources import *
 from .plugins import load_plugins
 
-load_plugins()
+load_plugins(Stream)
 
 try:
     from .dask import DaskStream, scatter

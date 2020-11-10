@@ -1,6 +1,10 @@
 import pkg_resources
 
 
-def load_plugins():
-    for entry_point in pkg_resources.iter_entry_points("streamz.plugins"):
-        entry_point.load()
+def load_plugins(cls):
+    for entry_point in pkg_resources.iter_entry_points("streamz.sources"):
+        cls.register_plugin_entrypoint(entry_point, staticmethod)
+    for entry_point in pkg_resources.iter_entry_points("streamz.nodes"):
+        cls.register_plugin_entrypoint(entry_point)
+    for entry_point in pkg_resources.iter_entry_points("streamz.sinks"):
+        cls.register_plugin_entrypoint(entry_point)
