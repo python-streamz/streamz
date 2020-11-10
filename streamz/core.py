@@ -273,7 +273,7 @@ class Stream(object):
             >>> Stream().foo(...)  # this works now
 
         It attaches the callable as a normal attribute to the class object.  In
-        doing so it respsects inheritance (all subclasses of Stream will also
+        doing so it respects inheritance (all subclasses of Stream will also
         get the foo attribute).
 
         By default callables are assumed to be instance methods.  If you like
@@ -285,6 +285,15 @@ class Stream(object):
             ...     ...
 
             >>> Stream.foo(...)  # Foo operates as a static method
+
+        You can also provide an optional ``attribute_name`` argument to control
+        the name of the attribute your callable will be attached as.
+
+            >>> @Stream.register_api(attribute_name="bar")
+            ... class foo(Stream):
+            ...     ...
+
+            >> Stream().bar(...)  # foo was actually attached as bar
         """
         def _(func):
             @functools.wraps(func)
@@ -298,11 +307,17 @@ class Stream(object):
     @classmethod
     def register_plugin_entry_point(cls, entry_point, modifier=identity):
         def stub(*args, **kwargs):
-            attribute = entry_point.load()
+            node = entry_point.load()
+            if not issubclass(node, Stream):
+                raise TypeError(
+                    f"Error loading {entry_point.name} "
+                    f"from module {entry_point.module_name}: "
+                    f"{entry_point.cls.__name__} must be a subclass of Stream"
+                )
             cls.register_api(
                 modifier=modifier, attribute_name=entry_point.name
-            )(attribute)
-            return attribute(*args, **kwargs)
+            )(node)
+            return node(*args, **kwargs)
         cls.register_api(modifier=modifier, attribute_name=entry_point.name)(stub)
 
     def start(self):
