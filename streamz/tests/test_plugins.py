@@ -53,3 +53,17 @@ def test_register_plugin_entry_point_raises():
 
     with pytest.raises(TypeError):
         Stream.test()
+
+
+def test_register_plugin_entry_point_already_registered():
+    @Stream.register_api()
+    class test(Stream):
+        pass
+
+    entry_point = MockEntryPoint("test_double", test, "test_module")
+
+    Stream.register_plugin_entry_point(entry_point)
+
+    assert Stream.test_double.__name__ == "stub"
+    Stream.test_double()
+    assert Stream.test_double.__name__ == "test"

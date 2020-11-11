@@ -312,7 +312,7 @@ class Stream(object):
                 raise TypeError(
                     f"Error loading {entry_point.name} "
                     f"from module {entry_point.module_name}: "
-                    f"{entry_point.cls.__name__} must be a subclass of Stream"
+                    f"{node.__class__.__name__} must be a subclass of Stream"
                 )
             cls.register_api(
                 modifier=modifier, attribute_name=entry_point.name
