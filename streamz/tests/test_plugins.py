@@ -41,7 +41,7 @@ def test_register_plugin_entry_point_modifier():
     assert inspect.isfunction(Stream().from_test)
 
 
-def test_register_plugin_entry_point_raises():
+def test_register_plugin_entry_point_raises_type():
     class invalid_node:
         pass
 
@@ -51,3 +51,10 @@ def test_register_plugin_entry_point_raises():
 
     with pytest.raises(TypeError):
         Stream.test()
+
+
+def test_register_plugin_entry_point_raises_duplicate_name():
+    entry_point = MockEntryPoint("map", None)
+
+    with pytest.raises(ValueError):
+        Stream.register_plugin_entry_point(entry_point)

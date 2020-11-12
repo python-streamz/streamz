@@ -306,6 +306,12 @@ class Stream(object):
 
     @classmethod
     def register_plugin_entry_point(cls, entry_point, modifier=identity):
+        if hasattr(cls, entry_point.name):
+            raise ValueError(
+                f"Can't add {entry_point.name} from {entry_point.module_name} "
+                f"to {cls.__name__}: duplicate method name."
+            )
+
         def stub(*args, **kwargs):
             """ Entrypoints-based streamz plugin. Will be loaded on first call. """
             node = entry_point.load()
