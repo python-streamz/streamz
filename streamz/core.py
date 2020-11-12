@@ -307,6 +307,7 @@ class Stream(object):
     @classmethod
     def register_plugin_entry_point(cls, entry_point, modifier=identity):
         def stub(*args, **kwargs):
+            """ Entrypoints-based streamz plugin. Will be loaded on first call. """
             node = entry_point.load()
             if not issubclass(node, Stream):
                 raise TypeError(
@@ -314,9 +315,10 @@ class Stream(object):
                     f"from module {entry_point.module_name}: "
                     f"{node.__class__.__name__} must be a subclass of Stream"
                 )
-            cls.register_api(
-                modifier=modifier, attribute_name=entry_point.name
-            )(node)
+            if getattr(cls, entry_point.name).__name__ == "stub":
+                cls.register_api(
+                    modifier=modifier, attribute_name=entry_point.name
+                )(node)
             return node(*args, **kwargs)
         cls.register_api(modifier=modifier, attribute_name=entry_point.name)(stub)
 
