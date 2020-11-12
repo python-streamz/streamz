@@ -27,8 +27,6 @@ from .orderedweakset import OrderedWeakrefSet
 
 no_default = '--no-default--'
 
-_global_sinks = set()
-
 _html_update_streams = set()
 
 thread_state = threading.local()
@@ -620,48 +618,6 @@ class Stream(object):
         for m in metadata:
             if 'ref' in m:
                 m['ref'].release(n)
-
-
-@Stream.register_api()
-class sink(Stream):
-    """ Apply a function on every element
-
-    Examples
-    --------
-    >>> source = Stream()
-    >>> L = list()
-    >>> source.sink(L.append)
-    >>> source.sink(print)
-    >>> source.sink(print)
-    >>> source.emit(123)
-    123
-    123
-    >>> L
-    [123]
-
-    See Also
-    --------
-    map
-    Stream.sink_to_list
-    """
-    _graphviz_shape = 'trapezium'
-
-    def __init__(self, upstream, func, *args, **kwargs):
-        self.func = func
-        # take the stream specific kwargs out
-        stream_name = kwargs.pop("stream_name", None)
-        self.kwargs = kwargs
-        self.args = args
-
-        Stream.__init__(self, upstream, stream_name=stream_name)
-        _global_sinks.add(self)
-
-    def update(self, x, who=None, metadata=None):
-        result = self.func(x, *self.args, **self.kwargs)
-        if gen.isawaitable(result):
-            return result
-        else:
-            return []
 
 
 @Stream.register_api()
