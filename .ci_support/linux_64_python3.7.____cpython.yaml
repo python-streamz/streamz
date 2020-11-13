@@ -1,0 +1,16 @@
+cdt_name:
+- cos6
+channel_sources:
+- conda-forge,defaults
+channel_targets:
+- conda-forge main
+docker_image:
+- quay.io/condaforge/linux-anvil-comp7
+pin_run_as_build:
+  python:
+    min_pin: x.x
+    max_pin: x.x
+python:
+- 3.7.* *_cpython
+target_platform:
+- linux-64

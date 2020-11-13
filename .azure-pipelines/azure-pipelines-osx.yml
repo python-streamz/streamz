@@ -1,0 +1,32 @@
+# This file was generated automatically from conda-smithy. To update this configuration,
+# update the conda-forge.yml and/or the recipe/meta.yaml.
+# -*- mode: yaml -*-
+
+jobs:
+- job: osx
+  pool:
+    vmImage: macOS-10.15
+  strategy:
+    matrix:
+      osx_64_python3.6.____cpython:
+        CONFIG: osx_64_python3.6.____cpython
+        UPLOAD_PACKAGES: 'True'
+      osx_64_python3.7.____cpython:
+        CONFIG: osx_64_python3.7.____cpython
+        UPLOAD_PACKAGES: 'True'
+      osx_64_python3.8.____cpython:
+        CONFIG: osx_64_python3.8.____cpython
+        UPLOAD_PACKAGES: 'True'
+  timeoutInMinutes: 360
+
+  steps:
+  # TODO: Fast finish on azure pipelines?
+  - script: |
+      export CI=azure
+      export OSX_FORCE_SDK_DOWNLOAD="1"
+      export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
+      export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
+      ./.scripts/run_osx_build.sh
+    displayName: Run OSX build
+    env:
+      BINSTAR_TOKEN: $(BINSTAR_TOKEN)

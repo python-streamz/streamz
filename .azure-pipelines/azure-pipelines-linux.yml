@@ -1,0 +1,46 @@
+# This file was generated automatically from conda-smithy. To update this configuration,
+# update the conda-forge.yml and/or the recipe/meta.yaml.
+# -*- mode: yaml -*-
+
+jobs:
+- job: linux
+  pool:
+    vmImage: ubuntu-16.04
+  strategy:
+    matrix:
+      linux_64_python3.6.____cpython:
+        CONFIG: linux_64_python3.6.____cpython
+        UPLOAD_PACKAGES: 'True'
+        DOCKER_IMAGE: quay.io/condaforge/linux-anvil-comp7
+      linux_64_python3.7.____cpython:
+        CONFIG: linux_64_python3.7.____cpython
+        UPLOAD_PACKAGES: 'True'
+        DOCKER_IMAGE: quay.io/condaforge/linux-anvil-comp7
+      linux_64_python3.8.____cpython:
+        CONFIG: linux_64_python3.8.____cpython
+        UPLOAD_PACKAGES: 'True'
+        DOCKER_IMAGE: quay.io/condaforge/linux-anvil-comp7
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+         rm -rf /opt/ghc
+         df -h
+    displayName: Manage disk space
+
+  # configure qemu binfmt-misc running.  This allows us to run docker containers
+  # embedded qemu-static
+  - script: |
+      docker run --rm --privileged multiarch/qemu-user-static:register --reset --credential yes
+      ls /proc/sys/fs/binfmt_misc/
+    condition: not(startsWith(variables['CONFIG'], 'linux_64'))
+    displayName: Configure binfmt_misc
+
+  - script: |
+        export CI=azure
+        export GIT_BRANCH=$BUILD_SOURCEBRANCHNAME
+        export FEEDSTOCK_NAME=$(basename ${BUILD_REPOSITORY_NAME})
+        .scripts/run_docker_build.sh
+    displayName: Run docker build
+    env:
+      BINSTAR_TOKEN: $(BINSTAR_TOKEN)

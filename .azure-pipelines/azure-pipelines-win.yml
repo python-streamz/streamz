@@ -1,0 +1,109 @@
+# This file was generated automatically from conda-smithy. To update this configuration,
+# update the conda-forge.yml and/or the recipe/meta.yaml.
+# -*- mode: yaml -*-
+
+jobs:
+- job: win
+  pool:
+    vmImage: vs2017-win2016
+  strategy:
+    matrix:
+      win_64_python3.6.____cpython:
+        CONFIG: win_64_python3.6.____cpython
+        UPLOAD_PACKAGES: 'True'
+      win_64_python3.7.____cpython:
+        CONFIG: win_64_python3.7.____cpython
+        UPLOAD_PACKAGES: 'True'
+      win_64_python3.8.____cpython:
+        CONFIG: win_64_python3.8.____cpython
+        UPLOAD_PACKAGES: 'True'
+  timeoutInMinutes: 360
+  variables:
+    CONDA_BLD_PATH: D:\\bld\\
+
+  steps:
+    - script: |
+        choco install vcpython27 -fdv -y --debug
+      condition: contains(variables['CONFIG'], 'vs2008')
+      displayName: Install vcpython27.msi (if needed)
+
+    # Cygwin's git breaks conda-build. (See https://github.com/conda-forge/conda-smithy-feedstock/pull/2.)
+    # - script: rmdir C:\cygwin /s /q
+    #   continueOnError: true
+
+    - powershell: |
+        Set-PSDebug -Trace 1
+
+        $batchcontent = @"
+        ECHO ON
+        SET vcpython=C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0
+
+        DIR "%vcpython%"
+
+        CALL "%vcpython%\vcvarsall.bat" %*
+        "@
+
+        $batchDir = "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC"
+        $batchPath = "$batchDir" + "\vcvarsall.bat"
+        New-Item -Path $batchPath -ItemType "file" -Force
+
+        Set-Content -Value $batchcontent -Path $batchPath
+
+        Get-ChildItem -Path $batchDir
+
+        Get-ChildItem -Path ($batchDir + '\..')
+
+      condition: contains(variables['CONFIG'], 'vs2008')
+      displayName: Patch vs2008 (if needed)
+
+    - task: CondaEnvironment@1
+      inputs:
+        packageSpecs: 'python=3.6 conda-build conda "conda-forge-ci-setup=3" pip' # Optional
+        installOptions: "-c conda-forge"
+        updateConda: true
+      displayName: Install conda-build and activate environment
+
+    - script: set PYTHONUNBUFFERED=1
+      displayName: Set PYTHONUNBUFFERED
+
+    # Configure the VM
+    - script: |
+        call activate base
+        setup_conda_rc .\ ".\recipe" .\.ci_support\%CONFIG%.yaml
+      displayName: conda-forge CI setup
+
+    # Configure the VM.
+    - script: |
+        set "CI=azure"
+        call activate base
+        run_conda_forge_build_setup
+      displayName: conda-forge build setup
+    
+
+    # Special cased version setting some more things!
+    - script: |
+        call activate base
+        conda.exe build "recipe" -m .ci_support\%CONFIG%.yaml
+      displayName: Build recipe (vs2008)
+      env:
+        VS90COMNTOOLS: "C:\\Program Files (x86)\\Common Files\\Microsoft\\Visual C++ for Python\\9.0\\VC\\bin"
+        PYTHONUNBUFFERED: 1
+      condition: contains(variables['CONFIG'], 'vs2008')
+
+    - script: |
+        call activate base
+        conda.exe build "recipe" -m .ci_support\%CONFIG%.yaml
+      displayName: Build recipe
+      env:
+        PYTHONUNBUFFERED: 1
+      condition: not(contains(variables['CONFIG'], 'vs2008'))
+
+    - script: |
+        set "GIT_BRANCH=%BUILD_SOURCEBRANCHNAME%"
+        set "FEEDSTOCK_NAME=%BUILD_REPOSITORY_NAME:*/=%"
+        call activate base
+        upload_package  .\ ".\recipe" .ci_support\%CONFIG%.yaml
+      displayName: Upload package
+      env:
+        BINSTAR_TOKEN: $(BINSTAR_TOKEN)
+      condition: and(succeeded(), not(eq(variables['UPLOAD_PACKAGES'], 'False')))
