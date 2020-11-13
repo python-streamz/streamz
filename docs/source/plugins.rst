@@ -60,7 +60,7 @@ Different kinds of add-ons go into different entry point groups:
 =========== ======================= =====================
  Source      ``streamz.Source``      ``streamz.sources``
  Node        ``streamz.Stream``      ``streamz.nodes``
- Sink        ``streamz.Stream``      ``streamz.sinks``
+ Sink        ``streamz.Sink``        ``streamz.sinks``
 =========== ======================= =====================
 
 

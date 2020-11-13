@@ -55,15 +55,16 @@ class sink(Sink):
 
 @Stream.register_api()
 class sink_to_textfile(Sink):
-    """ Write elements to a plain text file, one element per line. Type of elements
-        must be ``str``.
+    """ Write elements to a plain text file, one element per line.
+
+        Type of elements must be ``str``.
 
         Arguments
         ---------
         file: str or file-like
             File to write the elements to. ``str`` is treated as a file name to open.
-            If file-like, descriptor must be open in text mode.
-            Note that the file descriptor will be closed when sink is destroyed.
+            If file-like, descriptor must be open in text mode. Note that the file
+            descriptor will be closed when this sink is destroyed.
         end: str, optional
             This value will be written to the file after each element.
             Defaults to newline character.
@@ -74,7 +75,7 @@ class sink_to_textfile(Sink):
         Examples
         --------
         >>> source = Stream()
-        >>> source.map(str).sink_to_file("test.txt")
+        >>> source.map(str).sink_to_textfile("test.txt")
         >>> source.emit(0)
         >>> source.emit(1)
         >>> print(open("test.txt", "r").read())

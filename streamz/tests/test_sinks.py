@@ -1,6 +1,8 @@
 from time import sleep
 
+import pytest
 from streamz import Stream
+from streamz.sinks import _global_sinks
 from streamz.utils_test import tmpfile
 
 
@@ -43,3 +45,15 @@ def test_sink_to_textfile_named():
         sleep(0.01)
 
         assert open(filename, "r").read() == "0\n1\n"
+
+
+def test_sink_to_textfile_closes():
+    source = Stream()
+    with tmpfile() as filename:
+        sink = source.sink_to_textfile(filename)
+        fp = sink._fp
+        _global_sinks.remove(sink)
+        del sink
+
+        with pytest.raises(ValueError):  # I/O operation on closed file
+            fp.write(".")

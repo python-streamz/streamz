@@ -26,6 +26,7 @@ Stream
    rate_limit
    scatter
    sink
+   sink_to_textfile
    slice
    sliding_window
    starmap
@@ -84,6 +85,7 @@ Definitions
 .. autofunction:: partition
 .. autofunction:: rate_limit
 .. autofunction:: sink
+.. autofunction:: sink_to_textfile
 .. autofunction:: sliding_window
 .. autofunction:: Stream
 .. autofunction:: timed_window
