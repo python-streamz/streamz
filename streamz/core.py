@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-from collections import deque
+from collections import deque, defaultdict
 from datetime import timedelta
 import functools
 import logging
@@ -985,6 +985,19 @@ class slice(Stream):
 class partition(Stream):
     """ Partition stream into tuples of equal size
 
+    Parameters
+    ----------
+    n: int
+        Maximum partition size
+    timeout: int or float, optional
+        Number of seconds after which a partition will be emitted,
+        even if its size is less than ``n``. If ``None`` (default),
+        a partition will be emitted only when its size reaches ``n``.
+    key: hashable or callable, optional
+        Emit items with the same key together as a separate partition.
+        If ``key`` is callable, partition will be identified by ``key(x)``,
+        otherwise by ``x[key]``. Defaults to ``None``.
+
     Examples
     --------
     >>> source = Stream()
@@ -994,30 +1007,67 @@ class partition(Stream):
     (0, 1, 2)
     (3, 4, 5)
     (6, 7, 8)
+
+    >>> source = Stream()
+    >>> source.partition(2, key=lambda x: x % 2).sink(print)
+    >>> for i in range(4):
+    ...     source.emit(i)
+    (0, 2)
+    (1, 3)
+
+    >>> from time import sleep
+    >>> source = Stream()
+    >>> source.partition(5, timeout=1).sink(print)
+    >>> for i in range(3):
+    ...     source.emit(i)
+    >>> sleep(1)
+    (0, 1, 2)
     """
     _graphviz_shape = 'diamond'
 
-    def __init__(self, upstream, n, **kwargs):
+    def __init__(self, upstream, n, timeout=None, key=None, **kwargs):
         self.n = n
-        self._buffer = []
-        self.metadata_buffer = []
-        Stream.__init__(self, upstream, **kwargs)
+        self._timeout = timeout
+        self._key = key
+        self._buffer = defaultdict(lambda: [])
+        self._metadata_buffer = defaultdict(lambda: [])
+        self._callbacks = {}
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
 
+    def _get_key(self, x):
+        if self._key is None:
+            return None
+        if callable(self._key):
+            return self._key(x)
+        return x[self._key]
+
+    @gen.coroutine
+    def _flush(self, key):
+        result, self._buffer[key] = self._buffer[key], []
+        metadata_result, self._metadata_buffer[key] = self._metadata_buffer[key], []
+        yield self._emit(tuple(result), list(metadata_result))
+        self._release_refs(metadata_result)
+
+    @gen.coroutine
     def update(self, x, who=None, metadata=None):
         self._retain_refs(metadata)
-        self._buffer.append(x)
+        key = self._get_key(x)
+        buffer = self._buffer[key]
+        metadata_buffer = self._metadata_buffer[key]
+        buffer.append(x)
         if isinstance(metadata, list):
-            self.metadata_buffer.extend(metadata)
+            metadata_buffer.extend(metadata)
         else:
-            self.metadata_buffer.append(metadata)
-        if len(self._buffer) == self.n:
-            result, self._buffer = self._buffer, []
-            metadata_result, self.metadata_buffer = self.metadata_buffer, []
-            ret = self._emit(tuple(result), list(metadata_result))
-            self._release_refs(metadata_result)
-            return ret
-        else:
-            return []
+            metadata_buffer.append(metadata)
+        if len(buffer) == self.n:
+            if self._timeout is not None and self.n > 1:
+                self._callbacks[key].cancel()
+            yield self._flush(key)
+            return
+        if len(buffer) == 1 and self._timeout is not None:
+            self._callbacks[key] = self.loop.call_later(
+                self._timeout, self._flush, key
+            )
 
 
 @Stream.register_api()
