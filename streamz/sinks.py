@@ -1,7 +1,11 @@
+import inspect
+import weakref
+
 from tornado import gen
 
 from streamz import Stream
 
+# sinks add themselves here to avoid being garbage-collected
 _global_sinks = set()
 
 
@@ -17,6 +21,16 @@ class Sink(Stream):
 @Stream.register_api()
 class sink(Sink):
     """ Apply a function on every element
+
+    Parameters
+    ----------
+    func: callable
+        A function that will be applied on every element.
+    args:
+        Positional arguments that will be passed to ``func`` after the incoming element.
+    kwargs:
+        Stream-specific arguments will be passed to ``Stream.__init__``, the rest of
+        them will be passed to ``func``.
 
     Examples
     --------
@@ -40,10 +54,11 @@ class sink(Sink):
     def __init__(self, upstream, func, *args, **kwargs):
         self.func = func
         # take the stream specific kwargs out
-        stream_name = kwargs.pop("stream_name", None)
-        self.kwargs = kwargs
+        sig = set(inspect.signature(Stream).parameters)
+        stream_kwargs = {k: v for (k, v) in kwargs.items() if k in sig}
+        self.kwargs = {k: v for (k, v) in kwargs.items() if k not in sig}
         self.args = args
-        super().__init__(upstream, stream_name=stream_name)
+        super().__init__(upstream, **stream_kwargs)
 
     def update(self, x, who=None, metadata=None):
         result = self.func(x, *self.args, **self.kwargs)
@@ -59,8 +74,8 @@ class sink_to_textfile(Sink):
 
         Type of elements must be ``str``.
 
-        Arguments
-        ---------
+        Parameters
+        ----------
         file: str or file-like
             File to write the elements to. ``str`` is treated as a file name to open.
             If file-like, descriptor must be open in text mode. Note that the file
@@ -83,8 +98,9 @@ class sink_to_textfile(Sink):
         1
     """
     def __init__(self, upstream, file, end="\n", mode="a", **kwargs):
-        self._fp = open(file, mode=mode, buffering=1) if isinstance(file, str) else file
         self._end = end
+        self._fp = open(file, mode=mode) if isinstance(file, str) else file
+        weakref.finalize(self, self._fp.close)
         super().__init__(upstream, ensure_io_loop=True, **kwargs)
 
     def __del__(self):
@@ -92,5 +108,4 @@ class sink_to_textfile(Sink):
 
     @gen.coroutine
     def update(self, x, who=None, metadata=None):
-        yield self.loop.run_in_executor(None, self._fp.write, x)
-        yield self.loop.run_in_executor(None, self._fp.write, self._end)
+        yield self.loop.run_in_executor(None, self._fp.write, x + self._end)

@@ -1,5 +1,3 @@
-from time import sleep
-
 import pytest
 from streamz import Stream
 from streamz.sinks import _global_sinks
@@ -16,21 +14,22 @@ def test_sink_with_args_and_kwargs():
         L[key].append(elem)
 
     s = Stream()
-    s.sink(mycustomsink, "cat", "super")
-
+    sink = s.sink(mycustomsink, "cat", "super", stream_name="test")
     s.emit(1)
     s.emit(2)
+
     assert L['supercat'] == [1, 2]
+    assert sink.name == "test"
 
 
 def test_sink_to_textfile_fp():
     source = Stream()
-    with tmpfile() as filename, open(filename, "w", buffering=1) as fp:
+    with tmpfile() as filename, open(filename, "w") as fp:
         source.map(str).sink_to_textfile(fp)
         source.emit(0)
         source.emit(1)
 
-        sleep(0.01)
+        fp.flush()
 
         assert open(filename, "r").read() == "0\n1\n"
 
@@ -38,11 +37,11 @@ def test_sink_to_textfile_fp():
 def test_sink_to_textfile_named():
     source = Stream()
     with tmpfile() as filename:
-        source.map(str).sink_to_textfile(filename)
+        _sink = source.map(str).sink_to_textfile(filename)
         source.emit(0)
         source.emit(1)
 
-        sleep(0.01)
+        _sink._fp.flush()
 
         assert open(filename, "r").read() == "0\n1\n"
 
@@ -55,5 +54,5 @@ def test_sink_to_textfile_closes():
         _global_sinks.remove(sink)
         del sink
 
-        with pytest.raises(ValueError):  # I/O operation on closed file
+        with pytest.raises(ValueError, match=r"I/O operation on closed file\."):
             fp.write(".")
