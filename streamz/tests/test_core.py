@@ -164,6 +164,43 @@ def test_partition():
     assert L == [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]
 
 
+@pytest.mark.parametrize(
+    "n,key,keep,elements,exp_result",
+    [
+        (3, sz.identity, "first", [1, 2, 1, 3, 1, 3, 3, 2], [(1, 2, 3), (1, 3, 2)]),
+        (3, sz.identity, "last", [1, 2, 1, 3, 1, 3, 3, 2], [(2, 1, 3), (1, 3, 2)]),
+        (
+            3,
+            len,
+            "last",
+            ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"],
+            [("fo", "f", "foo"), ("f", "foo", "fo")],
+        ),
+        (
+            2,
+            "id",
+            "first",
+            [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+            [({"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"})],
+        ),
+        (
+            2,
+            "id",
+            "last",
+            [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+            [({"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"})],
+        ),
+    ]
+)
+def test_partition_unique(n, key, keep, elements, exp_result):
+    source = Stream()
+    L = source.partition_unique(n, key, keep).sink_to_list()
+    for ele in elements:
+        source.emit(ele)
+
+    assert L == exp_result
+
+
 def test_partition_timeout():
     source = Stream()
     L = source.partition(10, timeout=0.01).sink_to_list()
