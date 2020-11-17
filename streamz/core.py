@@ -165,8 +165,10 @@ class Stream(object):
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = list(upstreams)
-        else:
+        elif upstream is not None:
             self.upstreams = [upstream]
+        else:
+            self.upstreams = []
 
         self._set_asynchronous(asynchronous)
         self._set_loop(loop)
@@ -236,10 +238,7 @@ class Stream(object):
     def _add_upstream(self, upstream):
         """Add upstream to current upstreams, this method is overridden for
         classes which handle stream specific buffers/caches"""
-        if self.upstreams == [None]:
-            self.upstreams[0] = upstream
-        else:
-            self.upstreams.append(upstream)
+        self.upstreams.append(upstream)
 
     def _add_downstream(self, downstream):
         """Add downstream to current downstreams"""
@@ -252,10 +251,7 @@ class Stream(object):
     def _remove_upstream(self, upstream):
         """Remove upstream from current upstreams, this method is overridden for
         classes which handle stream specific buffers/caches"""
-        if len(self.upstreams) == 1:
-            self.upstreams[0] = [None]
-        else:
-            self.upstreams.remove(upstream)
+        self.upstreams.remove(upstream)
 
     @classmethod
     def register_api(cls, modifier=identity, attribute_name=None):
@@ -527,8 +523,8 @@ class Stream(object):
         if streams is None:
             streams = self.upstreams
         for upstream in list(streams):
-            upstream.downstreams.remove(self)
-            self.upstreams.remove(upstream)
+            upstream._remove_downstream(self)
+            self._remove_upstream(upstream)
 
     def scatter(self, **kwargs):
         from .dask import scatter

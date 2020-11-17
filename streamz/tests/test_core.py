@@ -1080,7 +1080,7 @@ def test_connect():
     # connect assumes this default behaviour
     # of stream initialization
     assert not source_downstream.downstreams
-    assert source_downstream.upstreams == [None]
+    assert source_downstream.upstreams == []
 
     # initialize the second stream to connect to
     source_upstream = Stream()

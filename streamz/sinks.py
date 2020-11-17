@@ -67,6 +67,10 @@ class sink(Sink):
         else:
             return []
 
+    def destroy(self):
+        super().destroy()
+        _global_sinks.remove(self)
+
 
 @Stream.register_api()
 class sink_to_textfile(Sink):

@@ -1,3 +1,5 @@
+import weakref
+
 import pytest
 from streamz import Stream
 from streamz.sinks import _global_sinks
@@ -56,3 +58,13 @@ def test_sink_to_textfile_closes():
 
         with pytest.raises(ValueError, match=r"I/O operation on closed file\."):
             fp.write(".")
+
+
+def test_sink_destroy():
+    source = Stream()
+    sink = source.sink(lambda x: None)
+    ref = weakref.ref(sink)
+    sink.destroy()
+    del sink
+
+    assert ref() is None
