@@ -333,6 +333,60 @@ def test_backpressure():
     assert end - start >= 0.2
 
 
+# TODO: looks like gen_test and pytest.mark.parametrize don't play nicely together:
+# TypeError: test_timed_window_unique() missing 5 required positional arguments: 'interval', 'key', 'keep', 'elements', and 'exp_result'
+# I think gen_test() needs to be modified for this to work, but unsure how
+# TODO: fix tests' exp_result values and the logic inside, once it runs without ^ error
+# @gen_test()
+# @pytest.mark.parametrize(
+#     "interval,key,keep,elements,exp_result",
+#     [
+#         (0.2, sz.identity, "first", [1, 2, 1, 3, 1, 3, 3, 2], [(1, 2, 3), (1, 3, 2)]),
+#         (0.2, sz.identity, "last", [1, 2, 1, 3, 1, 3, 3, 2], [(2, 1, 3), (1, 3, 2)]),
+#         (
+#             0.02,
+#             len,
+#             "last",
+#             ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"],
+#             [("fo", "f", "foo"), ("f", "foo", "fo")],
+#         ),
+#         (
+#             0.02,
+#             "id",
+#             "first",
+#             [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+#             [({"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"})],
+#         ),
+#         (
+#             0.02,
+#             "id",
+#             "last",
+#             [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+#             [({"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"})],
+#         ),
+#     ]
+# )
+# def test_timed_window_unique(interval, key, keep, elements, exp_result):
+#     import pdb; pdb.set_trace()
+#     source = Stream(asynchronous=True)
+#     a = source.timed_window_unique(interval, key, keep)
+
+#     assert a.loop is IOLoop.current()
+#     L = a.sink_to_list()
+
+#     for ele in elements:
+#         yield source.emit(ele)
+#         yield gen.sleep(0.006)
+#     yield gen.sleep(a.interval)
+
+#     assert L
+#     assert all(len(x) <= 3 for x in L)
+#     assert any(len(x) >= 2 for x in L)
+
+#     yield gen.sleep(0.1)
+#     assert not L[-1]
+
+
 @gen_test()
 def test_timed_window():
     source = Stream(asynchronous=True)
