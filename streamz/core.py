@@ -483,7 +483,7 @@ class Stream(object):
             sync(self.loop, _)
 
     def update(self, x, who=None, metadata=None):
-        self._emit(x, metadata=metadata)
+        return self._emit(x, metadata=metadata)
 
     def gather(self):
         """ This is a no-op for core streamz
