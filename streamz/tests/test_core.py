@@ -19,7 +19,7 @@ import streamz as sz
 from streamz import Stream, RefCounter
 from streamz.sources import sink_to_file, PeriodicCallback
 from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
-        clean, await_for, metadata)  # noqa: F401
+        clean, await_for, metadata, wait_for)  # noqa: F401
 from distributed.utils_test import loop   # noqa: F401
 
 
@@ -1634,3 +1634,31 @@ def test_buffer_after_timed_window():
 
 def test_buffer_after_sliding_window():
     Stream().sliding_window(1).buffer(1)
+
+
+def test_backpressure_connect_empty_stream():
+    @Stream.register_api()
+    class from_list(Stream):
+
+        def __init__(self, source, **kwargs):
+            self.source = source
+            super().__init__(ensure_io_loop=True, **kwargs)
+
+        def start(self):
+            self.stopped = False
+            self.loop.add_callback(self.run)
+
+        @gen.coroutine
+        def run(self):
+            while not self.stopped and len(self.source) > 0:
+                yield self._emit(self.source.pop(0))
+
+    source_list = [0, 1, 2, 3, 4]
+    source = Stream.from_list(source_list)
+    sout = Stream()
+    L = sout.rate_limit(1).sink_to_list()
+    source.connect(sout)
+    source.start()
+
+    wait_for(lambda: L == [0], 0.01)
+    assert len(source_list) > 0
