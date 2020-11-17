@@ -69,8 +69,6 @@ def create_graph(node, graph):
     """
     # Step 1 build a set of all the nodes
     node_set = build_node_set(node)
-    if None in node_set:
-        node_set.remove(None)
 
     # Step 2 for each node in the set add to the graph
     for n in node_set:
@@ -87,8 +85,7 @@ def create_graph(node, graph):
     # Step 3 for each node establish its edges
     for n in node_set:
         t = hash(n)
-        upstreams = [_ for _ in n.upstreams if _ is not None]
-        for nn in upstreams:
+        for nn in n.upstreams:
             tt = hash(nn)
             graph.add_edge(tt, t)
 
