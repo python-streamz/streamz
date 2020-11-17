@@ -105,11 +105,10 @@ class sink_to_textfile(Sink):
         self._end = end
         self._fp = open(file, mode=mode) if isinstance(file, str) else file
         weakref.finalize(self, self._fp.close)
-        super().__init__(upstream, ensure_io_loop=True, **kwargs)
+        super().__init__(upstream, **kwargs)
 
     def __del__(self):
         self._fp.close()
 
-    @gen.coroutine
     def update(self, x, who=None, metadata=None):
-        yield self.loop.run_in_executor(None, self._fp.write, x + self._end)
+        self._fp.write(x + self._end)
