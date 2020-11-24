@@ -395,23 +395,6 @@ def test_sink_to_file():
         assert data == 'a\nb\n'
 
 
-def test_sink_with_args_and_kwargs():
-    L = dict()
-
-    def mycustomsink(elem, key, prefix=""):
-        key = prefix + key
-        if key not in L:
-            L[key] = list()
-        L[key].append(elem)
-
-    s = Stream()
-    s.sink(mycustomsink, "cat", "super")
-
-    s.emit(1)
-    s.emit(2)
-    assert L['supercat'] == [1, 2]
-
-
 @gen_test()
 def test_counter():
     counter = itertools.count()
@@ -1097,7 +1080,7 @@ def test_connect():
     # connect assumes this default behaviour
     # of stream initialization
     assert not source_downstream.downstreams
-    assert source_downstream.upstreams == [None]
+    assert source_downstream.upstreams == []
 
     # initialize the second stream to connect to
     source_upstream = Stream()

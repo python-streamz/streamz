@@ -27,8 +27,6 @@ from .orderedweakset import OrderedWeakrefSet
 
 no_default = '--no-default--'
 
-_global_sinks = set()
-
 _html_update_streams = set()
 
 thread_state = threading.local()
@@ -167,8 +165,10 @@ class Stream(object):
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = list(upstreams)
-        else:
+        elif upstream is not None:
             self.upstreams = [upstream]
+        else:
+            self.upstreams = []
 
         self._set_asynchronous(asynchronous)
         self._set_loop(loop)
@@ -238,10 +238,7 @@ class Stream(object):
     def _add_upstream(self, upstream):
         """Add upstream to current upstreams, this method is overridden for
         classes which handle stream specific buffers/caches"""
-        if self.upstreams == [None]:
-            self.upstreams[0] = upstream
-        else:
-            self.upstreams.append(upstream)
+        self.upstreams.append(upstream)
 
     def _add_downstream(self, downstream):
         """Add downstream to current downstreams"""
@@ -254,10 +251,7 @@ class Stream(object):
     def _remove_upstream(self, upstream):
         """Remove upstream from current upstreams, this method is overridden for
         classes which handle stream specific buffers/caches"""
-        if len(self.upstreams) == 1:
-            self.upstreams[0] = [None]
-        else:
-            self.upstreams.remove(upstream)
+        self.upstreams.remove(upstream)
 
     @classmethod
     def register_api(cls, modifier=identity, attribute_name=None):
@@ -529,8 +523,8 @@ class Stream(object):
         if streams is None:
             streams = self.upstreams
         for upstream in list(streams):
-            upstream.downstreams.remove(self)
-            self.upstreams.remove(upstream)
+            upstream._remove_downstream(self)
+            self._remove_upstream(upstream)
 
     def scatter(self, **kwargs):
         from .dask import scatter
@@ -654,48 +648,6 @@ class Stream(object):
         for m in metadata:
             if 'ref' in m:
                 m['ref'].release(n)
-
-
-@Stream.register_api()
-class sink(Stream):
-    """ Apply a function on every element
-
-    Examples
-    --------
-    >>> source = Stream()
-    >>> L = list()
-    >>> source.sink(L.append)
-    >>> source.sink(print)
-    >>> source.sink(print)
-    >>> source.emit(123)
-    123
-    123
-    >>> L
-    [123]
-
-    See Also
-    --------
-    map
-    Stream.sink_to_list
-    """
-    _graphviz_shape = 'trapezium'
-
-    def __init__(self, upstream, func, *args, **kwargs):
-        self.func = func
-        # take the stream specific kwargs out
-        stream_name = kwargs.pop("stream_name", None)
-        self.kwargs = kwargs
-        self.args = args
-
-        Stream.__init__(self, upstream, stream_name=stream_name)
-        _global_sinks.add(self)
-
-    def update(self, x, who=None, metadata=None):
-        result = self.func(x, *self.args, **self.kwargs)
-        if gen.isawaitable(result):
-            return result
-        else:
-            return []
 
 
 @Stream.register_api()
