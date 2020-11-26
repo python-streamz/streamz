@@ -763,4 +763,7 @@ class from_iterable(Source):
     @gen.coroutine
     def _run(self):
         for x in self._iterable:
+            if self.stopped:
+                break
             yield self._emit(x)
+        self.stopped = True
