@@ -731,3 +731,36 @@ def get_message_batch_cudf(kafka_params, topic, partition, keys, low, high, time
     finally:
         consumer.close()
     return gdf
+
+
+@Stream.register_api(staticmethod)
+class from_iterable(Source):
+    """ Emits items from an iterable.
+
+    Parameters
+    ----------
+    iterable: iterable
+        An iterable to emit messages from.
+
+    Examples
+    --------
+
+    >>> source = Stream.from_iterable(range(3))
+    >>> L = source.sink_to_list()
+    >>> source.start()
+    >>> L
+    [0, 1, 2]
+    """
+
+    def __init__(self, iterable, **kwargs):
+        super().__init__(ensure_io_loop=True, **kwargs)
+        self._iterable = iterable
+
+    def start(self):
+        self.stopped = False
+        self.loop.add_callback(self._run)
+
+    @gen.coroutine
+    def _run(self):
+        for x in self._iterable:
+            yield self._emit(x)

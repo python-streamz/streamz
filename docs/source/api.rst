@@ -51,6 +51,7 @@ Sources
 -------
 
 .. autosummary::
+   from_iterable
    filenames
    from_kafka
    from_kafka_batched
@@ -95,6 +96,7 @@ Definitions
 .. autofunction:: zip
 .. autofunction:: zip_latest
 
+.. autofunction:: from_iterable
 .. autofunction:: filenames
 .. autofunction:: from_kafka
 .. autofunction:: from_kafka_batched

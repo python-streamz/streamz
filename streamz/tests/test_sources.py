@@ -95,3 +95,10 @@ def test_process():
     s.start()
     yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)
     s.stop()
+
+
+def test_from_iterable():
+    source = Source.from_iterable(range(3))
+    L = source.sink_to_list()
+    source.start()
+    wait_for(lambda: L == [0, 1, 2], 0.1)
