@@ -102,3 +102,28 @@ def test_from_iterable():
     L = source.sink_to_list()
     source.start()
     wait_for(lambda: L == [0, 1, 2], 0.1)
+
+
+def test_from_iterable_backpressure():
+    it = iter(range(5))
+    source = Source.from_iterable(it)
+    L = source.rate_limit(0.01).sink_to_list()
+    source.start()
+
+    wait_for(lambda: L == [0], 1)
+    assert next(it) == 2  # 1 is in blocked _emit
+
+
+def test_from_iterable_stop():
+    from _pytest.outcomes import Failed
+
+    source = Source.from_iterable(range(5))
+    L = source.rate_limit(0.01).sink_to_list()
+    source.start()
+
+    wait_for(lambda: L == [0], 1)
+    source.stop()
+
+    assert source.stopped
+    with pytest.raises(Failed):
+        wait_for(lambda: L == [0, 1, 2], 0.1)

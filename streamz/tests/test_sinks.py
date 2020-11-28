@@ -65,6 +65,9 @@ def test_sink_destroy():
     sink = Sink(source)
     ref = weakref.ref(sink)
     sink.destroy()
+
+    assert sink not in _global_sinks
+
     del sink
 
     assert ref() is None
