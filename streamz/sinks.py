@@ -17,6 +17,10 @@ class Sink(Stream):
         super().__init__(upstream, **kwargs)
         _global_sinks.add(self)
 
+    def destroy(self):
+        super().destroy()
+        _global_sinks.remove(self)
+
 
 @Stream.register_api()
 class sink(Sink):
@@ -66,10 +70,6 @@ class sink(Sink):
             return result
         else:
             return []
-
-    def destroy(self):
-        super().destroy()
-        _global_sinks.remove(self)
 
 
 @Stream.register_api()

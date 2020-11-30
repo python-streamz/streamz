@@ -2,7 +2,7 @@ import weakref
 
 import pytest
 from streamz import Stream
-from streamz.sinks import _global_sinks
+from streamz.sinks import _global_sinks, Sink
 from streamz.utils_test import tmpfile
 
 
@@ -62,9 +62,12 @@ def test_sink_to_textfile_closes():
 
 def test_sink_destroy():
     source = Stream()
-    sink = source.sink(lambda x: None)
+    sink = Sink(source)
     ref = weakref.ref(sink)
     sink.destroy()
+
+    assert sink not in _global_sinks
+
     del sink
 
     assert ref() is None
