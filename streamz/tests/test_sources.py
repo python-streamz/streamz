@@ -86,7 +86,6 @@ def test_http():
         requests.post('http://localhost:%i/other' % port, data=b'data2')
 
 
-#@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_process():
     import sys

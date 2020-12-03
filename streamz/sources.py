@@ -1,7 +1,6 @@
 import asyncio
 from glob import glob
 import os
-import inspect
 import time
 import tornado.ioloop
 from tornado import gen
@@ -17,6 +16,7 @@ def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
         source._emit(result)
 
     pc = tornado.ioloop.PeriodicCallback(_, callback_time, **kwargs)
+    pc.start()
     pc.start()
     return source
 
@@ -39,6 +39,7 @@ class Source(Stream):
     def __init__(self, start=False, **kwargs):
         self.stopped = True
         super().__init__(ensure_io_loop=True, **kwargs)
+        self.started = False
         if start:
             self.start()
 
@@ -50,6 +51,7 @@ class Source(Stream):
     def start(self):
         """start polling"""
         self.stopped = False
+        self.started = True
         self.loop.add_callback(self.run)
 
     async def run(self):
@@ -91,11 +93,11 @@ class from_textfile(Source):
         if isinstance(f, str):
             f = open(f)
         self.buffer = ''
+        self.file = f
+        self.from_end = from_end
         if self.from_end:
             # this only happens when we are ready to read
             self.file.seek(0, 2)
-        self.file = f
-        self.from_end = from_end
         self.delimiter = delimiter
 
         self.poll_interval = poll_interval
@@ -109,7 +111,7 @@ class from_textfile(Source):
                 parts = self.buffer.split(self.delimiter)
                 self.buffer = parts.pop(-1)
                 for part in parts:
-                    await self._emit(part + self.delimiter)
+                    await asyncio.gather(*self._emit(part + self.delimiter))
         else:
             await asyncio.sleep(self.poll_interval)
 
@@ -149,7 +151,7 @@ class filenames(Source):
         new = filenames - self.seen
         for fn in sorted(new):
             self.seen.add(fn)
-            await self._emit(fn)
+            await asyncio.gather(*self._emit(fn))
         await asyncio.sleep(self.poll_interval)  # TODO: remove poll if delayed
 
 
@@ -405,7 +407,7 @@ class from_kafka(Source):
         self.stopped = True
 
 
-class FromKafkaBatched(Stream):
+class FromKafkaBatched(Source):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
                  npartitions=None, refresh_partitions=False,
