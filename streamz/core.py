@@ -1280,9 +1280,9 @@ class timed_window_unique(Stream):
     key: Union[Hashable, Callable[[Any], Hashable]]
         Callable that accepts a stream element and returns a unique, hashable
         representation of the incoming data (``key(x)``), or a hashable that gets
-        the corresponding value of a stream element (``x[key]``). For example,
-        ``key=lambda x: x["a"]`` would allow only elements with unique ``"a"`` values
-        to pass through.
+        the corresponding value of a stream element (``x[key]``). For example, both
+        ``key=lambda x: x["a"]`` and ``key="a"`` would allow only elements with unique
+        ``"a"`` values to pass through.
 
         .. note:: By default, we simply use the element object itself as the key,
             so that object must be hashable. If that's not the case, a non-default
@@ -1298,39 +1298,37 @@ class timed_window_unique(Stream):
     Examples
     --------
     >>> source = Stream()
-    >>> stream = source.timed_window_unique(interval=2, keep="first").sink(print)
-    >>> eles = [1, 2, 1, 3, 1, 3, 3, 2]
-    >>> for ele in eles:
+
+    Get unique hashable elements in a window, keeping just the first occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, keep="first").sink(print)
+    >>> for ele in [1, 2, 3, 3, 2, 1]:
     ...     source.emit(ele)
-    ...     time.sleep(0.6)
     ()
     (1, 2, 3)
-    (1, 3)
-    (2,)
     ()
 
-    >>> source = Stream()
-    >>> stream = source.timed_window_unique(interval=2, keep="last").sink(print)
-    >>> eles = [1, 2, 1, 3, 1, 3, 3, 2]
-    >>> for ele in eles:
+    Get unique hashable elements in a window, keeping just the last occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, keep="last").sink(print)
+    >>> for ele in [1, 2, 3, 3, 2, 1]:
     ...     source.emit(ele)
-    ...     time.sleep(0.6)
     ()
-    (2, 1, 3)
-    (1, 3)
-    (2,)
+    (3, 2, 1)
     ()
 
-    >>> source = Stream()
-    >>> stream = source.timed_window_unique(interval=2, key=lambda x: len(x), keep="last").sink(print)
-    >>> eles = ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"]
-    >>> for ele in eles:
+    Get unique elements in a window by (string) length, keeping just the first occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="first")
+    >>> for ele in ["f", "b", "fo", "ba", "foo", "bar"]:
     ...     source.emit(ele)
-    ...     time.sleep(0.6)
     ()
-    ('fo', 'f', 'foo')
-    ('f', 'foo')
-    ('fo',)
+    ('f', 'fo', 'foo')
+    ()
+
+    Get unique elements in a window by (string) length, keeping just the last occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="first")
+    >>> for ele in ["f", "b", "fo", "ba", "foo", "bar"]:
+    ...     source.emit(ele)
+    ()
+    ('b', 'ba', 'bar')
     ()
     """
     _graphviz_shape = "octagon"
