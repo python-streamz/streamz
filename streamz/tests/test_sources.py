@@ -86,11 +86,19 @@ def test_http():
         requests.post('http://localhost:%i/other' % port, data=b'data2')
 
 
-@flaky(max_runs=3, min_passes=1)
+#@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_process():
+    import sys
+    import asyncio
     cmd = ["python", "-c", "for i in range(4): print(i)"]
     s = Source.from_process(cmd)
+    if sys.platform != "win32":
+        # don't know why - something with pytest and new processes
+        policy = asyncio.get_event_loop_policy()
+        watcher = asyncio.SafeChildWatcher()
+        policy.set_child_watcher(watcher)
+        watcher.attach_loop(s.loop.asyncio_loop)
     out = s.sink_to_list()
     s.start()
     yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)

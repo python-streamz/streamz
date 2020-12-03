@@ -23,7 +23,7 @@ except ImportError:
 
 from collections.abc import Iterable
 
-from .compatibility import get_thread_identity
+from threading import get_ident as get_thread_identity
 from .orderedweakset import OrderedWeakrefSet
 
 no_default = '--no-default--'
