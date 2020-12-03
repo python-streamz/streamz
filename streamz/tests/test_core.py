@@ -164,6 +164,43 @@ def test_partition():
     assert L == [(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]
 
 
+@pytest.mark.parametrize(
+    "n,key,keep,elements,exp_result",
+    [
+        (3, sz.identity, "first", [1, 2, 1, 3, 1, 3, 3, 2], [(1, 2, 3), (1, 3, 2)]),
+        (3, sz.identity, "last", [1, 2, 1, 3, 1, 3, 3, 2], [(2, 1, 3), (1, 3, 2)]),
+        (
+            3,
+            len,
+            "last",
+            ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"],
+            [("fo", "f", "foo"), ("f", "foo", "fo")],
+        ),
+        (
+            2,
+            "id",
+            "first",
+            [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+            [({"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"})],
+        ),
+        (
+            2,
+            "id",
+            "last",
+            [{"id": 0, "foo": "bar"}, {"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"}],
+            [({"id": 0, "foo": "baz"}, {"id": 1, "foo": "bat"})],
+        ),
+    ]
+)
+def test_partition_unique(n, key, keep, elements, exp_result):
+    source = Stream()
+    L = source.partition_unique(n, key, keep).sink_to_list()
+    for ele in elements:
+        source.emit(ele)
+
+    assert L == exp_result
+
+
 def test_partition_timeout():
     source = Stream()
     L = source.partition(10, timeout=0.01).sink_to_list()
@@ -294,6 +331,53 @@ def test_backpressure():
     end = time()
 
     assert end - start >= 0.2
+
+
+@gen_test()
+def test_timed_window_unique():
+    tests = [
+        (0.05, sz.identity, "first", [1, 2, 1, 3, 1, 3, 3, 2], [(1, 2, 3)]),
+        (0.05, sz.identity, "last", [1, 2, 1, 3, 1, 3, 3, 2], [(1, 3, 2)]),
+        (
+            0.05,
+            len,
+            "last",
+            ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"],
+            [("f", "foo", "fo")],
+        ),
+        (
+            0.05,
+            "id",
+            "first",
+            [{"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"}, {"id": 0, "foo": "baz"}],
+            [({"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"})],
+        ),
+        (
+            0.05,
+            "id",
+            "last",
+            [{"id": 0, "foo": "bar"}, {"id": 1, "foo": "bat"}, {"id": 0, "foo": "baz"}],
+            [({"id": 1, "foo": "bat"}, {"id": 0, "foo": "baz"})],
+        ),
+    ]
+    for interval, key, keep, elements, exp_result in tests:
+        source = Stream(asynchronous=True)
+        a = source.timed_window_unique(interval, key, keep)
+
+        assert a.loop is IOLoop.current()
+        L = a.sink_to_list()
+
+        for ele in elements:
+            yield source.emit(ele)
+        yield gen.sleep(a.interval)
+
+        assert L
+        assert all(wi in elements for window in L for wi in window)
+        assert sum(1 for window in L for _ in window) <= len(elements)
+        assert L == exp_result
+
+        yield gen.sleep(a.interval)
+        assert not L[-1]
 
 
 @gen_test()

@@ -13,3 +13,4 @@ log
 .cache/
 .ipynb_checkpoints/
 .vscode
+.python-version

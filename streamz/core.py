@@ -8,6 +8,7 @@ import six
 import sys
 import threading
 from time import time
+from typing import Any, Callable, Hashable, Union
 import weakref
 
 import toolz
@@ -1023,6 +1024,107 @@ class partition(Stream):
 
 
 @Stream.register_api()
+class partition_unique(Stream):
+    """
+    Partition stream elements into groups of equal size with unique keys only.
+
+    Parameters
+    ----------
+    n: int
+        Number of (unique) elements to pass through as a group.
+    key: Union[Hashable, Callable[[Any], Hashable]]
+        Callable that accepts a stream element and returns a unique, hashable
+        representation of the incoming data (``key(x)``), or a hashable that gets
+        the corresponding value of a stream element (``x[key]``). For example,
+        ``key=lambda x: x["a"]`` would allow only elements with unique ``"a"`` values
+        to pass through.
+
+        .. note:: By default, we simply use the element object itself as the key,
+            so that object must be hashable. If that's not the case, a non-default
+            key must be provided.
+
+    keep: str
+        Which element to keep in the case that a unique key is already found
+        in the group. If "first", keep element from the first occurrence of a given
+        key; if "last", keep element from the most recent occurrence. Note that
+        relative ordering of *elements* is preserved in the data passed through,
+        and not ordering of *keys*.
+    **kwargs
+
+    Examples
+    --------
+    >>> source = Stream()
+    >>> stream = source.partition_unique(n=3, keep="first").sink(print)
+    >>> eles = [1, 2, 1, 3, 1, 3, 3, 2]
+    >>> for ele in eles:
+    ...     source.emit(ele)
+    (1, 2, 3)
+    (1, 3, 2)
+
+    >>> source = Stream()
+    >>> stream = source.partition_unique(n=3, keep="last").sink(print)
+    >>> eles = [1, 2, 1, 3, 1, 3, 3, 2]
+    >>> for ele in eles:
+    ...     source.emit(ele)
+    (2, 1, 3)
+    (1, 3, 2)
+
+    >>> source = Stream()
+    >>> stream = source.partition_unique(n=3, key=lambda x: len(x), keep="last").sink(print)
+    >>> eles = ["f", "fo", "f", "foo", "f", "foo", "foo", "fo"]
+    >>> for ele in eles:
+    ...     source.emit(ele)
+    ('fo', 'f', 'foo')
+    ('f', 'foo', 'fo')
+    """
+    _graphviz_shape = "diamond"
+
+    def __init__(
+        self,
+        upstream,
+        n: int,
+        key: Union[Hashable, Callable[[Any], Hashable]] = identity,
+        keep: str = "first",  # Literal["first", "last"]
+        **kwargs
+    ):
+        self.n = n
+        self.key = key
+        self.keep = keep
+        self._buffer = {}
+        self._metadata_buffer = {}
+        Stream.__init__(self, upstream, **kwargs)
+
+    def _get_key(self, x):
+        if callable(self.key):
+            return self.key(x)
+        else:
+            return x[self.key]
+
+    def update(self, x, who=None, metadata=None):
+        self._retain_refs(metadata)
+        y = self._get_key(x)
+        if self.keep == "last":
+            # remove key if already present so that emitted value
+            # will reflect elements' actual relative ordering
+            self._buffer.pop(y, None)
+            self._metadata_buffer.pop(y, None)
+            self._buffer[y] = x
+            self._metadata_buffer[y] = metadata
+        else:  # self.keep == "first"
+            if y not in self._buffer:
+                self._buffer[y] = x
+                self._metadata_buffer[y] = metadata
+        if len(self._buffer) == self.n:
+            result, self._buffer = tuple(self._buffer.values()), {}
+            metadata_result, self._metadata_buffer = list(self._metadata_buffer.values()), {}
+            ret = self._emit(result, metadata_result)
+            self._release_refs(metadata_result)
+            return ret
+        else:
+            return []
+
+
+@Stream.register_api()
 class sliding_window(Stream):
     """ Produce overlapping tuples of size n
 
@@ -1112,6 +1214,124 @@ class timed_window(Stream):
             metadata, self.metadata_buffer = self.metadata_buffer, []
             m = [m for ml in metadata for m in ml]
             self.last = self._emit(L, m)
+            self._release_refs(m)
+            yield self.last
+            yield gen.sleep(self.interval)
+
+
+@Stream.register_api()
+class timed_window_unique(Stream):
+    """
+    Emit a group of elements with unique keys every ``interval`` seconds.
+
+    Parameters
+    ----------
+    interval: Union[int, str]
+        Number of seconds over which to group elements, or a ``pandas``-style
+        duration string that can be converted into seconds.
+    key: Union[Hashable, Callable[[Any], Hashable]]
+        Callable that accepts a stream element and returns a unique, hashable
+        representation of the incoming data (``key(x)``), or a hashable that gets
+        the corresponding value of a stream element (``x[key]``). For example, both
+        ``key=lambda x: x["a"]`` and ``key="a"`` would allow only elements with unique
+        ``"a"`` values to pass through.
+
+        .. note:: By default, we simply use the element object itself as the key,
+            so that object must be hashable. If that's not the case, a non-default
+            key must be provided.
+
+    keep: str
+        Which element to keep in the case that a unique key is already found
+        in the group. If "first", keep element from the first occurrence of a given
+        key; if "last", keep element from the most recent occurrence. Note that
+        relative ordering of *elements* is preserved in the data passed through,
+        and not ordering of *keys*.
+
+    Examples
+    --------
+    >>> source = Stream()
+
+    Get unique hashable elements in a window, keeping just the first occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, keep="first").sink(print)
+    >>> for ele in [1, 2, 3, 3, 2, 1]:
+    ...     source.emit(ele)
+    ()
+    (1, 2, 3)
+    ()
+
+    Get unique hashable elements in a window, keeping just the last occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, keep="last").sink(print)
+    >>> for ele in [1, 2, 3, 3, 2, 1]:
+    ...     source.emit(ele)
+    ()
+    (3, 2, 1)
+    ()
+
+    Get unique elements in a window by (string) length, keeping just the first occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="first")
+    >>> for ele in ["f", "b", "fo", "ba", "foo", "bar"]:
+    ...     source.emit(ele)
+    ()
+    ('f', 'fo', 'foo')
+    ()
+
+    Get unique elements in a window by (string) length, keeping just the last occurrence:
+    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="last")
+    >>> for ele in ["f", "b", "fo", "ba", "foo", "bar"]:
+    ...     source.emit(ele)
+    ()
+    ('b', 'ba', 'bar')
+    ()
+    """
+    _graphviz_shape = "octagon"
+
+    def __init__(
+        self,
+        upstream,
+        interval: Union[int, str],
+        key: Union[Hashable, Callable[[Any], Hashable]] = identity,
+        keep: str = "first",  # Literal["first", "last"]
+        **kwargs
+    ):
+        self.interval = convert_interval(interval)
+        self.key = key
+        self.keep = keep
+        self._buffer = {}
+        self._metadata_buffer = {}
+        self.last = gen.moment
+        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        self.loop.add_callback(self.cb)
+
+    def _get_key(self, x):
+        if callable(self.key):
+            return self.key(x)
+        else:
+            return x[self.key]
+
+    def update(self, x, who=None, metadata=None):
+        self._retain_refs(metadata)
+        y = self._get_key(x)
+        if self.keep == "last":
+            # remove key if already present so that emitted value
+            # will reflect elements' actual relative ordering
+            self._buffer.pop(y, None)
+            self._metadata_buffer.pop(y, None)
+            self._buffer[y] = x
+            self._metadata_buffer[y] = metadata
+        else:  # self.keep == "first"
+            if y not in self._buffer:
+                self._buffer[y] = x
+                self._metadata_buffer[y] = metadata
+        return self.last
+
+    @gen.coroutine
+    def cb(self):
+        while True:
+            result, self._buffer = tuple(self._buffer.values()), {}
+            metadata_result, self._metadata_buffer = list(self._metadata_buffer.values()), {}
+            # TODO: figure out why metadata_result is handled differently here...
+            m = [m for ml in metadata_result for m in ml]
+            self.last = self._emit(result, m)
             self._release_refs(m)
             yield self.last
             yield gen.sleep(self.interval)
