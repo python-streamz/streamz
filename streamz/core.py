@@ -1324,7 +1324,7 @@ class timed_window_unique(Stream):
     ()
 
     Get unique elements in a window by (string) length, keeping just the last occurrence:
-    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="first")
+    >>> stream = source.timed_window_unique(interval=1.0, key=len, keep="last")
     >>> for ele in ["f", "b", "fo", "ba", "foo", "bar"]:
     ...     source.emit(ele)
     ()
