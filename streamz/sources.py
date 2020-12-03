@@ -2,23 +2,9 @@ import asyncio
 from glob import glob
 import os
 import time
-import tornado.ioloop
 from tornado import gen
 
 from .core import Stream, convert_interval, RefCounter
-
-
-def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
-    source = Stream(asynchronous=asynchronous)
-
-    def _():
-        result = callback()
-        source._emit(result)
-
-    pc = tornado.ioloop.PeriodicCallback(_, callback_time, **kwargs)
-    pc.start()
-    pc.start()
-    return source
 
 
 def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=False):
@@ -34,6 +20,17 @@ def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=Fal
 
 
 class Source(Stream):
+    """Start node for a set of Streams
+
+    Source nodes emit data into other nodes. They typically get this data
+    by polling external sources, and are necessarily run by an event loop.
+
+    Parameters
+    ----------
+    start: bool
+        Whether to call the run method immediately. If False, nothing
+        will happen until ``source.start()`` is called.
+    """
     _graphviz_shape = 'doubleoctagon'
 
     def __init__(self, start=False, **kwargs):
@@ -49,14 +46,67 @@ class Source(Stream):
             self.stopped = True
 
     def start(self):
-        """start polling"""
-        self.stopped = False
-        self.started = True
-        self.loop.add_callback(self.run)
+        """start polling
+
+        If already running, this has no effect. If the source was started and then
+        stopped again, this will restart the ``self.run`` coroutine.
+        """
+        if self.stopped:
+            self.stopped = False
+            self.started = True
+            self.loop.add_callback(self.run)
 
     async def run(self):
+        """This coroutine will be invoked by start() and emit all data
+
+        You might either overrive ``_run()`` when all logic can be contained
+        there, or override this method directly.
+
+        Note the use of ``.stopped`` to halt the coroutine, whether or not
+
+        """
         while not self.stopped:
             await self._run()
+
+    async def _run(self):
+        """This is the functionality to run on each cycle
+
+        Typically this may be used for polling some external IO source
+        or time-based data emission. You might choose to include an
+        ``await asyncio.sleep()`` for the latter.
+        """
+        raise NotImplementedError
+
+
+@Stream.register_api(staticmethod)
+class from_periodic(Source):
+    """Generate data from a function on given period
+
+    cf ``streamz.dataframe.PeriodicDataFrame``
+
+    Parameters
+    ----------
+    callback: callable
+        Function to call on each iteration. Takes no arguments.
+    poll_interval: float
+        Time to sleep between calls (s)
+    """
+
+    def __init__(self, callback, poll_interval=0.1, **kwargs):
+        self._cb = callback
+        self._poll = poll_interval
+        super().__init__(**kwargs)
+
+    async def _run(self):
+        await asyncio.gather(self._emit(self._cb()))
+        await asyncio.sleep(self._poll)
+
+
+def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):  # pragma: no cover
+    """For backward compatibility - please use Stream.from_periodic"""
+    if kwargs:
+        callback = lambda: callback(**kwargs)
+    return Stream.from_periodic(callback, callback_time, asynchronous=asynchronous)
 
 
 @Stream.register_api(staticmethod)

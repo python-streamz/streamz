@@ -107,8 +107,5 @@ class sink_to_textfile(Sink):
         weakref.finalize(self, self._fp.close)
         super().__init__(upstream, **kwargs)
 
-    def __del__(self):
-        self._fp.close()
-
     def update(self, x, who=None, metadata=None):
         self._fp.write(x + self._end)
