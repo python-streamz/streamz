@@ -38,10 +38,6 @@ class DaskStream(Stream):
     --------
     dask.distributed.Client
     """
-    def __init__(self, *args, **kwargs):
-        if 'loop' not in kwargs:
-            kwargs['loop'] = default_client().loop
-        super(DaskStream, self).__init__(*args, **kwargs)
 
 
 @DaskStream.register_api()
