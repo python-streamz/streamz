@@ -7,7 +7,7 @@ pytest.importorskip('dask.distributed')
 from tornado import gen
 
 from streamz.dask import scatter
-from streamz import Stream
+from streamz import RefCounter, Stream
 
 from distributed import Future, Client
 from distributed.utils import sync
@@ -48,6 +48,25 @@ def test_map_on_dict(c, s, a, b):
     for i, item in enumerate(sorted(L, key=lambda x: x["x"])):
         assert item["x"] == i
         assert item["i"] == i
+
+
+@gen_cluster(client=True)
+def test_refcounter_usage(c, s, a, b):
+    # Ensure RefCounter usage works correctly.
+    start = time.monotonic()
+    source = Stream(asynchronous=True)
+    L = source.scatter().map(lambda x: x+2).buffer(8).gather().sink_to_list()
+
+    # As of master branch on 2020-12-04, instantiating a RefCounter (not even
+    # using it) breaks processing.
+    rc = RefCounter()
+    for i in range(3):
+        yield source.emit(i, metadata=[{'ref': rc}])
+
+    while rc.count != 0 and time.monotonic() - start < 1.:
+        yield gen.sleep(1e-2)
+
+    assert L == [2, 3, 4]
 
 
 @gen_cluster(client=True)
