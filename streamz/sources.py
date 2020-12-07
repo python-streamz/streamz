@@ -3,6 +3,7 @@ from glob import glob
 import os
 import time
 from tornado import gen
+import weakref
 
 from .core import Stream, convert_interval, RefCounter
 
@@ -446,6 +447,7 @@ class from_kafka(Source):
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
             self.consumer.subscribe(self.topics)
+            weakref.finalize(self, self.consumer.close)
             tp = ck.TopicPartition(self.topics[0], 0, 0)
 
             # blocks for consumer thread to come up
@@ -496,7 +498,7 @@ class FromKafkaBatched(Source):
 
         @gen.coroutine
         def checkpoint_emit(_part):
-            ref = RefCounter(cb=lambda: commit(_part))
+            ref = RefCounter(cb=lambda: commit(_part), loop=self.loop)
             yield self._emit(_part, metadata=[{'ref': ref}])
 
         if self.npartitions is None:
@@ -521,50 +523,46 @@ class FromKafkaBatched(Source):
                     self.positions[tp.partition] = tp.offset
                 break
 
-        try:
-            while not self.stopped:
-                out = []
+        while not self.stopped:
+            out = []
 
-                if self.refresh_partitions:
-                    kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-                    if self.engine == "cudf":  # pragma: no cover
-                        new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
-                    else:
-                        new_partitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
-                    if new_partitions > self.npartitions:
-                        self.positions.extend([-1001] * (new_partitions - self.npartitions))
-                        self.npartitions = new_partitions
-
-                for partition in range(self.npartitions):
-                    tp = ck.TopicPartition(self.topic, partition, 0)
-                    try:
-                        low, high = self.consumer.get_watermark_offsets(
-                            tp, timeout=0.1)
-                    except (RuntimeError, ck.KafkaException):
-                        continue
-                    self.started = True
-                    if 'auto.offset.reset' in self.consumer_params.keys():
-                        if self.consumer_params['auto.offset.reset'] == 'latest' and \
-                                self.positions[partition] == -1001:
-                            self.positions[partition] = high
-                    current_position = self.positions[partition]
-                    lowest = max(current_position, low)
-                    if high > lowest + self.max_batch_size:
-                        high = lowest + self.max_batch_size
-                    if high > lowest:
-                        out.append((self.consumer_params, self.topic, partition,
-                                    self.keys, lowest, high - 1))
-                        self.positions[partition] = high
-                self.consumer_params['auto.offset.reset'] = 'earliest'
-
-                for part in out:
-                    yield self.loop.add_callback(checkpoint_emit, part)
-
+            if self.refresh_partitions:
+                kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+                if self.engine == "cudf":  # pragma: no cover
+                    new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
                 else:
-                    yield gen.sleep(self.poll_interval)
-        finally:
-            self.consumer.unsubscribe()
-            self.consumer.close()
+                    new_partitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+                if new_partitions > self.npartitions:
+                    self.positions.extend([-1001] * (new_partitions - self.npartitions))
+                    self.npartitions = new_partitions
+
+            for partition in range(self.npartitions):
+                tp = ck.TopicPartition(self.topic, partition, 0)
+                try:
+                    low, high = self.consumer.get_watermark_offsets(
+                        tp, timeout=0.1)
+                except (RuntimeError, ck.KafkaException):
+                    continue
+                self.started = True
+                if 'auto.offset.reset' in self.consumer_params.keys():
+                    if self.consumer_params['auto.offset.reset'] == 'latest' and \
+                            self.positions[partition] == -1001:
+                        self.positions[partition] = high
+                current_position = self.positions[partition]
+                lowest = max(current_position, low)
+                if high > lowest + self.max_batch_size:
+                    high = lowest + self.max_batch_size
+                if high > lowest:
+                    out.append((self.consumer_params, self.topic, partition,
+                                self.keys, lowest, high - 1))
+                    self.positions[partition] = high
+            self.consumer_params['auto.offset.reset'] = 'earliest'
+
+            for part in out:
+                yield self.loop.add_callback(checkpoint_emit, part)
+
+            else:
+                yield gen.sleep(self.poll_interval)
 
     def start(self):
         import confluent_kafka as ck
@@ -572,10 +570,11 @@ class FromKafkaBatched(Source):
             from custreamz import kafka
 
         if self.stopped:
-            if self.engine == "cudf": # pragma: no cover
+            if self.engine == "cudf":  # pragma: no cover
                 self.consumer = kafka.Consumer(self.consumer_params)
             else:
                 self.consumer = ck.Consumer(self.consumer_params)
+            weakref.finalize(self, self.consumer.close)
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 

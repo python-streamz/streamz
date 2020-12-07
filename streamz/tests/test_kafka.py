@@ -116,9 +116,9 @@ def test_from_kafka():
         stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
         out = stream.sink_to_list()
         stream.start()
-        yield gen.sleep(0.1)  # for loop to run
+        yield gen.sleep(1.1)  # for loop to run
         for i in range(10):
-            yield gen.sleep(0.2)
+            yield gen.sleep(0.1)  # small pause ensures correct ordering
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
@@ -168,7 +168,9 @@ def test_from_kafka_thread():
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
+        yield gen.sleep(1.1)
         for i in range(10):
+            yield gen.sleep(0.1)
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
@@ -231,8 +233,10 @@ def test_kafka_dask_batch(c, s, w1, w2):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         yield await_for(lambda: any(out), 10, period=0.2)
-        assert {'key':None, 'value':b'value-1'} in out[0]
-        stream.upstream.stopped = True
+        assert {'key': None, 'value': b'value-1'} in out[0]
+        stream.stop()
+        yield gen.sleep(0)
+        stream.upstream.upstream.consumer.close()
 
 
 def test_kafka_batch_npartitions():
@@ -551,11 +555,12 @@ def test_kafka_batch_checkpointing_async_nodes_2():
         assert committed3[1].offset == 1
 
 
+@flaky(max_runs=3, min_passes=1)
 def test_kafka_checkpointing_auto_offset_reset_latest():
-    '''
+    """
     Testing whether checkpointing works as expected with multiple topic partitions and
     with auto.offset.reset configuration set to latest (also default).
-    '''
+    """
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j,

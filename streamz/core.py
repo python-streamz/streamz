@@ -512,8 +512,10 @@ class Stream(object):
 
     @property
     def upstream(self):
-        if len(self.upstreams) != 1:
+        if len(self.upstreams) > 1:
             raise ValueError("Stream has multiple upstreams")
+        elif len(self.upstreams) == 0:
+            return None
         else:
             return self.upstreams[0]
 
@@ -534,6 +536,13 @@ class Stream(object):
     def remove(self, predicate):
         """ Only pass through elements for which the predicate returns False """
         return self.filter(lambda x: not predicate(x))
+
+    def stop(self):
+        """Call on any stream node to halt all upstream sources"""
+        prev, s = self.upstream, self
+        while s:
+            prev, s = s, s.upstream
+        prev.stopped = True
 
     @property
     def scan(self):
