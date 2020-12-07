@@ -98,7 +98,7 @@ class from_periodic(Source):
         super().__init__(**kwargs)
 
     async def _run(self):
-        await asyncio.gather(self._emit(self._cb()))
+        await asyncio.gather(*self._emit(self._cb()))
         await asyncio.sleep(self._poll)
 
 
@@ -355,12 +355,13 @@ class from_process(Source):
         super().__init__(**kwargs)
 
     async def run(self):
+        import shlex
         import subprocess
         stderr = subprocess.STDOUT if self.with_stderr else None
         if isinstance(self.cmd, (list, tuple)):
             cmd, *args = self.cmd
         else:
-            cmd, args = self.cmd, ()
+            cmd, *args = shlex.split(self.cmd)
         process = await asyncio.create_subprocess_exec(
             cmd, *args, stdout=subprocess.PIPE,
             stderr=stderr, **self.open_kwargs)
@@ -368,13 +369,16 @@ class from_process(Source):
             try:
                 out = await process.stdout.readuntil(b'\n')
             except asyncio.IncompleteReadError as err:
-                if self.with_end:
+                if self.with_end and err.partial:
                     out = err.partial
                 else:
                     break
+            if process.returncode is not None:
+                self.stopped = True
             await asyncio.gather(*self._emit(out))
-        process.terminate()
-        await process.wait()
+        if process.returncode is not None:
+            process.terminate()
+            await process.wait()
 
 
 @Stream.register_api(staticmethod)
