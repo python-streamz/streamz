@@ -580,7 +580,7 @@ def test_kafka_checkpointing_auto_offset_reset_latest():
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
         out1 = stream1.map(split).gather().sink_to_list()
         stream1.start()
-        wait_for(lambda: stream1.upstream.started, 10, 0.1)
+        wait_for(lambda: stream1.upstream.started, 10, period=0.1)
 
         '''
         Stream has started, so these are read.
@@ -589,7 +589,8 @@ def test_kafka_checkpointing_auto_offset_reset_latest():
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
 
-        wait_for(lambda: len(out1) == 3 and (len(out1[0]) + len(out1[1]) + len(out1[2])) == 30, 10, 0.1)
+        wait_for(lambda: len(out1) == 3 and (len(out1[0]) + len(out1[1]) + len(out1[2])) == 30,
+                 10, period=0.1)
         '''
         Stream stops but checkpoint has been created.
         '''
@@ -616,5 +617,6 @@ def test_kafka_checkpointing_auto_offset_reset_latest():
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
 
-        wait_for(lambda: len(out2) == 6 and (len(out2[3]) + len(out2[4]) + len(out2[5])) == 30, 10, 0.1)
+        wait_for(lambda: len(out2) == 6 and (len(out2[3]) + len(out2[4]) + len(out2[5])) == 30,
+                 10, period=0.1)
         stream2.upstream.stopped = True
