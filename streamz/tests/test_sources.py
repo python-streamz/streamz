@@ -1,8 +1,21 @@
+import asyncio
+import sys
+
 from flaky import flaky
 import pytest
 from streamz import Source
 from streamz.utils_test import wait_for, await_for, gen_test
 import socket
+
+
+def test_periodic():
+    s = Source.from_periodic(lambda: True)
+    l = s.sink_to_list()
+    assert s.stopped
+    s.start()
+    wait_for(lambda: l, 0.11, period=0.01)
+    wait_for(lambda: len(l) > 1, 0.11, period=0.01)
+    assert all(l)
 
 
 @flaky(max_runs=3, min_passes=1)
@@ -86,11 +99,32 @@ def test_http():
         requests.post('http://localhost:%i/other' % port, data=b'data2')
 
 
-@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_process():
-    cmd = ["python", "-c", "for i in range(4): print(i)"]
+    cmd = ["python", "-c", "for i in range(4): print(i, end='')"]
+    s = Source.from_process(cmd, with_end=True)
+    if sys.platform != "win32":
+        # don't know why - something with pytest and new processes
+        policy = asyncio.get_event_loop_policy()
+        watcher = asyncio.SafeChildWatcher()
+        policy.set_child_watcher(watcher)
+        watcher.attach_loop(s.loop.asyncio_loop)
+    out = s.sink_to_list()
+    s.start()
+    yield await_for(lambda: out == [b'0123'], timeout=5)
+    s.stop()
+
+
+@gen_test(timeout=60)
+def test_process_str():
+    cmd = 'python -c "for i in range(4): print(i)"'
     s = Source.from_process(cmd)
+    if sys.platform != "win32":
+        # don't know why - something with pytest and new processes
+        policy = asyncio.get_event_loop_policy()
+        watcher = asyncio.SafeChildWatcher()
+        policy.set_child_watcher(watcher)
+        watcher.attach_loop(s.loop.asyncio_loop)
     out = s.sink_to_list()
     s.start()
     yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)
