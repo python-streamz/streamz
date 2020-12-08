@@ -1,4 +1,5 @@
 from operator import add
+import random
 import time
 
 import pytest
@@ -48,6 +49,24 @@ def test_map_on_dict(c, s, a, b):
     for i, item in enumerate(sorted(L, key=lambda x: x["x"])):
         assert item["x"] == i
         assert item["i"] == i
+
+
+@gen_cluster(client=True)
+def test_non_unique_emit(c, s, a, b):
+    """Regression for https://github.com/python-streamz/streams/issues/397
+
+    Non-unique stream entries still need to each be processed.
+    """
+    source = Stream(asynchronous=True)
+    futures = source.scatter().map(lambda x: random.random())
+    L = futures.gather().sink_to_list()
+
+    for _ in range(3):
+        # Emit non-unique values
+        yield source.emit(0)
+
+    assert len(L) == 3
+    assert L[0] != L[1] or L[0] != L[2]
 
 
 @gen_cluster(client=True)
