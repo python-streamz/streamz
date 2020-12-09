@@ -403,7 +403,7 @@ def test_timed_window():
 
 @gen_test()
 def test_timed_window_ref_counts():
-    source = Stream()
+    source = Stream(asynchronous=True)
     _ = source.timed_window(0.01)
 
     ref1 = RefCounter()

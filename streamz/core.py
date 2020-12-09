@@ -177,6 +177,7 @@ class Stream(object):
 
     def __init__(self, upstream=None, upstreams=None, stream_name=None,
                  loop=None, asynchronous=None, ensure_io_loop=False):
+        self.name = stream_name
         self.downstreams = OrderedWeakrefSet()
         if upstreams is not None:
             self.upstreams = list(upstreams)
@@ -195,8 +196,6 @@ class Stream(object):
         for upstream in self.upstreams:
             if upstream:
                 upstream.downstreams.add(self)
-
-        self.name = stream_name
 
     def _set_loop(self, loop):
         self.loop = None
@@ -1008,7 +1007,8 @@ class partition(Stream):
         self._buffer = defaultdict(lambda: [])
         self._metadata_buffer = defaultdict(lambda: [])
         self._callbacks = {}
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
 
     def _get_key(self, x):
         if self._key is None:
@@ -1220,7 +1220,8 @@ class timed_window(Stream):
         self.metadata_buffer = []
         self.last = gen.moment
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -1322,7 +1323,8 @@ class timed_window_unique(Stream):
         self._buffer = {}
         self._metadata_buffer = {}
         self.last = gen.moment
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
         self.loop.add_callback(self.cb)
 
     def _get_key(self, x):
@@ -1369,7 +1371,8 @@ class delay(Stream):
         self.interval = convert_interval(interval)
         self.queue = Queue()
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream,**kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -1407,7 +1410,8 @@ class rate_limit(Stream):
         self.interval = convert_interval(interval)
         self.next = 0
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
 
     @gen.coroutine
     def update(self, x, who=None, metadata=None):
@@ -1432,7 +1436,8 @@ class buffer(Stream):
     def __init__(self, upstream, n, **kwargs):
         self.queue = Queue(maxsize=n)
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -1876,7 +1881,8 @@ class latest(Stream):
         self.next = []
         self.next_metadata = None
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
 
         self.loop.add_callback(self.cb)
 
@@ -1932,7 +1938,8 @@ class to_kafka(Stream):
         self.topic = topic
         self.producer = ck.Producer(producer_config)
 
-        Stream.__init__(self, upstream, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
         self.stopped = False
         self.polltime = 0.2
         self.loop.add_callback(self.poll)

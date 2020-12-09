@@ -71,7 +71,6 @@ def test_partition_then_scatter_async(c, s, a, b):
     assert L == [1, 2, 3]
 
 
-@pytest.mark.slow
 def test_partition_then_scatter_sync(loop):
     # Ensure partition w/ timeout before scatter works correctly for synchronous
     with cluster() as (s, [a, b]):
@@ -163,7 +162,6 @@ def test_accumulate(c, s, a, b):
     assert L[-1][1] == 3
 
 
-@pytest.mark.slow
 def test_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841
@@ -180,7 +178,6 @@ def test_sync(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow
 def test_sync_2(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # noqa: F841
@@ -194,7 +191,6 @@ def test_sync_2(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow
 @gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
 def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -221,7 +217,6 @@ def test_buffer(c, s, a, b):
     assert source.loop == c.loop
 
 
-@pytest.mark.slow
 def test_buffer_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # noqa: F841
@@ -246,7 +241,6 @@ def test_buffer_sync(loop):  # noqa: F811
 
 
 @pytest.mark.xfail(reason='')
-@pytest.mark.slow
 def test_stream_shares_client_loop(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841

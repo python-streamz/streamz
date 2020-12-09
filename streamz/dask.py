@@ -38,7 +38,8 @@ class DaskStream(Stream):
     dask.distributed.Client
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, ensure_io_loop=True, **kwargs)
+        kwargs["ensure_io_loop"] = True
+        super().__init__(*args, **kwargs)
 
 
 @DaskStream.register_api()
