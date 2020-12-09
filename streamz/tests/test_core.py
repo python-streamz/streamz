@@ -5,19 +5,18 @@ import json
 import operator
 from operator import add
 import os
-from time import time, sleep
+from time import sleep
 import sys
 
 import pytest
 
-from tornado import gen
 from tornado.queues import Queue
 from tornado.ioloop import IOLoop
 
 import streamz as sz
 
-from streamz import Stream, RefCounter
-from streamz.sources import sink_to_file, PeriodicCallback
+from streamz import RefCounter
+from streamz.sources import sink_to_file
 from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
         clean, await_for, metadata, wait_for)  # noqa: F401
 from distributed.utils_test import loop   # noqa: F401
@@ -421,7 +420,7 @@ def test_timed_window_ref_counts():
 @gen_test()
 def test_timed_window_metadata():
     source = Stream()
-    L = metadata(source.timed_window(0.01)).sink_to_list()
+    L = metadata(source.timed_window(0.06)).sink_to_list()
 
     source.emit(0)
     source.emit(1, metadata=[{'v': 1}])
@@ -482,7 +481,8 @@ def test_sink_to_file():
 @gen_test()
 def test_counter():
     counter = itertools.count()
-    source = PeriodicCallback(lambda: next(counter), 0.001, asynchronous=True)
+    source = Stream.from_periodic(lambda: next(counter), 0.001, asynchronous=True,
+                                  start=True)
     L = source.sink_to_list()
     yield gen.sleep(0.05)
 

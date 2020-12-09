@@ -1,23 +1,11 @@
+import asyncio
 from glob import glob
 import os
-
 import time
-import tornado.ioloop
 from tornado import gen
+import weakref
 
 from .core import Stream, convert_interval, RefCounter
-
-
-def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):
-    source = Stream(asynchronous=asynchronous)
-
-    def _():
-        result = callback()
-        source._emit(result)
-
-    pc = tornado.ioloop.PeriodicCallback(_, callback_time, **kwargs)
-    pc.start()
-    return source
 
 
 def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=False):
@@ -33,16 +21,93 @@ def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=Fal
 
 
 class Source(Stream):
+    """Start node for a set of Streams
+
+    Source nodes emit data into other nodes. They typically get this data
+    by polling external sources, and are necessarily run by an event loop.
+
+    Parameters
+    ----------
+    start: bool
+        Whether to call the run method immediately. If False, nothing
+        will happen until ``source.start()`` is called.
+    """
     _graphviz_shape = 'doubleoctagon'
 
-    def __init__(self, **kwargs):
+    def __init__(self, start=False, **kwargs):
         self.stopped = True
-        super(Source, self).__init__(**kwargs)
+        super().__init__(ensure_io_loop=True, **kwargs)
+        self.started = False
+        if start:
+            self.start()
 
-    def stop(self):  # pragma: no cover
-        # fallback stop method - for poll functions with while not self.stopped
+    def stop(self):
+        """set self.stopped, which will cause polling to stop after next run"""
         if not self.stopped:
             self.stopped = True
+
+    def start(self):
+        """start polling
+
+        If already running, this has no effect. If the source was started and then
+        stopped again, this will restart the ``self.run`` coroutine.
+        """
+        if self.stopped:
+            self.stopped = False
+            self.started = True
+            self.loop.add_callback(self.run)
+
+    async def run(self):
+        """This coroutine will be invoked by start() and emit all data
+
+        You might either overrive ``_run()`` when all logic can be contained
+        there, or override this method directly.
+
+        Note the use of ``.stopped`` to halt the coroutine, whether or not
+
+        """
+        while not self.stopped:
+            await self._run()
+
+    async def _run(self):
+        """This is the functionality to run on each cycle
+
+        Typically this may be used for polling some external IO source
+        or time-based data emission. You might choose to include an
+        ``await asyncio.sleep()`` for the latter.
+        """
+        raise NotImplementedError
+
+
+@Stream.register_api(staticmethod)
+class from_periodic(Source):
+    """Generate data from a function on given period
+
+    cf ``streamz.dataframe.PeriodicDataFrame``
+
+    Parameters
+    ----------
+    callback: callable
+        Function to call on each iteration. Takes no arguments.
+    poll_interval: float
+        Time to sleep between calls (s)
+    """
+
+    def __init__(self, callback, poll_interval=0.1, **kwargs):
+        self._cb = callback
+        self._poll = poll_interval
+        super().__init__(**kwargs)
+
+    async def _run(self):
+        await asyncio.gather(*self._emit(self._cb()))
+        await asyncio.sleep(self._poll)
+
+
+def PeriodicCallback(callback, callback_time, asynchronous=False, **kwargs):  # pragma: no cover
+    """For backward compatibility - please use Stream.from_periodic"""
+    if kwargs:
+        callback = lambda: callback(**kwargs)
+    return Stream.from_periodic(callback, callback_time, asynchronous=asynchronous)
 
 
 @Stream.register_api(staticmethod)
@@ -74,44 +139,32 @@ class from_textfile(Source):
     -------
     Stream
     """
-    def __init__(self, f, poll_interval=0.100, delimiter='\n', start=False,
+    def __init__(self, f, poll_interval=0.100, delimiter='\n',
                  from_end=False, **kwargs):
         if isinstance(f, str):
             f = open(f)
+        self.buffer = ''
         self.file = f
         self.from_end = from_end
-        self.delimiter = delimiter
-
-        self.poll_interval = poll_interval
-        super(from_textfile, self).__init__(ensure_io_loop=True, **kwargs)
-        self.stopped = True
-        self.started = False
-        if start:
-            self.start()
-
-    def start(self):
-        self.stopped = False
-        self.started = False
-        self.loop.add_callback(self.do_poll)
-
-    @gen.coroutine
-    def do_poll(self):
-        buffer = ''
         if self.from_end:
             # this only happens when we are ready to read
             self.file.seek(0, 2)
-        while not self.stopped:
-            self.started = True
-            line = self.file.read()
-            if line:
-                buffer = buffer + line
-                if self.delimiter in buffer:
-                    parts = buffer.split(self.delimiter)
-                    buffer = parts.pop(-1)
-                    for part in parts:
-                        yield self._emit(part + self.delimiter)
-            else:
-                yield gen.sleep(self.poll_interval)
+        self.delimiter = delimiter
+
+        self.poll_interval = poll_interval
+        super().__init__(**kwargs)
+
+    async def _run(self):
+        line = self.file.read()
+        if line:
+            self.buffer = self.buffer + line
+            if self.delimiter in self.buffer:
+                parts = self.buffer.split(self.delimiter)
+                self.buffer = parts.pop(-1)
+                for part in parts:
+                    await asyncio.gather(*self._emit(part + self.delimiter))
+        else:
+            await asyncio.sleep(self.poll_interval)
 
 
 @Stream.register_api(staticmethod)
@@ -133,7 +186,7 @@ class filenames(Source):
     >>> source = Stream.filenames('path/to/dir')  # doctest: +SKIP
     >>> source = Stream.filenames('path/to/*.csv', poll_interval=0.500)  # doctest: +SKIP
     """
-    def __init__(self, path, poll_interval=0.100, start=False, **kwargs):
+    def __init__(self, path, poll_interval=0.100, **kwargs):
         if '*' not in path:
             if os.path.isdir(path):
                 if not path.endswith(os.path.sep):
@@ -142,26 +195,15 @@ class filenames(Source):
         self.path = path
         self.seen = set()
         self.poll_interval = poll_interval
-        self.stopped = True
-        super(filenames, self).__init__(ensure_io_loop=True)
-        if start:
-            self.start()
+        super().__init__(**kwargs)
 
-    def start(self):
-        self.stopped = False
-        self.loop.add_callback(self.do_poll)
-
-    @gen.coroutine
-    def do_poll(self):
-        while True:
-            filenames = set(glob(self.path))
-            new = filenames - self.seen
-            for fn in sorted(new):
-                self.seen.add(fn)
-                yield self._emit(fn)
-            yield gen.sleep(self.poll_interval)  # TODO: remove poll if delayed
-            if self.stopped:
-                break
+    async def _run(self):
+        filenames = set(glob(self.path))
+        new = filenames - self.seen
+        for fn in sorted(new):
+            self.seen.add(fn)
+            await asyncio.gather(*self._emit(fn))
+        await asyncio.sleep(self.poll_interval)  # TODO: remove poll if delayed
 
 
 @Stream.register_api(staticmethod)
@@ -191,41 +233,30 @@ class from_tcp(Source):
 
     >>> source = Source.from_tcp(4567)  # doctest: +SKIP
     """
-    def __init__(self, port, delimiter=b'\n', start=False,
-                 server_kwargs=None):
-        super(from_tcp, self).__init__(ensure_io_loop=True)
-        self.stopped = True
+    def __init__(self, port, delimiter=b'\n', server_kwargs=None, **kwargs):
         self.server_kwargs = server_kwargs or {}
         self.port = port
         self.server = None
         self.delimiter = delimiter
-        if start:  # pragma: no cover
-            self.start()
+        super().__init__(**kwargs)
 
-    @gen.coroutine
-    def _start_server(self):
+    def run(self):
         from tornado.tcpserver import TCPServer
         from tornado.iostream import StreamClosedError
 
         class EmitServer(TCPServer):
             source = self
 
-            @gen.coroutine
-            def handle_stream(self, stream, address):
-                while True:
+            async def handle_stream(self, stream, address):
+                while not self.source.stopped:
                     try:
-                        data = yield stream.read_until(self.source.delimiter)
-                        yield self.source._emit(data)
+                        data = await stream.read_until(self.source.delimiter)
+                        await self.source._emit(data)
                     except StreamClosedError:
                         break
 
         self.server = EmitServer(**self.server_kwargs)
         self.server.listen(self.port)
-
-    def start(self):
-        if self.stopped:
-            self.loop.add_callback(self._start_server)
-            self.stopped = False
 
     def stop(self):
         if not self.stopped:
@@ -260,26 +291,22 @@ class from_http_server(Source):
 
     """
 
-    def __init__(self, port, path='/.*', start=False, server_kwargs=None):
+    def __init__(self, port, path='/.*', server_kwargs=None, **kwargs):
         self.port = port
         self.path = path
         self.server_kwargs = server_kwargs or {}
-        super(from_http_server, self).__init__(ensure_io_loop=True)
-        self.stopped = True
         self.server = None
-        if start:  # pragma: no cover
-            self.start()
+        super().__init__(**kwargs)
 
-    def _start_server(self):
+    def run(self):
         from tornado.web import Application, RequestHandler
         from tornado.httpserver import HTTPServer
 
         class Handler(RequestHandler):
             source = self
 
-            @gen.coroutine
-            def post(self):
-                yield self.source._emit(self.request.body)
+            async def post(self):
+                await asyncio.gather(*self.source._emit(self.request.body))
                 self.write('OK')
 
         application = Application([
@@ -287,12 +314,6 @@ class from_http_server(Source):
         ])
         self.server = HTTPServer(application, **self.server_kwargs)
         self.server.listen(self.port)
-
-    def start(self):
-        """Start HTTP server and listen"""
-        if self.stopped:
-            self.loop.add_callback(self._start_server)
-            self.stopped = False
 
     def stop(self):
         """Shutdown HTTP server"""
@@ -325,46 +346,40 @@ class from_process(Source):
     >>> source = Source.from_process(['ping', 'localhost'])  # doctest: +SKIP
     """
 
-    def __init__(self, cmd, open_kwargs=None, with_stderr=False, start=False):
+    def __init__(self, cmd, open_kwargs=None, with_stderr=False, with_end=True,
+                 **kwargs):
         self.cmd = cmd
         self.open_kwargs = open_kwargs or {}
         self.with_stderr = with_stderr
-        super(from_process, self).__init__(ensure_io_loop=True)
-        self.stopped = True
+        self.with_end = with_end
         self.process = None
-        if start:  # pragma: no cover
-            self.start()
+        super().__init__(**kwargs)
 
-    @gen.coroutine
-    def _start_process(self):
-        # should be done in asyncio (py3 only)? Apparently can handle Windows
-        # with appropriate config.
-        from tornado.process import Subprocess
-        from tornado.iostream import StreamClosedError
+    async def run(self):
+        import shlex
         import subprocess
-        stderr = subprocess.STDOUT if self.with_stderr else subprocess.PIPE
-        process = Subprocess(self.cmd, stdout=Subprocess.STREAM,
-                             stderr=stderr, **self.open_kwargs)
+        stderr = subprocess.STDOUT if self.with_stderr else None
+        if isinstance(self.cmd, (list, tuple)):
+            cmd, *args = self.cmd
+        else:
+            cmd, *args = shlex.split(self.cmd)
+        process = await asyncio.create_subprocess_exec(
+            cmd, *args, stdout=subprocess.PIPE,
+            stderr=stderr, **self.open_kwargs)
         while not self.stopped:
             try:
-                out = yield process.stdout.read_until(b'\n')
-            except StreamClosedError:
-                # process exited
-                break
-            yield self._emit(out)
-        yield process.stdout.close()
-        process.proc.terminate()
-
-    def start(self):
-        """Start external process"""
-        if self.stopped:
-            self.loop.add_callback(self._start_process)
-            self.stopped = False
-
-    def stop(self):
-        """Shutdown external process"""
-        if not self.stopped:
-            self.stopped = True
+                out = await process.stdout.readuntil(b'\n')
+            except asyncio.IncompleteReadError as err:
+                if self.with_end and err.partial:
+                    out = err.partial
+                else:
+                    break
+            if process.returncode is not None:
+                self.stopped = True
+            await asyncio.gather(*self._emit(out))
+        if process.returncode is not None:
+            process.terminate()
+            await process.wait()
 
 
 @Stream.register_api(staticmethod)
@@ -401,15 +416,12 @@ class from_kafka(Source):
     ...            'group.id': 'streamz'})  # doctest: +SKIP
 
     """
-    def __init__(self, topics, consumer_params, poll_interval=0.1, start=False, **kwargs):
+    def __init__(self, topics, consumer_params, poll_interval=0.1, **kwargs):
         self.cpars = consumer_params
         self.consumer = None
         self.topics = topics
         self.poll_interval = poll_interval
-        super(from_kafka, self).__init__(ensure_io_loop=True, **kwargs)
-        self.stopped = True
-        if start:
-            self.start()
+        super().__init__(**kwargs)
 
     def do_poll(self):
         if self.consumer is not None:
@@ -435,6 +447,7 @@ class from_kafka(Source):
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
             self.consumer.subscribe(self.topics)
+            weakref.finalize(self, self.consumer.close)
             tp = ck.TopicPartition(self.topics[0], 0, 0)
 
             # blocks for consumer thread to come up
@@ -450,7 +463,7 @@ class from_kafka(Source):
         self.stopped = True
 
 
-class FromKafkaBatched(Stream):
+class FromKafkaBatched(Source):
     """Base class for both local and cluster-based batched kafka processing"""
     def __init__(self, topic, consumer_params, poll_interval='1s',
                  npartitions=None, refresh_partitions=False,
@@ -470,10 +483,9 @@ class FromKafkaBatched(Stream):
         self.max_batch_size = max_batch_size
         self.keys = keys
         self.engine = engine
-        self.stopped = True
         self.started = False
 
-        super(FromKafkaBatched, self).__init__(ensure_io_loop=True, **kwargs)
+        super().__init__(**kwargs)
 
     @gen.coroutine
     def poll_kafka(self):
@@ -486,7 +498,7 @@ class FromKafkaBatched(Stream):
 
         @gen.coroutine
         def checkpoint_emit(_part):
-            ref = RefCounter(cb=lambda: commit(_part))
+            ref = RefCounter(cb=lambda: commit(_part), loop=self.loop)
             yield self._emit(_part, metadata=[{'ref': ref}])
 
         if self.npartitions is None:
@@ -511,50 +523,46 @@ class FromKafkaBatched(Stream):
                     self.positions[tp.partition] = tp.offset
                 break
 
-        try:
-            while not self.stopped:
-                out = []
+        while not self.stopped:
+            out = []
 
-                if self.refresh_partitions:
-                    kafka_cluster_metadata = self.consumer.list_topics(self.topic)
-                    if self.engine == "cudf":  # pragma: no cover
-                        new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
-                    else:
-                        new_partitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
-                    if new_partitions > self.npartitions:
-                        self.positions.extend([-1001] * (new_partitions - self.npartitions))
-                        self.npartitions = new_partitions
-
-                for partition in range(self.npartitions):
-                    tp = ck.TopicPartition(self.topic, partition, 0)
-                    try:
-                        low, high = self.consumer.get_watermark_offsets(
-                            tp, timeout=0.1)
-                    except (RuntimeError, ck.KafkaException):
-                        continue
-                    self.started = True
-                    if 'auto.offset.reset' in self.consumer_params.keys():
-                        if self.consumer_params['auto.offset.reset'] == 'latest' and \
-                                self.positions[partition] == -1001:
-                            self.positions[partition] = high
-                    current_position = self.positions[partition]
-                    lowest = max(current_position, low)
-                    if high > lowest + self.max_batch_size:
-                        high = lowest + self.max_batch_size
-                    if high > lowest:
-                        out.append((self.consumer_params, self.topic, partition,
-                                    self.keys, lowest, high - 1))
-                        self.positions[partition] = high
-                self.consumer_params['auto.offset.reset'] = 'earliest'
-
-                for part in out:
-                    yield self.loop.add_callback(checkpoint_emit, part)
-
+            if self.refresh_partitions:
+                kafka_cluster_metadata = self.consumer.list_topics(self.topic)
+                if self.engine == "cudf":  # pragma: no cover
+                    new_partitions = len(kafka_cluster_metadata[self.topic.encode('utf-8')])
                 else:
-                    yield gen.sleep(self.poll_interval)
-        finally:
-            self.consumer.unsubscribe()
-            self.consumer.close()
+                    new_partitions = len(kafka_cluster_metadata.topics[self.topic].partitions)
+                if new_partitions > self.npartitions:
+                    self.positions.extend([-1001] * (new_partitions - self.npartitions))
+                    self.npartitions = new_partitions
+
+            for partition in range(self.npartitions):
+                tp = ck.TopicPartition(self.topic, partition, 0)
+                try:
+                    low, high = self.consumer.get_watermark_offsets(
+                        tp, timeout=0.1)
+                except (RuntimeError, ck.KafkaException):
+                    continue
+                self.started = True
+                if 'auto.offset.reset' in self.consumer_params.keys():
+                    if self.consumer_params['auto.offset.reset'] == 'latest' and \
+                            self.positions[partition] == -1001:
+                        self.positions[partition] = high
+                current_position = self.positions[partition]
+                lowest = max(current_position, low)
+                if high > lowest + self.max_batch_size:
+                    high = lowest + self.max_batch_size
+                if high > lowest:
+                    out.append((self.consumer_params, self.topic, partition,
+                                self.keys, lowest, high - 1))
+                    self.positions[partition] = high
+            self.consumer_params['auto.offset.reset'] = 'earliest'
+
+            for part in out:
+                yield self.loop.add_callback(checkpoint_emit, part)
+
+            else:
+                yield gen.sleep(self.poll_interval)
 
     def start(self):
         import confluent_kafka as ck
@@ -562,10 +570,11 @@ class FromKafkaBatched(Stream):
             from custreamz import kafka
 
         if self.stopped:
-            if self.engine == "cudf": # pragma: no cover
+            if self.engine == "cudf":  # pragma: no cover
                 self.consumer = kafka.Consumer(self.consumer_params)
             else:
                 self.consumer = ck.Consumer(self.consumer_params)
+            weakref.finalize(self, self.consumer.close)
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
@@ -753,17 +762,12 @@ class from_iterable(Source):
     """
 
     def __init__(self, iterable, **kwargs):
-        super().__init__(ensure_io_loop=True, **kwargs)
         self._iterable = iterable
+        super().__init__(**kwargs)
 
-    def start(self):
-        self.stopped = False
-        self.loop.add_callback(self._run)
-
-    @gen.coroutine
-    def _run(self):
+    async def run(self):
         for x in self._iterable:
             if self.stopped:
                 break
-            yield self._emit(x)
+            await asyncio.gather(*self._emit(x))
         self.stopped = True
