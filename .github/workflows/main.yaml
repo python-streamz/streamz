@@ -14,6 +14,9 @@ jobs:
       fail-fast: false
       matrix:
         CONDA_ENV: [py37, py38]
+    env:
+      STREAMZ_LAUNCH_KAFKA: true
+
     steps:
       - name: APT
         run: sudo apt-get install liblzo2-dev libsnappy-dev
@@ -29,6 +32,7 @@ jobs:
           activate-environment: test_env
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
+
       - name: pip-install
         shell: bash -l {0}
         run: |
@@ -38,6 +42,11 @@ jobs:
         shell: bash -l {0}
         run: |
           pytest --verbose --cov=streamz
+
+      - name: coveralls
+         shell: bash -l {0}
+         if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == '3.8' }}
+         run: coveralls
 
   lint:
     name: lint
@@ -52,4 +61,4 @@ jobs:
       - name: Lint
         shell: bash -l {0}
         run: |
-          flake8 fsspec
+          flake8 streamz
