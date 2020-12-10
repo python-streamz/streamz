@@ -1,6 +1,6 @@
 [run]
-source = 
-    streamz
+source = streamz
+relative_files = True
 [report]
 omit =
     */python?.?/*

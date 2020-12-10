@@ -1,10 +1,9 @@
-name: streamz_dev
+name: test_env
 channels:
   - conda-forge
-  - bokeh
   - defaults
 dependencies:
-  - python>=3.7
+  - python=3.7
   - pytest
   - flake8
   - black
@@ -31,3 +30,4 @@ dependencies:
   - ipykernel
   - ipywidgets
   - flaky
+  - pytest-cov
