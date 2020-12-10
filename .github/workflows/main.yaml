@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: "*"
+  pull_request:
+    branches: master
+
+jobs:
+  test:
+    name: ${{ matrix.CONDA_ENV }}-pytest
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        CONDA_ENV: [py37, py38]
+    env:
+      STREAMZ_LAUNCH_KAFKA: true
+
+    steps:
+      - name: APT
+        run: sudo apt-get install liblzo2-dev libsnappy-dev
+
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          auto-activate-base: false
+          activate-environment: test_env
+          environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
+
+
+      - name: pip-install
+        shell: bash -l {0}
+        run: |
+          pip install -e . --no-deps
+
+      - name: Run Tests
+        shell: bash -l {0}
+        run: |
+          pytest --verbose --cov=streamz
+
+      - name: coveralls
+        shell: bash -l {0}
+        if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == 'py38' }}
+        run: coveralls
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - name: pip-install
+        shell: bash -l {0}
+        run: |
+          pip install flake8
+      - name: Lint
+        shell: bash -l {0}
+        run: |
+          flake8 streamz
