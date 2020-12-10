@@ -13,8 +13,8 @@ def test_periodic():
     l = s.sink_to_list()
     assert s.stopped
     s.start()
-    wait_for(lambda: l, 0.11, period=0.01)
-    wait_for(lambda: len(l) > 1, 0.11, period=0.01)
+    wait_for(lambda: l, 0.3, period=0.01)
+    wait_for(lambda: len(l) > 1, 0.3, period=0.01)
     assert all(l)
 
 
