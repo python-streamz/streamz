@@ -91,6 +91,7 @@ def test_partition_then_scatter_sync(loop):
             assert L == [1, 2, 3]
 
 
+@gen_cluster(client=True)
 def test_non_unique_emit(c, s, a, b):
     """Regression for https://github.com/python-streamz/streams/issues/397
 
@@ -191,7 +192,7 @@ def test_sync_2(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
+@gen_cluster(client=True, nthreads=[('127.0.0.1', 1)] * 2)
 def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
     L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()

@@ -23,7 +23,7 @@ except ImportError:
 
 try:
     from distributed.client import default_client as _dask_default_client
-except ImportError:
+except ImportError:  # pragma: no cover
     _dask_default_client = None
 
 from collections.abc import Iterable
@@ -356,8 +356,6 @@ class Stream(object):
                     s = str(at)
                 elif hasattr(at, '__name__'):
                     s = getattr(self, m).__name__
-                elif hasattr(at.__class__, '__name__'):
-                    s = getattr(self, m).__class__.__name__
                 else:
                     s = None
             if s:
