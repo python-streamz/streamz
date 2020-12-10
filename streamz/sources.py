@@ -312,8 +312,9 @@ class from_http_server(Source):
         application = Application([
             (self.path, Handler),
         ])
-        self.server = HTTPServer(application, **self.server_kwargs)
-        self.server.listen(self.port)
+        server = HTTPServer(application, **self.server_kwargs)
+        server.listen(self.port)
+        self.server = server
 
     def stop(self):
         """Shutdown HTTP server"""
@@ -447,7 +448,7 @@ class from_kafka(Source):
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
             self.consumer.subscribe(self.topics)
-            weakref.finalize(self, self.consumer.close)
+            weakref.finalize(self, lambda consumer=self.consumer: _close_consumer(consumer))
             tp = ck.TopicPartition(self.topics[0], 0, 0)
 
             # blocks for consumer thread to come up
@@ -461,6 +462,13 @@ class from_kafka(Source):
             consumer.unsubscribe()
             consumer.close()
         self.stopped = True
+
+
+def _close_consumer(consumer):
+    try:
+        consumer.close()
+    except RuntimeError:
+        pass
 
 
 class FromKafkaBatched(Source):
@@ -574,7 +582,7 @@ class FromKafkaBatched(Source):
                 self.consumer = kafka.Consumer(self.consumer_params)
             else:
                 self.consumer = ck.Consumer(self.consumer_params)
-            weakref.finalize(self, self.consumer.close)
+            weakref.finalize(self, lambda consumer=self.consumer: _close_consumer(consumer))
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
