@@ -45,7 +45,7 @@ jobs:
 
       - name: coveralls
         shell: bash -l {0}
-        if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == '3.8' }}
+        if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == 'py38' }}
         run: coveralls
 
   lint:
