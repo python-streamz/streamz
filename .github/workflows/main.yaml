@@ -44,9 +44,9 @@ jobs:
           pytest --verbose --cov=streamz
 
       - name: coveralls
-         shell: bash -l {0}
-         if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == '3.8' }}
-         run: coveralls
+        shell: bash -l {0}
+        if: ${{ matrix.os == 'ubuntu-latest' &&  matrix.CONDA_ENV == '3.8' }}
+        run: coveralls
 
   lint:
     name: lint
