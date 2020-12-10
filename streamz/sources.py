@@ -312,8 +312,9 @@ class from_http_server(Source):
         application = Application([
             (self.path, Handler),
         ])
-        self.server = HTTPServer(application, **self.server_kwargs)
-        self.server.listen(self.port)
+        server = HTTPServer(application, **self.server_kwargs)
+        server.listen(self.port)
+        self.server = server
 
     def stop(self):
         """Shutdown HTTP server"""
