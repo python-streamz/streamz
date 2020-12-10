@@ -8,7 +8,7 @@ pytest.importorskip('dask.distributed')
 from tornado import gen
 
 from streamz.dask import scatter
-from streamz import Stream
+from streamz import RefCounter, Stream
 
 from distributed import Future, Client
 from distributed.utils import sync
@@ -49,6 +49,46 @@ def test_map_on_dict(c, s, a, b):
     for i, item in enumerate(sorted(L, key=lambda x: x["x"])):
         assert item["x"] == i
         assert item["i"] == i
+
+
+@gen_cluster(client=True)
+def test_partition_then_scatter_async(c, s, a, b):
+    # Ensure partition w/ timeout before scatter works correctly for
+    # asynchronous
+    start = time.monotonic()
+    source = Stream(asynchronous=True)
+
+    L = source.partition(2, timeout=.1).scatter().map(
+            lambda x: [xx+1 for xx in x]).buffer(2).gather().flatten().sink_to_list()
+
+    rc = RefCounter(loop=source.loop)
+    for i in range(3):
+        yield source.emit(i, metadata=[{'ref': rc}])
+
+    while rc.count != 0 and time.monotonic() - start < 1.:
+        yield gen.sleep(1e-2)
+
+    assert L == [1, 2, 3]
+
+
+def test_partition_then_scatter_sync(loop):
+    # Ensure partition w/ timeout before scatter works correctly for synchronous
+    with cluster() as (s, [a, b]):
+        with Client(s['address'], loop=loop) as client:  # noqa: F841
+            start = time.monotonic()
+            source = Stream()
+            L = source.partition(2, timeout=.1).scatter().map(
+                    lambda x: [xx+1 for xx in x]).gather().flatten().sink_to_list()
+            assert source.loop is client.loop
+
+            rc = RefCounter()
+            for i in range(3):
+                source.emit(i, metadata=[{'ref': rc}])
+
+            while rc.count != 0 and time.monotonic() - start < 2.:
+                time.sleep(1e-2)
+
+            assert L == [1, 2, 3]
 
 
 @gen_cluster(client=True)
@@ -123,7 +163,6 @@ def test_accumulate(c, s, a, b):
     assert L[-1][1] == 3
 
 
-@pytest.mark.slow
 def test_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841
@@ -140,7 +179,6 @@ def test_sync(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow
 def test_sync_2(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop):  # noqa: F841
@@ -154,8 +192,7 @@ def test_sync_2(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.slow
-@gen_cluster(client=True, ncores=[('127.0.0.1', 1)] * 2)
+@gen_cluster(client=True, nthreads=[('127.0.0.1', 1)] * 2)
 def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
     L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()
@@ -181,7 +218,6 @@ def test_buffer(c, s, a, b):
     assert source.loop == c.loop
 
 
-@pytest.mark.slow
 def test_buffer_sync(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as c:  # noqa: F841
@@ -206,7 +242,6 @@ def test_buffer_sync(loop):  # noqa: F811
 
 
 @pytest.mark.xfail(reason='')
-@pytest.mark.slow
 def test_stream_shares_client_loop(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841

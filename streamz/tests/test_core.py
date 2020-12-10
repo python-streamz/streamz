@@ -403,10 +403,11 @@ def test_timed_window():
 
 @gen_test()
 def test_timed_window_ref_counts():
-    source = Stream()
+    source = Stream(asynchronous=True)
     _ = source.timed_window(0.01)
 
     ref1 = RefCounter()
+    assert str(ref1) == "<RefCounter count=0>"
     source.emit(1, metadata=[{'ref': ref1}])
     assert ref1.count == 1
     yield gen.sleep(0.05)
@@ -415,6 +416,13 @@ def test_timed_window_ref_counts():
     source.emit(2, metadata=[{'ref': ref2}])
     assert ref1.count == 0
     assert ref2.count == 1
+
+
+def test_mixed_async():
+    s1 = Stream(asynchronous=False)
+    with pytest.raises(ValueError):
+        Stream(asynchronous=True, upstream=s1)
+
 
 
 @gen_test()

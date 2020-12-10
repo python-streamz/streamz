@@ -11,7 +11,7 @@ import pandas as pd
 from tornado import gen
 
 from streamz import Stream
-from streamz.utils_test import gen_test
+from streamz.utils_test import gen_test, wait_for
 from streamz.dataframe import DataFrame, Series, DataFrames, Aggregation
 import streamz.dataframe as sd
 from streamz.dask import DaskStream
@@ -230,6 +230,8 @@ def test_index(stream):
 
     a.emit(df)
     a.emit(df)
+
+    wait_for(lambda: len(L) > 1, timeout=2, period=0.05)
 
     assert_eq(L[0], df.index + 5)
     assert_eq(L[1], df.index + 5)
