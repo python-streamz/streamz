@@ -344,7 +344,8 @@ class DataFrame(Frame, _DataFrameMixin):
     @property
     def plot(self):
         try:
-            import hvplot.streamz
+            # import has side-effect of attaching .hvplot attribute
+            import hvplot.streamz  # # noqa: F401
         except ImportError as err:  # pragma: no cover
             raise ImportError("Streamz dataframe plotting requires hvplot") from err
         return self.hvplot
