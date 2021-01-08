@@ -326,6 +326,10 @@ class DataFrame(Frame, _DataFrameMixin):
                 example = kwargs.get('example')
             elif len(args) > 1:
                 example = args[1]
+            if callable(example):
+                example = example()
+                kwargs["example"] = example
+
             self._subtype = get_base_frame_type(self.__class__.__name__,
                                                 is_dataframe_like, example)
             super(DataFrame, self).__init__(*args, **kwargs)
@@ -336,6 +340,14 @@ class DataFrame(Frame, _DataFrameMixin):
         if list(x.columns) != list(self.example.columns):
             raise IndexError("Input expected to have columns %s, got %s" %
                              (self.example.columns, x.columns))
+
+    @property
+    def plot(self):
+        try:
+            import hvplot.streamz
+        except ImportError as err:  # pragma: no cover
+            raise ImportError("Streamz dataframe plotting requires hvplot") from err
+        return self.hvplot
 
 
 class _SeriesMixin(object):

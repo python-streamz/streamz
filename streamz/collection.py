@@ -232,6 +232,12 @@ class Streaming(OperatorMixin, core.APIRegisterMixin):
     def current_value(self):
         return self.stream.current_value
 
+    def start(self):
+        self.stream.start()
+
+    def stop(self):
+        self.stream.stop()
+
     def _ipython_display_(self, **kwargs):
         return self.stream.latest().rate_limit(
             0.5).gather()._ipython_display_(**kwargs)
