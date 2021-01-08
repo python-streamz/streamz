@@ -1,11 +1,11 @@
-from __future__ import division, print_function
+import asyncio
 
 import operator
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
 import toolz
-from tornado.ioloop import IOLoop
+
 from tornado import gen
 
 from ..collection import Streaming, _stream_types, OperatorMixin
@@ -801,8 +801,10 @@ class WindowedGroupBy(GroupBy):
         return Streaming(outstream, example, stream_type=stream_type)
 
 
-def random_datapoint(now, **kwargs):
+def random_datapoint(now=None, **kwargs):
     """Example of querying a single current value"""
+    if now is None:
+        now = pd.Timestamp.now()
     return pd.DataFrame(
         {'a': np.random.random(1)}, index=[now])
 
@@ -838,6 +840,7 @@ def random_datablock(last, now, **kwargs):
     return df
 
 
+@DataFrame.register_api(staticmethod, "from_periodic")
 class PeriodicDataFrame(DataFrame):
     """A streaming dataframe using the asyncio ioloop to poll a callback fn
 
@@ -863,26 +866,31 @@ class PeriodicDataFrame(DataFrame):
     >>> df = PeriodicDataFrame(interval='1s', datafn=random_datapoint)  # doctest: +SKIP
     """
 
-    def __init__(self, datafn=random_datablock, interval='500ms', dask=False, **kwargs):
+    def __init__(self, datafn=random_datablock, interval='500ms', dask=False,
+                 start=True, **kwargs):
         if dask:
             from streamz.dask import DaskStream
             source = DaskStream()
-            loop = source.loop
         else:
             source = Source()
-            loop = IOLoop.current()
+        self.loop = source.loop
         self.interval = pd.Timedelta(interval).total_seconds()
         self.source = source
         self.continue_ = [True]
         self.kwargs = kwargs
 
-        stream = self.source.map(lambda x: datafn(**x, **kwargs))
+        stream = self.source.map(
+            lambda x, continue_=self.continue_: datafn(continue_=continue_, **x, **kwargs)
+        )
         example = datafn(last=pd.Timestamp.now(), now=pd.Timestamp.now(), **kwargs)
 
         super(PeriodicDataFrame, self).__init__(stream, example)
+        if start:
+            self.start()
 
-        loop.add_callback(self._cb, self.interval, self.source,
-                          self.continue_)
+    def start(self):
+        self.loop.add_callback(self._cb, self.interval, self.source,
+                               self.continue_)
 
     def __del__(self):
         self.stop()
@@ -891,16 +899,16 @@ class PeriodicDataFrame(DataFrame):
         self.continue_[0] = False
 
     @staticmethod
-    @gen.coroutine
-    def _cb(interval, source, continue_):
+    async def _cb(interval, source, continue_):
         last = pd.Timestamp.now()
         while continue_[0]:
-            yield gen.sleep(interval)
+            await gen.sleep(interval)
             now = pd.Timestamp.now()
-            yield source._emit(dict(last=last, now=now))
+            await asyncio.gather(*source._emit(dict(last=last, now=now)))
             last = now
 
 
+@DataFrame.register_api(staticmethod, "random")
 class Random(PeriodicDataFrame):
     """PeriodicDataFrame providing random values by default
 
