@@ -876,7 +876,7 @@ class PeriodicDataFrame(DataFrame):
         self.loop = source.loop
         self.interval = pd.Timedelta(interval).total_seconds()
         self.source = source
-        self.continue_ = [True]
+        self.continue_ = [False]  # like the oppose of self.stopped
         self.kwargs = kwargs
 
         stream = self.source.map(
@@ -889,8 +889,10 @@ class PeriodicDataFrame(DataFrame):
             self.start()
 
     def start(self):
-        self.loop.add_callback(self._cb, self.interval, self.source,
-                               self.continue_)
+        if not self.continue_[0]:
+            self.continue_[0] = True
+            self.loop.add_callback(self._cb, self.interval, self.source,
+                                   self.continue_)
 
     def __del__(self):
         self.stop()
@@ -924,8 +926,9 @@ class Random(PeriodicDataFrame):
     """
 
     def __init__(self, freq='100ms', interval='500ms', dask=False,
-                 datafn=random_datablock):
-        super(Random, self).__init__(datafn, interval, dask, freq=pd.Timedelta(freq))
+                 start=True, datafn=random_datablock):
+        super(Random, self).__init__(datafn, interval, dask, start,
+                                     freq=pd.Timedelta(freq))
 
 
 _stream_types['streaming'].append((is_dataframe_like, DataFrame))

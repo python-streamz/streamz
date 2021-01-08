@@ -560,13 +560,6 @@ class Stream(APIRegisterMixin):
         """ Only pass through elements for which the predicate returns False """
         return self.filter(lambda x: not predicate(x))
 
-    def stop(self):
-        """Call on any stream node to halt all upstream sources"""
-        prev, s = self.upstream, self
-        while s:
-            prev, s = s, s.upstream
-        prev.stopped = True
-
     @property
     def scan(self):
         return self.accumulate
