@@ -232,18 +232,12 @@ class Streaming(OperatorMixin, core.APIRegisterMixin):
     def current_value(self):
         return self.stream.current_value
 
-    @current_value.setter
-    def current_value(self, *args, **kwargs):
-        # this actually happens in self.stream - Streaming.emit is ignored
-        pass
-
     def _ipython_display_(self, **kwargs):
         return self.stream.latest().rate_limit(
             0.5).gather()._ipython_display_(**kwargs)
 
     def emit(self, x):
         self.verify(x)
-        self.current_value = x
         self.stream.emit(x)
 
     def verify(self, x):
