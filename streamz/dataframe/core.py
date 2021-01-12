@@ -892,9 +892,7 @@ class PeriodicDataFrame(DataFrame):
         self.continue_ = [False]  # like the oppose of self.stopped
         self.kwargs = kwargs
 
-        stream = self.source.map(
-            lambda x, continue_=self.continue_: datafn(continue_=continue_, **x, **kwargs)
-        )
+        stream = self.source.map(lambda x: datafn(**x, **kwargs))
         example = datafn(last=pd.Timestamp.now(), now=pd.Timestamp.now(), **kwargs)
 
         super(PeriodicDataFrame, self).__init__(stream, example)
