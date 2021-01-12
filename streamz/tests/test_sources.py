@@ -141,10 +141,10 @@ def test_from_iterable():
 def test_from_iterable_backpressure():
     it = iter(range(5))
     source = Source.from_iterable(it)
-    L = source.rate_limit(0.01).sink_to_list()
+    L = source.rate_limit(0.1).sink_to_list()
     source.start()
 
-    wait_for(lambda: L == [0], 1)
+    wait_for(lambda: L == [0], 1, period=0.01)
     assert next(it) == 2  # 1 is in blocked _emit
 
 

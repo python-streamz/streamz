@@ -557,7 +557,6 @@ def test_gc():
     a = DataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
     n = len(sdf.stream.downstreams)
-    yield gen.sleep(0.1)
     a = DataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
     yield gen.sleep(0.1)
@@ -566,6 +565,7 @@ def test_gc():
     yield gen.sleep(0.1)
     a = DataFrame({'volatility': sdf.x.rolling('100ms').var(),
                             'sub': sdf.x - sdf.x.rolling('100ms').mean()})
+    yield gen.sleep(0.1)
 
     assert len(sdf.stream.downstreams) == n
     del a

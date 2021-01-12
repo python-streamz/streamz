@@ -152,7 +152,7 @@ class OperatorMixin(object):
         return self.map_partitions(operator.xor, other, self)
 
 
-class Streaming(OperatorMixin):
+class Streaming(OperatorMixin, core.APIRegisterMixin):
     """
     Superclass for streaming collections
 
@@ -227,6 +227,16 @@ class Streaming(OperatorMixin):
             body = repr(example)
 
         return "<h5>%s - elements like<h5>\n%s" % (type(self).__name__, body)
+
+    @property
+    def current_value(self):
+        return self.stream.current_value
+
+    def start(self):
+        self.stream.start()
+
+    def stop(self):
+        self.stream.stop()
 
     def _ipython_display_(self, **kwargs):
         return self.stream.latest().rate_limit(

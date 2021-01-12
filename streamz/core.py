@@ -122,7 +122,79 @@ class RefCounter:
     __repr__ = __str__
 
 
-class Stream(object):
+class APIRegisterMixin(object):
+
+    @classmethod
+    def register_api(cls, modifier=identity, attribute_name=None):
+        """ Add callable to Stream API
+
+        This allows you to register a new method onto this class.  You can use
+        it as a decorator.::
+
+            >>> @Stream.register_api()
+            ... class foo(Stream):
+            ...     ...
+
+            >>> Stream().foo(...)  # this works now
+
+        It attaches the callable as a normal attribute to the class object.  In
+        doing so it respects inheritance (all subclasses of Stream will also
+        get the foo attribute).
+
+        By default callables are assumed to be instance methods.  If you like
+        you can include modifiers to apply before attaching to the class as in
+        the following case where we construct a ``staticmethod``.
+
+            >>> @Stream.register_api(staticmethod)
+            ... class foo(Stream):
+            ...     ...
+
+            >>> Stream.foo(...)  # Foo operates as a static method
+
+        You can also provide an optional ``attribute_name`` argument to control
+        the name of the attribute your callable will be attached as.
+
+            >>> @Stream.register_api(attribute_name="bar")
+            ... class foo(Stream):
+            ...     ...
+
+            >> Stream().bar(...)  # foo was actually attached as bar
+        """
+        def _(func):
+            @functools.wraps(func)
+            def wrapped(*args, **kwargs):
+                return func(*args, **kwargs)
+            name = attribute_name if attribute_name else func.__name__
+            setattr(cls, name, modifier(wrapped))
+            return func
+        return _
+
+    @classmethod
+    def register_plugin_entry_point(cls, entry_point, modifier=identity):
+        if hasattr(cls, entry_point.name):
+            raise ValueError(
+                f"Can't add {entry_point.name} from {entry_point.module_name} "
+                f"to {cls.__name__}: duplicate method name."
+            )
+
+        def stub(*args, **kwargs):
+            """ Entrypoints-based streamz plugin. Will be loaded on first call. """
+            node = entry_point.load()
+            if not issubclass(node, Stream):
+                raise TypeError(
+                    f"Error loading {entry_point.name} "
+                    f"from module {entry_point.module_name}: "
+                    f"{node.__class__.__name__} must be a subclass of Stream"
+                )
+            if getattr(cls, entry_point.name).__name__ == "stub":
+                cls.register_api(
+                    modifier=modifier, attribute_name=entry_point.name
+                )(node)
+            return node(*args, **kwargs)
+        cls.register_api(modifier=modifier, attribute_name=entry_point.name)(stub)
+
+
+class Stream(APIRegisterMixin):
     """ A Stream is an infinite sequence of data.
 
     Streams subscribe to each other passing and transforming data between them.
@@ -179,6 +251,8 @@ class Stream(object):
                  loop=None, asynchronous=None, ensure_io_loop=False):
         self.name = stream_name
         self.downstreams = OrderedWeakrefSet()
+        self.current_value = None
+        self.current_metadata = None
         if upstreams is not None:
             self.upstreams = list(upstreams)
         elif upstream is not None:
@@ -267,79 +341,15 @@ class Stream(object):
         classes which handle stream specific buffers/caches"""
         self.upstreams.remove(upstream)
 
-    @classmethod
-    def register_api(cls, modifier=identity, attribute_name=None):
-        """ Add callable to Stream API
-
-        This allows you to register a new method onto this class.  You can use
-        it as a decorator.::
-
-            >>> @Stream.register_api()
-            ... class foo(Stream):
-            ...     ...
-
-            >>> Stream().foo(...)  # this works now
-
-        It attaches the callable as a normal attribute to the class object.  In
-        doing so it respects inheritance (all subclasses of Stream will also
-        get the foo attribute).
-
-        By default callables are assumed to be instance methods.  If you like
-        you can include modifiers to apply before attaching to the class as in
-        the following case where we construct a ``staticmethod``.
-
-            >>> @Stream.register_api(staticmethod)
-            ... class foo(Stream):
-            ...     ...
-
-            >>> Stream.foo(...)  # Foo operates as a static method
-
-        You can also provide an optional ``attribute_name`` argument to control
-        the name of the attribute your callable will be attached as.
-
-            >>> @Stream.register_api(attribute_name="bar")
-            ... class foo(Stream):
-            ...     ...
-
-            >> Stream().bar(...)  # foo was actually attached as bar
-        """
-        def _(func):
-            @functools.wraps(func)
-            def wrapped(*args, **kwargs):
-                return func(*args, **kwargs)
-            name = attribute_name if attribute_name else func.__name__
-            setattr(cls, name, modifier(wrapped))
-            return func
-        return _
-
-    @classmethod
-    def register_plugin_entry_point(cls, entry_point, modifier=identity):
-        if hasattr(cls, entry_point.name):
-            raise ValueError(
-                f"Can't add {entry_point.name} from {entry_point.module_name} "
-                f"to {cls.__name__}: duplicate method name."
-            )
-
-        def stub(*args, **kwargs):
-            """ Entrypoints-based streamz plugin. Will be loaded on first call. """
-            node = entry_point.load()
-            if not issubclass(node, Stream):
-                raise TypeError(
-                    f"Error loading {entry_point.name} "
-                    f"from module {entry_point.module_name}: "
-                    f"{node.__class__.__name__} must be a subclass of Stream"
-                )
-            if getattr(cls, entry_point.name).__name__ == "stub":
-                cls.register_api(
-                    modifier=modifier, attribute_name=entry_point.name
-                )(node)
-            return node(*args, **kwargs)
-        cls.register_api(modifier=modifier, attribute_name=entry_point.name)(stub)
-
     def start(self):
         """ Start any upstream sources """
         for upstream in self.upstreams:
             upstream.start()
+
+    def stop(self):
+        """ Stop upstream sources """
+        for upstream in self.upstreams:
+            upstream.stop()
 
     def __str__(self):
         s_list = []
@@ -430,6 +440,8 @@ class Stream(object):
             A reference counter used to check when data is done
 
         """
+        self.current_value = x
+        self.current_metadata = metadata
         if metadata:
             self._retain_refs(metadata, len(self.downstreams))
         else:
@@ -547,13 +559,6 @@ class Stream(object):
     def remove(self, predicate):
         """ Only pass through elements for which the predicate returns False """
         return self.filter(lambda x: not predicate(x))
-
-    def stop(self):
-        """Call on any stream node to halt all upstream sources"""
-        prev, s = self.upstream, self
-        while s:
-            prev, s = s, s.upstream
-        prev.stopped = True
 
     @property
     def scan(self):
