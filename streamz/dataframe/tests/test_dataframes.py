@@ -344,6 +344,24 @@ def test_repr_html(stream):
         assert '1' in html
 
 
+def test_display(monkeypatch, capsys):
+    pytest.importorskip("ipywidgets")
+    import ipywidgets
+    df = pd.DataFrame({'x': (np.arange(10) // 2).astype(float), 'y': [1.0] * 10})
+    a = DataFrame(example=df, stream=stream)
+
+    # works by side-affect of display()
+    a._ipython_display_()
+    assert "Output()" in capsys.readouterr().out
+
+    def get(*_, **__):
+        raise ImportError
+    monkeypatch.setattr(ipywidgets.Output, "__init__", get)
+
+    out = source._ipython_display_()
+    assert "DataFrame" in capsys.readouterr().out
+
+
 def test_setitem(stream):
     df = pd.DataFrame({'x': list(range(10)), 'y': [1] * 10})
 

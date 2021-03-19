@@ -239,8 +239,17 @@ class Streaming(OperatorMixin, core.APIRegisterMixin):
         self.stream.stop()
 
     def _ipython_display_(self, **kwargs):
-        return self.stream.latest().rate_limit(
-            0.5).gather()._ipython_display_(**kwargs)
+        try:
+            from ipywidgets import Output
+            return self.stream.latest().rate_limit(
+                0.5).gather()._ipython_display_(**kwargs)
+        except ImportError:
+            # since this function is only called by jupyter, this import must succeed
+            from IPython.display import display, HTML
+            if hasattr(self, '_repr_html_'):
+                return display(HTML(self._repr_html_()))
+            else:
+                return display(self.__repr__())
 
     def emit(self, x):
         self.verify(x)
