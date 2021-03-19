@@ -240,7 +240,7 @@ class Streaming(OperatorMixin, core.APIRegisterMixin):
 
     def _ipython_display_(self, **kwargs):
         try:
-            from ipywidgets import Output
+            from ipywidgets import Output  # noqa: F401
             return self.stream.latest().rate_limit(
                 0.5).gather()._ipython_display_(**kwargs)
         except ImportError:

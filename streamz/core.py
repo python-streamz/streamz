@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division, print_function
-import asyncio
 from collections import deque, defaultdict
 from datetime import timedelta
 import functools
