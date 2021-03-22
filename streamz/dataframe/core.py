@@ -170,6 +170,12 @@ class Frame(BaseFrame):
         """
         return Window(self, n=n, value=value, with_state=with_state, start=start)
 
+    def expanding(self, with_state=False, start=None):
+        return Expanding(self, n=1, with_state=with_state, start=start)
+
+    def ewm(self, com=None, span=None, halflife=None, alpha=None, with_state=False, start=None):
+        return EWM(self, n=1, com=com, span=span, halflife=halflife, alpha=alpha, with_state=with_state, start=start)
+
     def _cumulative_aggregation(self, op):
         return self.accumulate_partitions(_cumulative_accumulator,
                                           returns_state=True,
@@ -531,18 +537,30 @@ class Window(OperatorMixin):
 
     def __getitem__(self, key):
         sdf = self.root[key]
-        return Window(sdf, n=self.n, value=self.value, with_state=self.with_state, start=self.start)
+        return type(self)(
+            sdf,
+            n=self.n,
+            value=self.value,
+            with_state=self.with_state,
+            start=self.start
+        )
 
     def __getattr__(self, key):
         if key in self.root.columns or not len(self.root.columns):
             return self[key]
         else:
-            raise AttributeError("Window has no attribute %r" % key)
+            raise AttributeError(f"{type(self)} has no attribute {key}")
 
     def map_partitions(self, func, *args, **kwargs):
-        args2 = [a.root if isinstance(a, Window) else a for a in args]
+        args2 = [a.root if isinstance(a, type(self)) else a for a in args]
         root = self.root.map_partitions(func, *args2, **kwargs)
-        return Window(root, n=self.n, value=self.value, with_state=self.with_state, start=self.start)
+        return type(self)(
+            root,
+            n=self.n,
+            value=self.value,
+            with_state=self.with_state,
+            start=self.start
+        )
 
     @property
     def index(self):
@@ -561,7 +579,7 @@ class Window(OperatorMixin):
         return self.root.example
 
     def reset_index(self):
-        return Window(self.root.reset_index(), n=self.n, value=self.value)
+        return type(self)(self.root.reset_index(), n=self.n, value=self.value)
 
     def aggregate(self, agg):
         if self.n is not None:
@@ -620,6 +638,122 @@ class Window(OperatorMixin):
         """ Groupby-aggregations within window """
         return WindowedGroupBy(self.root, other, None, self.n, self.value,
                                self.with_state, self.start)
+
+
+class Expanding(Window):
+
+    def aggregate(self, agg):
+        window = self.n
+        diff = aggregations.diff_expanding
+        return self.root.accumulate_partitions(aggregations.window_accumulator,
+                                               diff=diff,
+                                               window=window,
+                                               agg=agg,
+                                               start=self.start,
+                                               returns_state=True,
+                                               stream_type='updating',
+                                               with_state=self.with_state)
+
+    def groupby(self, other):
+        raise NotImplementedError
+
+
+class EWM(Expanding):
+
+    def __init__(
+            self,
+            sdf,
+            n=1,
+            value=None,
+            with_state=False,
+            start=None,
+            com=None,
+            span=None,
+            halflife=None,
+            alpha=None
+    ):
+        super().__init__(sdf, n=n, value=value, with_state=with_state, start=start)
+        self._com = self._get_com(com, span, halflife, alpha)
+        self.com = com
+        self.span = span
+        self.alpha = alpha
+        self.halflife = halflife
+
+    def __getitem__(self, key):
+        sdf = self.root[key]
+        return type(self)(
+            sdf,
+            n=self.n,
+            value=self.value,
+            with_state=self.with_state,
+            start=self.start,
+            com=self.com,
+            span=self.span,
+            halflife=self.halflife,
+            alpha=self.alpha
+        )
+
+    @staticmethod
+    def _get_com(com, span, halflife, alpha):
+        if sum(var is not None for var in (com, span, halflife, alpha)) > 1:
+            raise ValueError("Can only provide one of `com`, `span`, `halflife`, `alpha`.")
+        # Convert to center of mass; domain checks ensure 0 < alpha <= 1
+        if com is not None:
+            if com < 0:
+                raise ValueError("com must satisfy: comass >= 0")
+        elif span is not None:
+            if span < 1:
+                raise ValueError("span must satisfy: span >= 1")
+            com = (span - 1) / 2
+        elif halflife is not None:
+            if halflife <= 0:
+                raise ValueError("halflife must satisfy: halflife > 0")
+            decay = 1 - np.exp(np.log(0.5) / halflife)
+            com = 1 / decay - 1
+        elif alpha is not None:
+            if alpha <= 0 or alpha > 1:
+                raise ValueError("alpha must satisfy: 0 < alpha <= 1")
+            com = (1 - alpha) / alpha
+        else:
+            raise ValueError("Must pass one of com, span, halflife, or alpha")
+
+        return float(com)
+
+    def full(self):
+        raise NotImplementedError
+
+    def apply(self, func):
+        """ Apply an arbitrary function over each window of data """
+        raise NotImplementedError
+
+    def sum(self):
+        """ Sum elements within window """
+        raise NotImplementedError
+
+    def count(self):
+        """ Count elements within window """
+        raise NotImplementedError
+
+    def mean(self):
+        """ Average elements within window """
+        return self.aggregate(aggregations.EWMean(self._com))
+
+    def var(self, ddof=1):
+        """ Compute variance of elements within window """
+        raise NotImplementedError
+
+    def std(self, ddof=1):
+        """ Compute standard deviation of elements within window """
+        raise NotImplementedError
+
+    @property
+    def size(self):
+        """ Number of elements within window """
+        raise NotImplementedError
+
+    def value_counts(self):
+        """ Count groups of elements within window """
+        raise NotImplementedError
 
 
 def rolling_accumulator(acc, new, window=None, op=None,

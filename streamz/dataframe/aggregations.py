@@ -148,6 +148,25 @@ class Full(Aggregation):
         return new.iloc[:0]
 
 
+class EWMean(Mean):
+    def __init__(self, com):
+        self.com = com
+        alpha = 1. / (1. + self.com)
+        self.old_wt_factor = 1. - alpha
+        self.new_wt = 1.
+
+    def on_new(self, acc, new):
+        result, old_wt = acc
+        for i in range(len(new)):
+            result = ((old_wt * result) + (self.new_wt * new.iloc[i])) / (old_wt + self.new_wt)
+            old_wt *= self.old_wt_factor
+            old_wt += self.new_wt
+        return (result, old_wt), result
+
+    def on_old(self, acc, old):
+        pass
+
+
 def diff_iloc(dfs, new, window=None):
     """ Emit new list of dfs and decayed data
 
@@ -221,6 +240,13 @@ def diff_loc(dfs, new, window=None):
                 dfs.popleft()
 
     return dfs, old
+
+
+def diff_expanding(dfs, new, window=None):
+    dfs = deque(dfs)
+    if len(new) > 0:
+        dfs.append(new)
+    return dfs, []
 
 
 def diff_align(dfs, groupers):
