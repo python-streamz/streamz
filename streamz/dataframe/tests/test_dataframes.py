@@ -713,26 +713,21 @@ def test_windowing_n(func, n, getter):
     lambda x: x.sum(),
     lambda x: x.mean(),
     lambda x: x.count(),
-    lambda x: x.size,
     lambda x: x.var(ddof=1),
     lambda x: x.std(ddof=1),
     lambda x: x.var(ddof=0),
-])
-@pytest.mark.parametrize('getter', [
-    lambda df: df,
-    lambda df: df.x,
-])
-def test_expanding(func, getter):
+], ids=["sum", "mean", "count", "var_1", "std", "var_0"])
+def test_expanding(func):
     df = pd.DataFrame({'x': [1.], 'y': [2.]})
     sdf = DataFrame(example=df)
 
-    L = func(getter(sdf).expanding()).stream.gather().sink_to_list()
+    L = func(sdf.expanding()).stream.gather().sink_to_list()
 
     for i in range(5):
         sdf.emit(df)
 
-    result = pd.concat(L, axis=1).T
-    expected = func(getter(pd.concat([df] * 5)).expanding())
+    result = pd.concat(L, axis=1).T.astype(float)
+    expected = func(pd.concat([df] * 5, ignore_index=True).expanding())
     assert_eq(result, expected)
 
 
