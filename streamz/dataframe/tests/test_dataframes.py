@@ -731,6 +731,33 @@ def test_expanding(func):
     assert_eq(result, expected)
 
 
+def test_ewm_mean():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    L = sdf.ewm(1).mean().stream.gather().sink_to_list()
+    sdf.emit(pd.DataFrame({'x': [1.], 'y': [2.]}))
+    sdf.emit(pd.DataFrame({'x': [2.], 'y': [3.]}))
+    sdf.emit(pd.DataFrame({'x': [3.], 'y': [4.]}))
+    result = pd.concat(L, ignore_index=True)
+
+    df = pd.DataFrame({'x': [1., 2., 3.], 'y': [2., 3., 4.]})
+    expected = df.ewm(1).mean()
+    assert_eq(result, expected)
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.count(),
+    lambda x: x.apply(lambda x: x),
+    lambda x: x.full(),
+    lambda x: x.var(),
+    lambda x: x.std()
+], ids=["sum", "count", "apply", "full", "var", "std"])
+def test_ewm_notimplemented(func):
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(NotImplementedError):
+        func(sdf.ewm(1))
+
+
 @pytest.mark.parametrize('func', [
     lambda x: x.sum(),
     lambda x: x.mean(),

@@ -148,7 +148,7 @@ class Full(Aggregation):
         return new.iloc[:0]
 
 
-class EWMean(Mean):
+class EWMean(Aggregation):
     def __init__(self, com):
         self.com = com
         alpha = 1. / (1. + self.com)
@@ -156,15 +156,18 @@ class EWMean(Mean):
         self.new_wt = 1.
 
     def on_new(self, acc, new):
-        result, old_wt = acc
-        for i in range(len(new)):
-            result = ((old_wt * result) + (self.new_wt * new.iloc[i])) / (old_wt + self.new_wt)
+        result, old_wt, is_first = acc
+        for i in range(int(is_first), len(new)):
             old_wt *= self.old_wt_factor
+            result = ((old_wt * result) + (self.new_wt * new.iloc[i])) / (old_wt + self.new_wt)
             old_wt += self.new_wt
-        return (result, old_wt), result
+        return (result, old_wt, False), result
 
     def on_old(self, acc, old):
         pass
+
+    def initial(self, new):
+        return new.iloc[:1], 1, True
 
 
 def diff_iloc(dfs, new, window=None):
