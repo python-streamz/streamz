@@ -744,6 +744,26 @@ def test_ewm_mean():
     assert_eq(result, expected)
 
 
+def test_ewm_raise_multiple_arguments():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(ValueError, match="Can only provide one of"):
+        sdf.ewm(com=1, halflife=1)
+
+
+def test_ewm_raise_no_argument():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(ValueError, match="Must pass one of"):
+        sdf.ewm()
+
+
+@pytest.mark.parametrize("arg", ["com", "halflife", "alpha", "span"])
+def test_raise_invalid_argument(arg):
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    param = {arg: -1}
+    with pytest.raises(ValueError):
+        sdf.ewm(**param)
+
+
 @pytest.mark.parametrize('func', [
     lambda x: x.sum(),
     lambda x: x.count(),
