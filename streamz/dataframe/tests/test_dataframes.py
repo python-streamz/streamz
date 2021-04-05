@@ -714,6 +714,75 @@ def test_windowing_n(func, n, getter):
     lambda x: x.mean(),
     lambda x: x.count(),
     lambda x: x.var(ddof=1),
+    lambda x: x.std(ddof=1),
+    lambda x: x.var(ddof=0),
+], ids=["sum", "mean", "count", "var_1", "std", "var_0"])
+def test_expanding(func):
+    df = pd.DataFrame({'x': [1.], 'y': [2.]})
+    sdf = DataFrame(example=df)
+
+    L = func(sdf.expanding()).stream.gather().sink_to_list()
+
+    for i in range(5):
+        sdf.emit(df)
+
+    result = pd.concat(L, axis=1).T.astype(float)
+    expected = func(pd.concat([df] * 5, ignore_index=True).expanding())
+    assert_eq(result, expected)
+
+
+def test_ewm_mean():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    L = sdf.ewm(1).mean().stream.gather().sink_to_list()
+    sdf.emit(pd.DataFrame({'x': [1.], 'y': [2.]}))
+    sdf.emit(pd.DataFrame({'x': [2.], 'y': [3.]}))
+    sdf.emit(pd.DataFrame({'x': [3.], 'y': [4.]}))
+    result = pd.concat(L, ignore_index=True)
+
+    df = pd.DataFrame({'x': [1., 2., 3.], 'y': [2., 3., 4.]})
+    expected = df.ewm(1).mean()
+    assert_eq(result, expected)
+
+
+def test_ewm_raise_multiple_arguments():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(ValueError, match="Can only provide one of"):
+        sdf.ewm(com=1, halflife=1)
+
+
+def test_ewm_raise_no_argument():
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(ValueError, match="Must pass one of"):
+        sdf.ewm()
+
+
+@pytest.mark.parametrize("arg", ["com", "halflife", "alpha", "span"])
+def test_raise_invalid_argument(arg):
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    param = {arg: -1}
+    with pytest.raises(ValueError):
+        sdf.ewm(**param)
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.count(),
+    lambda x: x.apply(lambda x: x),
+    lambda x: x.full(),
+    lambda x: x.var(),
+    lambda x: x.std()
+], ids=["sum", "count", "apply", "full", "var", "std"])
+def test_ewm_notimplemented(func):
+    sdf = DataFrame(example=pd.DataFrame(columns=['x', 'y']))
+    with pytest.raises(NotImplementedError):
+        func(sdf.ewm(1))
+
+
+@pytest.mark.parametrize('func', [
+    lambda x: x.sum(),
+    lambda x: x.mean(),
+    lambda x: x.count(),
+    lambda x: x.var(ddof=1),
     lambda x: x.std(),
     pytest.param(lambda x: x.var(ddof=0), marks=pytest.mark.xfail),
 ])
