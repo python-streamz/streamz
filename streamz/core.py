@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division, print_function
-
 from collections import deque, defaultdict
 from datetime import timedelta
 import functools
@@ -385,14 +384,16 @@ class Stream(APIRegisterMixin):
 
     def _ipython_display_(self, **kwargs):  # pragma: no cover
         try:
-            from ipywidgets import Output
+            import ipywidgets
             from IPython.core.interactiveshell import InteractiveShell
+            output = ipywidgets.Output(_view_count=0)
         except ImportError:
+            # since this function is only called by jupyter, this import must succeed
+            from IPython.display import display, HTML
             if hasattr(self, '_repr_html_'):
-                return self._repr_html_()
+                return display(HTML(self._repr_html_()))
             else:
-                return self.__repr__()
-        output = Output(_view_count=0)
+                return display(self.__repr__())
         output_ref = weakref.ref(output)
 
         def update_cell(val):

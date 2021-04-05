@@ -1016,6 +1016,25 @@ def test_map_str():
     assert str(s) == '<map: add>'
 
 
+def test_no_ipywidget_repr(monkeypatch, capsys):
+    pytest.importorskip("ipywidgets")
+    import ipywidgets
+    source = Stream()
+
+    # works by side-affect of display()
+    source._ipython_display_()
+    assert "Output()" in capsys.readouterr().out
+
+    def get(*_, **__):
+        raise ImportError
+    monkeypatch.setattr(ipywidgets.Output, "__init__", get)
+
+    out = source._ipython_display_()
+    assert "Stream" in capsys.readouterr().out
+
+
+
+
 def test_filter_str():
     def iseven(x):
         return x % 2 == 0
