@@ -6,8 +6,6 @@ import numpy as np
 import pandas as pd
 import toolz
 
-from tornado import gen
-
 from ..collection import Streaming, _stream_types, OperatorMixin
 from ..sources import Source
 from ..utils import M
@@ -1049,7 +1047,7 @@ class PeriodicDataFrame(DataFrame):
     async def _cb(interval, source, continue_):
         last = pd.Timestamp.now()
         while continue_[0]:
-            await gen.sleep(interval)
+            await asyncio.sleep(interval)
             now = pd.Timestamp.now()
             await asyncio.gather(*source._emit(dict(last=last, now=now)))
             last = now
