@@ -38,14 +38,14 @@ def get_base_frame_type(frame_name, is_frame_like, example=None):
        Returns the base type of streaming objects if type checks pass."""
     if example is None:
         raise TypeError("Missing required argument:'example'")
-    if not is_frame_like(example):
-        try:
-            import pandas as pd
-            example = pd.DataFrame(example)
-        except (TypeError, ValueError) as e:
-            msg = "Streaming {0} expects an example of {0} like objects. Got: {1}."\
-                                                 .format(frame_name, example)
-            raise TypeError(msg) from e
+    if is_frame_like is is_dataframe_like and not is_frame_like(example):
+        import pandas as pd
+        example = pd.DataFrame(example)
+
+    elif not is_frame_like(example):
+        msg = "Streaming {0} expects an example of {0} like objects. Got: {1}."\
+                                             .format(frame_name, example)
+        raise TypeError(msg)
     return type(example)
 
 
