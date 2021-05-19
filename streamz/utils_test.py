@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import contextmanager
 import logging
 import os
@@ -116,11 +117,10 @@ def wait_for(predicate, timeout, fail_func=None, period=0.001):
             pytest.fail("condition not reached within %s seconds" % timeout)
 
 
-@gen.coroutine
-def await_for(predicate, timeout, fail_func=None, period=0.001):
+async def await_for(predicate, timeout, fail_func=None, period=0.001):
     deadline = time() + timeout
     while not predicate():
-        yield gen.sleep(period)
+        await asyncio.sleep(period)
         if time() > deadline:  # pragma: no cover
             if fail_func is not None:
                 fail_func()

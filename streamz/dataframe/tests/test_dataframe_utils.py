@@ -18,14 +18,14 @@ def test_utils_get_base_frame_type_pandas():
     with pytest.raises(TypeError):
         get_base_frame_type("Index", is_index_like, df)
 
-    with pytest.raises(TypeError):
-        get_base_frame_type("DataFrame", is_dataframe_like, df.x)
+    # casts Series to DataFrame, if that's what we ask for
+    assert pd.DataFrame == get_base_frame_type("DataFrame", is_dataframe_like, df.x)
     assert pd.Series == get_base_frame_type("Series", is_series_like, df.x)
     with pytest.raises(TypeError):
         get_base_frame_type("Index", is_index_like, df.x)
 
-    with pytest.raises(TypeError):
-        get_base_frame_type("DataFrame", is_dataframe_like, df.index)
+    # casts Series to DataFrame, if that's what we ask for
+    assert pd.DataFrame == get_base_frame_type("DataFrame", is_dataframe_like, df.index)
     with pytest.raises(TypeError):
         get_base_frame_type("Series", is_series_like, df.index)
     assert issubclass(get_base_frame_type("Index", is_index_like, df.index), pd.Index)
