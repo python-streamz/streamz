@@ -14,10 +14,6 @@ from tornado import gen
 from tornado.locks import Condition
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue
-try:
-    from tornado.ioloop import PollIOLoop
-except ImportError:
-    PollIOLoop = None  # dropped in tornado 6.0
 
 try:
     from distributed.client import default_client as _dask_default_client
@@ -1994,11 +1990,6 @@ def sync(loop, func, *args, **kwargs):
     Run coroutine in loop running in separate thread.
     """
     # This was taken from distrbuted/utils.py
-
-    # Tornado's PollIOLoop doesn't raise when using closed, do it ourselves
-    if PollIOLoop and ((isinstance(loop, PollIOLoop) and getattr(loop, '_closing', False))
-            or (hasattr(loop, 'asyncio_loop') and loop.asyncio_loop._closed)):
-        raise RuntimeError("IOLoop is closed")
 
     timeout = kwargs.pop('callback_timeout', None)
 
