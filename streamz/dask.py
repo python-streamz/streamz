@@ -4,7 +4,7 @@ from operator import getitem
 
 from tornado import gen
 
-from dask.compatibility import apply
+from dask.utils import apply
 from distributed.client import default_client
 
 from .core import Stream
