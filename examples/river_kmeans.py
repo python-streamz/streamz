@@ -1,17 +1,13 @@
 import random
 
 import pandas as pd
-import panel.pane.holoviews
-import tornado.ioloop
 
 from streamz import Stream
 import hvplot.streamz
 from streamz.river import RiverTrain
 from river import cluster
 import holoviews as hv
-import panel as pn
 from panel.pane.holoviews import HoloViews
-import tornado.ioloop
 hv.extension('bokeh')
 
 model = cluster.KMeans(n_clusters=3, sigma=0.1, mu=0.5)
@@ -60,14 +56,15 @@ def main(viz=True):
         pl = (ooo.hvplot.scatter('x', 'y', color="blue", backlog=50) *
               pout.hvplot.scatter('x', 'y', color="red", backlog=3))
         pl.opts(xlim=(-0.2, 1.2), ylim=(-0.2, 1.2), height=600, width=600)
-        pan = panel.pane.holoviews.HoloViews(pl)
-        pan.show(threaded=True)
+        pan = HoloViews(pl)
+        pan.show()
     else:
         import time
         time.sleep(5)
         print(count, "events")
         print("Current centres", centres)
         print("Output centres", [list(c.values()) for c in model.centers.values()])
+    s.stop()
 
 if __name__ == "__main__":
     main(viz=True)
