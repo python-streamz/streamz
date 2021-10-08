@@ -113,7 +113,22 @@ class sink_to_textfile(Sink):
 
 
 @Stream.register_api()
-class sink_to_websocket(Sink):
+class to_websocket(Sink):
+    """Write bytes data to websocket
+
+    The websocket will be opened on first call, and kept open. Should
+    it close at some point, future writes will fail.
+
+    Requires the ``websockets`` package.
+
+    :param uri: str
+        Something like "ws://host:port". Use "wss:" to allow TLS.
+    :param ws_kwargs: dict
+        Further kwargs to pass to ``websockets.connect``, please
+        read its documentation.
+    :param kwargs:
+        Passed to superclass
+    """
 
     def __init__(self, upstream, uri, ws_kwargs=None, **kwargs):
         self.uri = uri
@@ -129,7 +144,7 @@ class sink_to_websocket(Sink):
         yield self.ws.send(x)
 
     def destroy(self):
-        super(sink_to_websocket, self).destroy()
+        super().destroy()
         if self.ws is not None:
             sync(self.loop, self.ws.protocol.close)
         self.ws = None

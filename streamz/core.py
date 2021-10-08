@@ -1,3 +1,4 @@
+import asyncio
 from collections import deque, defaultdict
 from datetime import timedelta
 import functools
@@ -485,15 +486,14 @@ class Stream(APIRegisterMixin):
             finally:
                 thread_state.asynchronous = ts_async
         else:
-            @gen.coroutine
-            def _():
+            async def _():
                 thread_state.asynchronous = True
                 try:
-                    result = yield self._emit(x, metadata=metadata)
+                    result = await asyncio.gather(*self._emit(x, metadata=metadata))
                 finally:
                     del thread_state.asynchronous
+                return result
 
-                raise gen.Return(result)
             sync(self.loop, _)
 
     def update(self, x, who=None, metadata=None):

@@ -80,7 +80,7 @@ def test_ws_roundtrip():
 
     data = [b'0123'] * 4
     s = Stream.from_iterable(data)
-    s.sink_to_websocket("ws://localhost:8989")
+    s.to_websocket("ws://localhost:8989")
     s.start()
 
     wait_for(lambda: data == l, timeout=1)

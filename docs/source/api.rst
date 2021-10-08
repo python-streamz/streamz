@@ -43,7 +43,10 @@ Stream
 .. automethod:: Stream.emit
 .. automethod:: Stream.frequencies
 .. automethod:: Stream.register_api
+.. automethod:: Stream.sink
 .. automethod:: Stream.sink_to_list
+.. automethod:: Stream.sink_to_textfile
+.. automethod:: Stream.to_websocket
 .. automethod:: Stream.update
 .. automethod:: Stream.visualize
 
@@ -56,6 +59,7 @@ Sources
    from_kafka
    from_kafka_batched
    from_process
+   from_websocket
    from_textfile
    from_tcp
    from_http_server

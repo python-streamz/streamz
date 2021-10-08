@@ -783,6 +783,23 @@ class from_iterable(Source):
 
 @Stream.register_api()
 class from_websocket(Source):
+    """Read binary data from a websocket
+
+    This source will accept connections on a given port and handle messages
+    coming in.
+
+    The websockets library must be installed.
+
+    :param host: str
+        Typically "localhost"
+    :param port: int
+        Which port to listen on (must be available)
+    :param serve_kwargs: dict
+        Passed to ``websockets.serve``
+    :param kwargs:
+        Passed to superclass
+    """
+
     def __init__(self, host, port, serve_kwargs=None, **kwargs):
         self.host = host
         self.port = port
