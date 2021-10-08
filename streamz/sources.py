@@ -1,11 +1,12 @@
 import asyncio
 from glob import glob
+import queue
 import os
 import time
 from tornado import gen
 import weakref
 
-from .core import Stream, convert_interval, RefCounter
+from .core import Stream, convert_interval, RefCounter, sync
 
 
 def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=False):
@@ -779,3 +780,135 @@ class from_iterable(Source):
                 break
             await asyncio.gather(*self._emit(x))
         self.stopped = True
+
+
+@Stream.register_api()
+class from_websocket(Source):
+    """Read binary data from a websocket
+
+    This source will accept connections on a given port and handle messages
+    coming in.
+
+    The websockets library must be installed.
+
+    :param host: str
+        Typically "localhost"
+    :param port: int
+        Which port to listen on (must be available)
+    :param serve_kwargs: dict
+        Passed to ``websockets.serve``
+    :param kwargs:
+        Passed to superclass
+    """
+
+    def __init__(self, host, port, serve_kwargs=None, **kwargs):
+        self.host = host
+        self.port = port
+        self.s_kw = serve_kwargs
+        self.server = None
+        super().__init__(**kwargs)
+
+    @gen.coroutine
+    def _read(self, ws, path):
+        while not self.stopped:
+            data = yield ws.recv()
+            yield self._emit(data)
+
+    async def run(self):
+        import websockets
+        self.server = await websockets.serve(
+            self._read, self.host, self.port, **(self.s_kw or {})
+        )
+
+    def stop(self):
+        self.server.close()
+        sync(self.loop, self.server.wait_closed)
+
+
+@Stream.register_api()
+class from_q(Source):
+    """Source events from a threading.Queue, running another event framework
+
+    The queue is polled, i.e., there is a latency/overhead tradeoff, since
+    we cannot use ``await`` directly with a multithreaded queue.
+
+    Allows mixing of another event loop, for example pyqt, on another thread.
+    Note that, by default, a streamz.Source such as this one will start
+    an event loop in a new thread, unless otherwise specified.
+    """
+
+    def __init__(self, q, sleep_time=0.01, **kwargs):
+        """
+        :param q: threading.Queue
+            Any items pushed into here will become streamz events
+        :param sleep_time: int
+            Sets how long we wait before checking the input queue when
+            empty (in s)
+        :param kwargs:
+            passed to streamz.Source
+        """
+        self.q = q
+        self.sleep = sleep_time
+        super().__init__(**kwargs)
+
+    async def _run(self):
+        """Poll threading queue for events
+        This uses check-and-wait, but overhead is low. Could maybe have
+        a sleep-free version with an threading.Event.
+        """
+        try:
+            out = self.q.get_nowait()
+            await self.emit(out, asynchronous=True)
+        except queue.Empty:
+            await asyncio.sleep(self.sleep)
+
+
+@Stream.register_api()
+class from_mqtt(from_q):
+    """Read from MQTT source
+
+    See https://en.wikipedia.org/wiki/MQTT for a description of the protocol
+    and its uses.
+
+    See also ``sinks.to_mqtt``.
+
+    Requires ``paho.mqtt``
+
+    The outputs are ``paho.mqtt.client.MQTTMessage`` instances, which each have
+    attributes timestamp, payload, topic, ...
+
+    NB: paho.mqtt.python runs on its own thread in this implementation. We may
+    wish to instead call client.loop() directly
+
+    :param host: str
+    :param port: int
+    :param topic: str
+        (May in the future support a list of topics)
+    :param keepalive: int
+        See mqtt docs - to keep the channel alive
+    :param client_kwargs:
+        Passed to the client's ``connect()`` method
+    """
+    def __init__(self, host, port, topic, keepalive=60 , client_kwargs=None, **kwargs):
+        self.host = host
+        self.port = port
+        self.keepalive = keepalive
+        self.topic = topic
+        self.client_kwargs = client_kwargs
+        super().__init__(q=queue.Queue(), **kwargs)
+
+    def _on_connect(self, client, userdata, flags, rc):
+        client.subscribe(self.topic)
+
+    def _on_message(self, client, userdata, msg):
+        self.q.put(msg)
+
+    async def run(self):
+        import paho.mqtt.client as mqtt
+        client = mqtt.Client()
+        client.on_connect = self._on_connect
+        client.on_message = self._on_message
+        client.connect(self.host, self.port, self.keepalive, **(self.client_kwargs or {}))
+        client.loop_start()
+        await super().run()
+        client.disconnect()
