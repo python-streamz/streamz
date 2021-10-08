@@ -5,7 +5,7 @@ import time
 from tornado import gen
 import weakref
 
-from .core import Stream, convert_interval, RefCounter
+from .core import Stream, convert_interval, RefCounter, sync
 
 
 def sink_to_file(filename, upstream, mode='w', prefix='', suffix='\n', flush=False):
@@ -779,3 +779,29 @@ class from_iterable(Source):
                 break
             await asyncio.gather(*self._emit(x))
         self.stopped = True
+
+
+@Stream.register_api()
+class from_websocket(Source):
+    def __init__(self, host, port, serve_kwargs=None, **kwargs):
+        self.host = host
+        self.port = port
+        self.s_kw = serve_kwargs
+        self.server = None
+        super().__init__(**kwargs)
+
+    @gen.coroutine
+    def _read(self, ws, path):
+        while not self.stopped:
+            data = yield ws.recv()
+            yield self._emit(data)
+
+    async def run(self):
+        import websockets
+        self.server = await websockets.serve(
+            self._read, self.host, self.port, **(self.s_kw or {})
+        )
+
+    def stop(self):
+        self.server.close()
+        sync(self.loop, self.server.wait_closed)

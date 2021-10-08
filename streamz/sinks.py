@@ -4,6 +4,7 @@ import weakref
 from tornado import gen
 
 from streamz import Stream
+from streamz.core import sync
 
 # sinks add themselves here to avoid being garbage-collected
 _global_sinks = set()
@@ -109,3 +110,26 @@ class sink_to_textfile(Sink):
 
     def update(self, x, who=None, metadata=None):
         self._fp.write(x + self._end)
+
+
+@Stream.register_api()
+class sink_to_websocket(Sink):
+
+    def __init__(self, upstream, uri, ws_kwargs=None, **kwargs):
+        self.uri = uri
+        self.ws_kw = ws_kwargs
+        self.ws = None
+        super().__init__(upstream, **kwargs)
+
+    @gen.coroutine
+    def update(self, x, who=None, metadata=None):
+        import websockets
+        if self.ws is None:
+            self.ws = yield websockets.connect(self.uri, **(self.ws_kw or {}))
+        yield self.ws.send(x)
+
+    def destroy(self):
+        super(sink_to_websocket, self).destroy()
+        if self.ws is not None:
+            sync(self.loop, self.ws.protocol.close)
+        self.ws = None

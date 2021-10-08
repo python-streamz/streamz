@@ -3,7 +3,7 @@ import weakref
 import pytest
 from streamz import Stream
 from streamz.sinks import _global_sinks, Sink
-from streamz.utils_test import tmpfile
+from streamz.utils_test import tmpfile, wait_for
 
 
 def test_sink_with_args_and_kwargs():
@@ -71,3 +71,18 @@ def test_sink_destroy():
     del sink
 
     assert ref() is None
+
+
+def test_ws_roundtrip():
+    pytest.importorskip("websockets")
+    s0 = Stream.from_websocket("localhost", 8989, start=True)
+    l = s0.sink_to_list()
+
+    data = [b'0123'] * 4
+    s = Stream.from_iterable(data)
+    s.sink_to_websocket("ws://localhost:8989")
+    s.start()
+
+    wait_for(lambda: data == l, timeout=1)
+    s.stop()
+    s0.stop()
