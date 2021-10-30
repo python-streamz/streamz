@@ -452,7 +452,8 @@ class from_kafka(Source):
             weakref.finalize(self, lambda consumer=self.consumer: _close_consumer(consumer))
             tp = ck.TopicPartition(self.topics[0], 0, 0)
 
-            # blocks for consumer thread to come up
+             # blocks for consumer thread to come up and invoke poll to establish connection with broker to fetch oauth token for kafka
+            self.consumer.poll()
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
@@ -587,7 +588,8 @@ class FromKafkaBatched(Source):
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
-            # blocks for consumer thread to come up
+            # blocks for consumer thread to come up and invoke poll to establish connection with broker to fetch oauth token for kafka
+            self.consumer.poll()
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
