@@ -195,6 +195,7 @@ class to_kafka(Stream):
         self.producer.flush(timeout)
 
 
+@Stream.register_api()
 class to_websocket(Sink):
     """Write bytes data to websocket
 
