@@ -109,3 +109,86 @@ class sink_to_textfile(Sink):
 
     def update(self, x, who=None, metadata=None):
         self._fp.write(x + self._end)
+
+
+@Stream.register_api()
+class to_kafka(Stream):
+    """ Writes data in the stream to Kafka
+
+    This stream accepts a string or bytes object. Call ``flush`` to ensure all
+    messages are pushed. Responses from Kafka are pushed downstream.
+
+    Parameters
+    ----------
+    topic : string
+        The topic which to write
+    producer_config : dict
+        Settings to set up the stream, see
+        https://docs.confluent.io/current/clients/confluent-kafka-python/#configuration
+        https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
+        Examples:
+        bootstrap.servers: Connection string (host:port) to Kafka
+
+    Examples
+    --------
+    >>> from streamz import Stream
+    >>> ARGS = {'bootstrap.servers': 'localhost:9092'}
+    >>> source = Stream()
+    >>> kafka = source.map(lambda x: str(x)).to_kafka('test', ARGS)
+    <to_kafka>
+    >>> for i in range(10):
+    ...     source.emit(i)
+    >>> kafka.flush()
+    """
+    def __init__(self, upstream, topic, producer_config, **kwargs):
+        import confluent_kafka as ck
+
+        self.topic = topic
+        self.producer = ck.Producer(producer_config)
+
+        kwargs["ensure_io_loop"] = True
+        Stream.__init__(self, upstream, **kwargs)
+        self.stopped = False
+        self.polltime = 0.2
+        self.loop.add_callback(self.poll)
+        self.futures = []
+
+    @gen.coroutine
+    def poll(self):
+        while not self.stopped:
+            # executes callbacks for any delivered data, in this thread
+            # if no messages were sent, nothing happens
+            self.producer.poll(0)
+            yield gen.sleep(self.polltime)
+
+    def update(self, x, who=None, metadata=None):
+        future = gen.Future()
+        self.futures.append(future)
+
+        @gen.coroutine
+        def _():
+            while True:
+                try:
+                    # this runs asynchronously, in C-K's thread
+                    self.producer.produce(self.topic, x, callback=self.cb)
+                    return
+                except BufferError:
+                    yield gen.sleep(self.polltime)
+                except Exception as e:
+                    future.set_exception(e)
+                    return
+
+        self.loop.add_callback(_)
+        return future
+
+    @gen.coroutine
+    def cb(self, err, msg):
+        future = self.futures.pop(0)
+        if msg is not None and msg.value() is not None:
+            future.set_result(None)
+            yield self._emit(msg.value())
+        else:
+            future.set_exception(err or msg.error())
+
+    def flush(self, timeout=-1):
+        self.producer.flush(timeout)
