@@ -1,3 +1,4 @@
+import asyncio
 from operator import add
 import random
 import time
@@ -16,21 +17,21 @@ from distributed.utils_test import gen_cluster, inc, cluster, loop, slowinc  # n
 
 
 @gen_cluster(client=True)
-def test_map(c, s, a, b):
+async def test_map(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
 
     for i in range(5):
-        yield source.emit(i)
+        await source.emit(i)
 
     assert L == [1, 2, 3, 4, 5]
     assert all(isinstance(f, Future) for f in futures_L)
 
 
 @gen_cluster(client=True)
-def test_map_on_dict(c, s, a, b):
+async def test_map_on_dict(c, s, a, b):
     # dask treats dicts differently, so we have to make sure
     # the user sees no difference in the streamz api.
     # Regression test against #336
@@ -43,7 +44,7 @@ def test_map_on_dict(c, s, a, b):
     L = futures.gather().sink_to_list()
 
     for i in range(5):
-        yield source.emit({"i": i})
+        await source.emit({"i": i})
 
     assert len(L) == 5
     for i, item in enumerate(sorted(L, key=lambda x: x["x"])):
@@ -52,7 +53,7 @@ def test_map_on_dict(c, s, a, b):
 
 
 @gen_cluster(client=True)
-def test_partition_then_scatter_async(c, s, a, b):
+async def test_partition_then_scatter_async(c, s, a, b):
     # Ensure partition w/ timeout before scatter works correctly for
     # asynchronous
     start = time.monotonic()
@@ -63,10 +64,10 @@ def test_partition_then_scatter_async(c, s, a, b):
 
     rc = RefCounter(loop=source.loop)
     for i in range(3):
-        yield source.emit(i, metadata=[{'ref': rc}])
+        await source.emit(i, metadata=[{'ref': rc}])
 
     while rc.count != 0 and time.monotonic() - start < 1.:
-        yield gen.sleep(1e-2)
+        await gen.sleep(1e-2)
 
     assert L == [1, 2, 3]
 
@@ -92,7 +93,7 @@ def test_partition_then_scatter_sync(loop):
 
 
 @gen_cluster(client=True)
-def test_non_unique_emit(c, s, a, b):
+async def test_non_unique_emit(c, s, a, b):
     """Regression for https://github.com/python-streamz/streams/issues/397
 
     Non-unique stream entries still need to each be processed.
@@ -103,28 +104,28 @@ def test_non_unique_emit(c, s, a, b):
 
     for _ in range(3):
         # Emit non-unique values
-        yield source.emit(0)
+        await source.emit(0)
 
     assert len(L) == 3
     assert L[0] != L[1] or L[0] != L[2]
 
 
 @gen_cluster(client=True)
-def test_scan(c, s, a, b):
+async def test_scan(c, s, a, b):
     source = Stream(asynchronous=True)
     futures = scatter(source).map(inc).scan(add)
     futures_L = futures.sink_to_list()
     L = futures.gather().sink_to_list()
 
     for i in range(5):
-        yield source.emit(i)
+        await source.emit(i)
 
     assert L == [1, 3, 6, 10, 15]
     assert all(isinstance(f, Future) for f in futures_L)
 
 
 @gen_cluster(client=True)
-def test_scan_state(c, s, a, b):
+async def test_scan_state(c, s, a, b):
     source = Stream(asynchronous=True)
 
     def f(acc, i):
@@ -133,33 +134,33 @@ def test_scan_state(c, s, a, b):
 
     L = scatter(source).scan(f, returns_state=True).gather().sink_to_list()
     for i in range(3):
-        yield source.emit(i)
+        await source.emit(i)
 
     assert L == [0, 1, 3]
 
 
 @gen_cluster(client=True)
-def test_zip(c, s, a, b):
+async def test_zip(c, s, a, b):
     a = Stream(asynchronous=True)
     b = Stream(asynchronous=True)
     c = scatter(a).zip(scatter(b))
 
     L = c.gather().sink_to_list()
 
-    yield a.emit(1)
-    yield b.emit('a')
-    yield a.emit(2)
-    yield b.emit('b')
+    await a.emit(1)
+    await b.emit('a')
+    await a.emit(2)
+    await b.emit('b')
 
     assert L == [(1, 'a'), (2, 'b')]
 
 
 @gen_cluster(client=True)
-def test_accumulate(c, s, a, b):
+async def test_accumulate(c, s, a, b):
     source = Stream(asynchronous=True)
     L = source.scatter().accumulate(lambda acc, x: acc + x, with_state=True).gather().sink_to_list()
     for i in range(3):
-        yield source.emit(i)
+        await source.emit(i)
     assert L[-1][1] == 3
 
 
@@ -169,10 +170,9 @@ def test_sync(loop):  # noqa: F811
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
-            @gen.coroutine
-            def f():
+            async def f():
                 for i in range(10):
-                    yield source.emit(i, asynchronous=True)
+                    await source.emit(i, asynchronous=True)
 
             sync(loop, f)
 
@@ -193,24 +193,24 @@ def test_sync_2(loop):  # noqa: F811
 
 
 @gen_cluster(client=True, nthreads=[('127.0.0.1', 1)] * 2)
-def test_buffer(c, s, a, b):
+async def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
     L = source.scatter().map(slowinc, delay=0.5).buffer(5).gather().sink_to_list()
 
     start = time.time()
     for i in range(5):
-        yield source.emit(i)
+        await source.emit(i)
     end = time.time()
     assert end - start < 0.5
 
     for i in range(5, 10):
-        yield source.emit(i)
+        await source.emit(i)
 
     end2 = time.time()
     assert end2 - start > (0.5 / 3)
 
     while len(L) < 10:
-        yield gen.sleep(0.01)
+        await gen.sleep(0.01)
         assert time.time() - start < 5
 
     assert L == list(map(inc, range(10)))
@@ -242,7 +242,7 @@ def test_buffer_sync(loop):  # noqa: F811
 
 
 @pytest.mark.xfail(reason='')
-def test_stream_shares_client_loop(loop):  # noqa: F811
+async def test_stream_shares_client_loop(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841
             source = Stream()
@@ -251,7 +251,7 @@ def test_stream_shares_client_loop(loop):  # noqa: F811
 
 
 @gen_cluster(client=True)
-def test_starmap(c, s, a, b):
+async def test_starmap(c, s, a, b):
     def add(x, y, z=0):
         return x + y + z
 
@@ -259,6 +259,6 @@ def test_starmap(c, s, a, b):
     L = source.scatter().starmap(add, z=10).gather().sink_to_list()
 
     for i in range(5):
-        yield source.emit((i, i))
+        await source.emit((i, i))
 
     assert L == [10, 12, 14, 16, 18]

@@ -1,3 +1,4 @@
+import asyncio
 import atexit
 from contextlib import contextmanager
 from flaky import flaky
@@ -217,7 +218,7 @@ def test_kafka_batch():
 
 
 @gen_cluster(client=True, timeout=60)
-def test_kafka_dask_batch(c, s, w1, w2):
+async def test_kafka_dask_batch(c, s, w1, w2):
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
@@ -227,15 +228,15 @@ def test_kafka_dask_batch(c, s, w1, w2):
                                            asynchronous=True, dask=True)
         out = stream.gather().sink_to_list()
         stream.start()
-        yield gen.sleep(5)  # this frees the loop while dask workers report in
+        await asyncio.sleep(5)  # this frees the loop while dask workers report in
         assert isinstance(stream, DaskStream)
         for i in range(10):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
-        yield await_for(lambda: any(out), 10, period=0.2)
+        await await_for(lambda: any(out), 10, period=0.2)
         assert {'key': None, 'value': b'value-1'} in out[0]
         stream.stop()
-        yield gen.sleep(0)
+        await asyncio.sleep(0)
         stream.upstream.upstream.consumer.close()
 
 
@@ -382,7 +383,7 @@ def test_kafka_batch_checkpointing_sync_nodes():
 
 
 @gen_cluster(client=True, timeout=60)
-def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
+async def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
     '''
     Testing whether Dask's scatter and gather works in conformity with
     the reference counting checkpointing implementation.
@@ -403,23 +404,23 @@ def test_kafka_dask_checkpointing_sync_nodes(c, s, w1, w2):
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out1 = stream1.map(split).gather().filter(lambda x: x[-1] % 2 == 1).sink_to_list()
         stream1.start()
-        yield await_for(lambda: any(out1) and out1[-1][-1] == 9, 10, period=0.2)
+        await await_for(lambda: any(out1) and out1[-1][-1] == 9, 10, period=0.2)
         stream1.upstream.stopped = True
         stream2 = Stream.from_kafka_batched(TOPIC, ARGS1, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out2 = stream2.map(split).gather().filter(lambda x: x[-1] % 2 == 1).sink_to_list()
         stream2.start()
         time.sleep(5)
         assert len(out2) == 0
         stream2.upstream.stopped = True
         stream3 = Stream.from_kafka_batched(TOPIC, ARGS2, asynchronous=True,
-                                           dask=True)
+                                            dask=True)
         out3 = stream3.map(split).gather().filter(lambda x: x[-1] % 2 == 1).sink_to_list()
         stream3.start()
-        yield await_for(lambda: any(out3) and out3[-1][-1] == 9, 10, period=0.2)
+        await await_for(lambda: any(out3) and out3[-1][-1] == 9, 10, period=0.2)
         stream3.upstream.stopped = True
 
 
