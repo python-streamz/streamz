@@ -456,7 +456,7 @@ class from_kafka(Source):
 
             # blocks for consumer thread to come up and invoke poll to
             # establish connection with broker to fetch oauth token for kafka
-            self.consumer.poll()
+            self.consumer.poll(timeout=1)
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
@@ -594,7 +594,7 @@ class FromKafkaBatched(Source):
 
             # blocks for consumer thread to come up and invoke poll to establish
             # connection with broker to fetch oauth token for kafka
-            self.consumer.poll()
+            self.consumer.poll(timeout=1)
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
