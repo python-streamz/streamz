@@ -12,11 +12,11 @@ dependencies:
   - toolz
   - zict
   - six
-  - librdkafka=1.2.2
+  - librdkafka=1.5.3
   - dask
   - distributed
   - pandas
-  - python-confluent-kafka=1.1.0
+  - python-confluent-kafka=1.5.0
   - numpydoc
   - sphinx
   - sphinx_rtd_theme
@@ -24,6 +24,7 @@ dependencies:
   - coverage
   - networkx
   - graphviz
+  - pytest-asyncio
   - python-graphviz
   - bokeh
   - ipython

@@ -449,10 +449,14 @@ class from_kafka(Source):
             self.stopped = False
             self.consumer = ck.Consumer(self.cpars)
             self.consumer.subscribe(self.topics)
-            weakref.finalize(self, lambda consumer=self.consumer: _close_consumer(consumer))
+            weakref.finalize(
+                self, lambda consumer=self.consumer: _close_consumer(consumer)
+            )
             tp = ck.TopicPartition(self.topics[0], 0, 0)
 
-            # blocks for consumer thread to come up
+            # blocks for consumer thread to come up and invoke poll to
+            # establish connection with broker to fetch oauth token for kafka
+            self.consumer.poll(timeout=1)
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
@@ -479,7 +483,8 @@ class FromKafkaBatched(Source):
                  max_batch_size=10000, keys=False,
                  engine=None, **kwargs):
         self.consumer_params = consumer_params
-        # Override the auto-commit config to enforce custom streamz checkpointing
+        # Override the auto-commit config to enforce custom streamz
+        # checkpointing
         self.consumer_params['enable.auto.commit'] = 'false'
         if 'auto.offset.reset' not in self.consumer_params.keys():
             consumer_params['auto.offset.reset'] = 'latest'
@@ -587,7 +592,9 @@ class FromKafkaBatched(Source):
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
-            # blocks for consumer thread to come up
+            # blocks for consumer thread to come up and invoke poll to establish
+            # connection with broker to fetch oauth token for kafka
+            self.consumer.poll(timeout=1)
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
 
