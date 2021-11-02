@@ -25,6 +25,7 @@ dependencies:
   - networkx
   - graphviz
   - python-graphviz
+  - pytest-asyncio
   - bokeh
   - ipython
   - ipykernel

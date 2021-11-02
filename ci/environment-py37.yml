@@ -24,6 +24,7 @@ dependencies:
   - coverage
   - networkx
   - graphviz
+  - pytest-asyncio
   - python-graphviz
   - bokeh
   - ipython
