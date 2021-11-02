@@ -592,7 +592,8 @@ class FromKafkaBatched(Source):
             self.stopped = False
             tp = ck.TopicPartition(self.topic, 0, 0)
 
-            # blocks for consumer thread to come up and invoke poll to establish connection with broker to fetch oauth token for kafka
+            # blocks for consumer thread to come up and invoke poll to establish
+            # connection with broker to fetch oauth token for kafka
             self.consumer.poll()
             self.consumer.get_watermark_offsets(tp)
             self.loop.add_callback(self.poll_kafka)
