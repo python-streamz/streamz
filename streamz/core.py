@@ -156,9 +156,25 @@ class APIRegisterMixin(object):
             >> Stream().bar(...)  # foo was actually attached as bar
         """
         def _(func):
-            @functools.wraps(func)
-            def wrapped(*args, **kwargs):
-                return func(*args, **kwargs)
+            if modifier is identity:
+                # bounded method
+                @functools.wraps(func)
+                def wrapped(self, *args, **kwargs):
+                    tbase = type(self)
+                    if self.upstreams:
+                        tbase = tbase.__bases__[0]
+
+                    if issubclass(func, tbase):
+                        return func(self, *args, **kwargs)
+                    else:
+                        fn = type(func.__name__, (tbase, func), dict(func.__dict__))
+                        return fn(self, *args, **kwargs)
+            else:
+                # static method or provided modifier
+                @functools.wraps(func)
+                def wrapped(*args, **kwargs):
+                    return func(*args, **kwargs)
+
             name = attribute_name if attribute_name else func.__name__
             setattr(cls, name, modifier(wrapped))
             return func

@@ -1356,8 +1356,15 @@ def test_subclass():
         pass
 
     @NewStream.register_api()
-    class foo(NewStream):
-        pass
+    class foo(sz.sinks.Sink):
+
+        def __init__(self, upstream, func, **kwargs):
+            super().__init__(upstream, **kwargs)
+            self.func = func
+
+        def update(self, x, who=None, metadata=None):
+            self.func(x)
+
 
     assert hasattr(NewStream, 'map')
     assert hasattr(NewStream(), 'map')
@@ -1365,6 +1372,21 @@ def test_subclass():
     assert hasattr(NewStream(), 'foo')
     assert not hasattr(Stream, 'foo')
     assert not hasattr(Stream(), 'foo')
+
+    def add(x) :
+        return x + 1
+
+    s = NewStream()
+    assert isinstance(s.map(add), NewStream)
+    assert isinstance(s.sink(print), NewStream)
+    assert isinstance(s.map(add), sz.core.map)
+    assert isinstance(s.sink(print), sz.sinks.sink)
+
+    lst = list()
+    s = NewStream()
+    s.map(add).map(add).foo(lst.append)
+    s.emit(25)
+    assert lst == [ 27 ], "%s != %s" % (lst, [ 27 ])
 
 
 @gen_test()
