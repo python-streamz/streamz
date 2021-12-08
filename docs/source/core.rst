@@ -297,7 +297,7 @@ stream have been lost those operations will no longer occur.  The one counter
 example to this is ``sink``, which is intended to be used with side effects and
 will stick around even without a reference.
 
-.. note:: Sink streams store themselves in ``streamz.core._global_sinks``.  You
+.. note:: Sink streams store themselves in ``streamz.sinks._global_sinks``.  You
           can remove them permanently by clearing that collection.
 
 .. code-block:: python
