@@ -46,9 +46,9 @@ class RiverTrain(Stream):
         if self.metric:
             yp = self.model.predict_one(x[0])
             weights = x[2] if len(x) > 1 else 1.0
-            self.emit(self.metric.update(x[1], yp, weights).get(), metadata=metadata)
+            return self._emit(self.metric.update(x[1], yp, weights).get(), metadata=metadata)
         if self.pass_model:
-            self.emit(self.model, metadata=metadata)
+            return self._emit(self.model, metadata=metadata)
 
 
 class RiverPredict(Stream):
@@ -59,4 +59,4 @@ class RiverPredict(Stream):
 
     def update(self, x, who=None, metadata=None):
         out = self.model.predict_one(x)
-        self.emit(out, metadata=metadata)
+        return self._emit(out, metadata=metadata)
