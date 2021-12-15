@@ -70,7 +70,7 @@ def launch_kafka():
             return b'kafka entered RUNNING state' in out
         except subprocess.CalledProcessError:
             pass
-    wait_for(predicate, 10, period=0.1)
+    wait_for(predicate, 30, period=0.1)
     return cid
 
 
