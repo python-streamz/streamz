@@ -123,12 +123,12 @@ async def test_from_kafka():
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
-        wait_for(lambda: len(out) == 10, 10, period=0.1)
+        await await_for(lambda: len(out) == 10, 10, period=0.1)
         assert out[-1] == b'value-9'
 
         kafka.produce(TOPIC, b'final message')
         kafka.flush()
-        wait_for(lambda: out[-1] == b'final message', 10, period=0.1)
+        await await_for(lambda: out[-1] == b'final message', 10, period=0.1)
 
         stream._close_consumer()
         kafka.produce(TOPIC, b'lost message')
@@ -139,9 +139,8 @@ async def test_from_kafka():
         stream._close_consumer()
 
 
-@pytest.mark.asyncio
 @flaky(max_runs=3, min_passes=1)
-async def test_to_kafka():
+def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
     with kafka_service() as kafka:
         _, TOPIC = kafka
@@ -150,7 +149,7 @@ async def test_to_kafka():
         out = kafka.sink_to_list()
 
         for i in range(10):
-            await source.emit(b'value-%d' % i)
+            source.emit(b'value-%d' % i)
 
         source.emit('final message')
         kafka.flush()
