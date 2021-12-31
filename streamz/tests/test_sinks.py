@@ -83,7 +83,7 @@ def test_ws_roundtrip():
     s.to_websocket("ws://localhost:8989")
     s.start()
 
-    wait_for(lambda: data == l, timeout=1)
+    wait_for(lambda: data == l, timeout=5)
     s.stop()
     s0.stop()
 
@@ -99,7 +99,7 @@ def test_mqtt_roundtrip():
     s.to_mqtt("mqtt.eclipseprojects.io", 1883, "streamz/sensor/temperature")
     s.start()
 
-    wait_for(lambda: data == l, timeout=1)
+    wait_for(lambda: data == l, timeout=5)
     s.stop()
     s0.stop()
 
