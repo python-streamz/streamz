@@ -9,7 +9,7 @@ tests = [p + '.tests' for p in packages]
 
 
 setup(name='streamz',
-      version='0.6.3',
+      version='0.6.4',
       description='Streams',
       url='http://github.com/python-streamz/streamz/',
       maintainer='Matthew Rocklin',
@@ -17,7 +17,7 @@ setup(name='streamz',
       license='BSD',
       keywords='streams',
       packages=packages + tests,
-      python_requires='>=3.6',
+      python_requires='>=3.7',
       long_description=(open('README.rst').read() if exists('README.rst')
                         else ''),
       install_requires=list(open('requirements.txt').read().strip().split('\n')),
