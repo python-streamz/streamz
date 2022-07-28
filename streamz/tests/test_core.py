@@ -1367,6 +1367,35 @@ def test_subclass():
     assert not hasattr(Stream(), 'foo')
 
 
+def test_subclass_node():
+
+    def add(x) : return x + 1
+
+    class MyStream(Stream):
+        def _new_node(self, cls, args, kwargs):
+            if not issubclass(cls, MyStream):
+                cls = type(cls.__name__, (cls, MyStream), dict(cls.__dict__))
+            return cls(*args, **kwargs)
+
+    @MyStream.register_api()
+    class foo(sz.sinks.sink):
+        pass
+
+    stream = MyStream()
+    lst = list()
+
+    node = stream.map(add)
+    assert isinstance(node, sz.core.map)
+    assert isinstance(node, MyStream)
+
+    node = node.foo(lst.append)
+    assert isinstance(node, sz.sinks.sink)
+    assert isinstance(node, MyStream)
+
+    stream.emit(100)
+    assert lst == [ 101 ]
+
+
 @gen_test()
 def test_latest():
     source = Stream(asynchronous=True)

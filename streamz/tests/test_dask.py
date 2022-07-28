@@ -242,6 +242,7 @@ def test_buffer_sync(loop):  # noqa: F811
 
 
 @pytest.mark.xfail(reason='')
+@pytest.mark.asyncio
 async def test_stream_shares_client_loop(loop):  # noqa: F811
     with cluster() as (s, [a, b]):
         with Client(s['address'], loop=loop) as client:  # noqa: F841

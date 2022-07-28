@@ -119,6 +119,22 @@ class RefCounter:
 
 class APIRegisterMixin(object):
 
+    def _new_node(self, cls, args, kwargs):
+        """ Constructor for downstream nodes.
+
+        Examples
+        --------
+        To provide inheritance through nodes :
+
+        >>> class MyStream(Stream):
+        >>>
+        >>>     def _new_node(self, cls, args, kwargs):
+        >>>         if not issubclass(cls, MyStream):
+        >>>             cls = type(cls.__name__, (cls, MyStream), dict(cls.__dict__))
+        >>>         return cls(*args, **kwargs)
+        """
+        return cls(*args, **kwargs)
+
     @classmethod
     def register_api(cls, modifier=identity, attribute_name=None):
         """ Add callable to Stream API
@@ -158,6 +174,10 @@ class APIRegisterMixin(object):
         def _(func):
             @functools.wraps(func)
             def wrapped(*args, **kwargs):
+                if identity is not staticmethod and args:
+                    self = args[0]
+                    if isinstance(self, APIRegisterMixin):
+                        return self._new_node(func, args, kwargs)
                 return func(*args, **kwargs)
             name = attribute_name if attribute_name else func.__name__
             setattr(cls, name, modifier(wrapped))

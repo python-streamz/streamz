@@ -70,7 +70,7 @@ def launch_kafka():
             return b'kafka entered RUNNING state' in out
         except subprocess.CalledProcessError:
             pass
-    wait_for(predicate, 10, period=0.1)
+    wait_for(predicate, 30, period=0.1)
     return cid
 
 
@@ -106,9 +106,9 @@ def split(messages):
     return parsed
 
 
+@pytest.mark.asyncio
 @flaky(max_runs=3, min_passes=1)
-@gen_test(timeout=60)
-def test_from_kafka():
+async def test_from_kafka():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
@@ -117,30 +117,29 @@ def test_from_kafka():
         stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
         out = stream.sink_to_list()
         stream.start()
-        yield gen.sleep(1.1)  # for loop to run
+        await asyncio.sleep(1.1)  # for loop to run
         for i in range(10):
-            yield gen.sleep(0.1)  # small pause ensures correct ordering
+            await asyncio.sleep(0.1)  # small pause ensures correct ordering
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
         # it takes some time for messages to come back out of kafka
-        wait_for(lambda: len(out) == 10, 10, period=0.1)
+        await await_for(lambda: len(out) == 10, 10, period=0.1)
         assert out[-1] == b'value-9'
 
         kafka.produce(TOPIC, b'final message')
         kafka.flush()
-        wait_for(lambda: out[-1] == b'final message', 10, period=0.1)
+        await await_for(lambda: out[-1] == b'final message', 10, period=0.1)
 
         stream._close_consumer()
         kafka.produce(TOPIC, b'lost message')
         kafka.flush()
         # absolute sleep here, since we expect output list *not* to change
-        yield gen.sleep(1)
+        await asyncio.sleep(1)
         assert out[-1] == b'final message'
         stream._close_consumer()
 
 
 @flaky(max_runs=3, min_passes=1)
-@gen_test(timeout=60)
 def test_to_kafka():
     ARGS = {'bootstrap.servers': 'localhost:9092'}
     with kafka_service() as kafka:
@@ -150,7 +149,7 @@ def test_to_kafka():
         out = kafka.sink_to_list()
 
         for i in range(10):
-            yield source.emit(b'value-%d' % i)
+            source.emit(b'value-%d' % i)
 
         source.emit('final message')
         kafka.flush()
@@ -158,35 +157,44 @@ def test_to_kafka():
         assert out[-1] == b'final message'
 
 
+@pytest.mark.asyncio
 @flaky(max_runs=3, min_passes=1)
-@gen_test(timeout=60)
-def test_from_kafka_thread():
+async def test_from_kafka_thread():
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
+    print(".")
     with kafka_service() as kafka:
         kafka, TOPIC = kafka
-        stream = Stream.from_kafka([TOPIC], ARGS)
+        stream = Stream.from_kafka([TOPIC], ARGS, asynchronous=True)
+        print(".")
         out = stream.sink_to_list()
         stream.start()
-        yield gen.sleep(1.1)
+        await asyncio.sleep(1.1)
+        print(".")
         for i in range(10):
-            yield gen.sleep(0.1)
+            await asyncio.sleep(0.1)
             kafka.produce(TOPIC, b'value-%d' % i)
         kafka.flush()
+        print(".")
         # it takes some time for messages to come back out of kafka
-        yield await_for(lambda: len(out) == 10, 10, period=0.1)
+        await await_for(lambda: len(out) == 10, 10, period=0.1)
+        print(".")
 
         assert out[-1] == b'value-9'
         kafka.produce(TOPIC, b'final message')
         kafka.flush()
-        yield await_for(lambda: out[-1] == b'final message', 10, period=0.1)
+        print(".")
+        await await_for(lambda: out[-1] == b'final message', 10, period=0.1)
+        print(".")
 
         stream._close_consumer()
         kafka.produce(TOPIC, b'lost message')
         kafka.flush()
         # absolute sleep here, since we expect output list *not* to change
-        yield gen.sleep(1)
+        print(".")
+        await asyncio.sleep(1)
+        print(".")
         assert out[-1] == b'final message'
         stream._close_consumer()
 
