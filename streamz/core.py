@@ -379,13 +379,14 @@ class Stream(APIRegisterMixin):
     __repr__ = __str__
 
     def _ipython_display_(self, **kwargs):  # pragma: no cover
+        # Since this function is only called by jupyter, this import must succeed
+        from IPython.display import HTML, display
+
         try:
             import ipywidgets
             from IPython.core.interactiveshell import InteractiveShell
             output = ipywidgets.Output(_view_count=0)
         except ImportError:
-            # since this function is only called by jupyter, this import must succeed
-            from IPython.display import display, HTML
             if hasattr(self, '_repr_html_'):
                 return display(HTML(self._repr_html_()))
             else:
@@ -420,7 +421,11 @@ class Stream(APIRegisterMixin):
 
         output.observe(remove_stream, '_view_count')
 
-        return output._ipython_display_(**kwargs)
+        if hasattr(output, "_repr_mimebundle_"):
+            data = output._repr_mimebundle_(**kwargs)
+            return display(data, raw=True)
+        else:
+            return output._ipython_display_(**kwargs)
 
     def _emit(self, x, metadata=None):
         """
