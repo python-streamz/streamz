@@ -16,7 +16,6 @@ from distributed.utils import sync
 from distributed.utils_test import gen_cluster, loop, loop_in_thread, cleanup, inc, cluster, loop, slowinc  # noqa: F401
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_map(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -31,7 +30,6 @@ async def test_map(c, s, a, b):
     assert all(isinstance(f, Future) for f in futures_L)
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_map_on_dict(c, s, a, b):
     # dask treats dicts differently, so we have to make sure
@@ -54,7 +52,6 @@ async def test_map_on_dict(c, s, a, b):
         assert item["i"] == i
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_partition_then_scatter_async(c, s, a, b):
     # Ensure partition w/ timeout before scatter works correctly for
@@ -95,7 +92,6 @@ def test_partition_then_scatter_sync(loop):
             assert L == [1, 2, 3]
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_non_unique_emit(c, s, a, b):
     """Regression for https://github.com/python-streamz/streams/issues/397
@@ -114,7 +110,6 @@ async def test_non_unique_emit(c, s, a, b):
     assert L[0] != L[1] or L[0] != L[2]
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_scan(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -129,7 +124,6 @@ async def test_scan(c, s, a, b):
     assert all(isinstance(f, Future) for f in futures_L)
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_scan_state(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -145,7 +139,6 @@ async def test_scan_state(c, s, a, b):
     assert L == [0, 1, 3]
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_zip(c, s, a, b):
     a = Stream(asynchronous=True)
@@ -162,7 +155,6 @@ async def test_zip(c, s, a, b):
     assert L == [(1, 'a'), (2, 'b')]
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_accumulate(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -200,7 +192,6 @@ def test_sync_2(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True, nthreads=[('127.0.0.1', 1)] * 2)
 async def test_buffer(c, s, a, b):
     source = Stream(asynchronous=True)
@@ -260,7 +251,6 @@ async def test_stream_shares_client_loop(loop):  # noqa: F811
             assert source.loop is client.loop
 
 
-@pytest.mark.asyncio
 @gen_cluster(client=True)
 async def test_starmap(c, s, a, b):
     def add(x, y, z=0):
