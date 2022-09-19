@@ -219,7 +219,7 @@ def test_binary_stream_operators(stream):
 
     a.emit(df)
 
-    assert_eq(b[0], expected)
+    wait_for(lambda: b and b[0].equals(expected), 1)
 
 
 def test_index(stream):
@@ -246,7 +246,7 @@ def test_pair_arithmetic(stream):
     a.emit(df.iloc[:5])
     a.emit(df.iloc[5:])
 
-    assert len(L) == 2
+    wait_for(lambda: len(L) == 2, 1)
     assert_eq(pd.concat(L, axis=0), (df.x + df.y) * 2)
 
 
@@ -259,7 +259,7 @@ def test_getitem(stream):
     a.emit(df.iloc[:5])
     a.emit(df.iloc[5:])
 
-    assert len(L) == 2
+    wait_for(lambda: len(L) == 2, 1)
     assert_eq(pd.concat(L, axis=0), df[df.x > 4])
 
 
@@ -298,6 +298,7 @@ def test_groupby_aggregate(agg, grouper, indexer, stream):
     a.emit(df.iloc[7:])
 
     first = df.iloc[:3]
+    wait_for(lambda: len(L) > 2, 1)
     assert assert_eq(L[0], f(first))
     assert assert_eq(L[-1], f(df))
 
@@ -382,7 +383,7 @@ def test_setitem(stream):
     df['a'] = 10
     df[['c', 'd']] = df[['x', 'y']]
 
-    assert_eq(L[-1], df.mean())
+    wait_for(lambda: L and L[-1].equals(df.mean()), 1)
 
 
 def test_setitem_overwrites(stream):

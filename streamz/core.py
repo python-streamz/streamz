@@ -1473,17 +1473,22 @@ class zip(Stream):
 
     def __init__(self, *upstreams, **kwargs):
         self.maxsize = kwargs.pop('maxsize', 10)
-        self.condition = Condition()
+        self._condition = None
         self.literals = [(i, val) for i, val in enumerate(upstreams)
                          if not isinstance(val, Stream)]
 
         self.buffers = {upstream: deque()
                         for upstream in upstreams
                         if isinstance(upstream, Stream)}
-
         upstreams2 = [upstream for upstream in upstreams if isinstance(upstream, Stream)]
 
         Stream.__init__(self, upstreams=upstreams2, **kwargs)
+
+    @property
+    def condition(self):
+        if self._condition is None:
+            self._condition = Condition()
+        return self._condition
 
     def _add_upstream(self, upstream):
         # Override method to handle setup of buffer for new stream
@@ -1881,7 +1886,7 @@ class latest(Stream):
     _graphviz_shape = 'octagon'
 
     def __init__(self, upstream, **kwargs):
-        self.condition = Condition()
+        self._condition = None
         self.next = []
         self.next_metadata = None
 
@@ -1889,6 +1894,12 @@ class latest(Stream):
         Stream.__init__(self, upstream, **kwargs)
 
         self.loop.add_callback(self.cb)
+
+    @property
+    def condition(self):
+        if self._condition is None:
+            self._condition = Condition()
+        return self._condition
 
     def update(self, x, who=None, metadata=None):
         if self.next_metadata:
