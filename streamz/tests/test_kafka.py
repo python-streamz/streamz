@@ -182,14 +182,6 @@ def test_from_kafka_thread():
         kafka.flush()
         yield await_for(lambda: out[-1] == b'final message', 10, period=0.1)
 
-        stream._close_consumer()
-        kafka.produce(TOPIC, b'lost message')
-        kafka.flush()
-        # absolute sleep here, since we expect output list *not* to change
-        yield gen.sleep(1)
-        assert out[-1] == b'final message'
-        stream._close_consumer()
-
 
 def test_kafka_batch():
     j = random.randint(0, 10000)
