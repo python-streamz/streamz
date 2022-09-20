@@ -169,7 +169,7 @@ def test_from_kafka_thread():
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
-        yield await_for(stream.started, 10, period=0.1)
+        yield await_for(lambda: stream.started, 10, period=0.1)
         for i in range(10):
             yield gen.sleep(0.1)
             kafka.produce(TOPIC, b'value-%d' % i)
