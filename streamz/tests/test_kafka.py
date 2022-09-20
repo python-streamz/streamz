@@ -49,14 +49,15 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
             raise
 
 
+@pytest.fixture(scope="session")
 def launch_kafka():
     stop_docker(let_fail=True)
     subprocess.call(shlex.split("docker pull spotify/kafka"))
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
            "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")
-    print(cmd)
-    cid = subprocess.check_output(shlex.split(cmd)).decode()[:-1]
+    cid = subprocess.check_output(shlex.split(cmd),
+                                  stderr=subprocess.DEVNULL).decode()[:-1]
 
     def end():
         if cid:
@@ -66,11 +67,11 @@ def launch_kafka():
     def predicate():
         try:
             out = subprocess.check_output(['docker', 'logs', cid],
-                                      stderr=subprocess.STDOUT)
-            return b'kafka entered RUNNING state' in out
+                                          stderr=subprocess.STDOUT)
+            return b'RUNNING' in out
         except subprocess.CalledProcessError:
             pass
-    wait_for(predicate, 10, period=0.1)
+    wait_for(predicate, 45, period=0.1)
     return cid
 
 
