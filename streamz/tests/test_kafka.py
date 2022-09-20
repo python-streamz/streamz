@@ -49,7 +49,6 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
             raise
 
 
-@pytest.fixture(scope="session")
 def launch_kafka():
     stop_docker(let_fail=True)
     subprocess.call(shlex.split("docker pull spotify/kafka"))
