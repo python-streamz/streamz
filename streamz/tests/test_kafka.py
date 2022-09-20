@@ -169,7 +169,7 @@ def test_from_kafka_thread():
         stream = Stream.from_kafka([TOPIC], ARGS)
         out = stream.sink_to_list()
         stream.start()
-        yield gen.sleep(1.1)
+        yield await_for(stream.started, 10, period=0.1)
         for i in range(10):
             yield gen.sleep(0.1)
             kafka.produce(TOPIC, b'value-%d' % i)
@@ -585,6 +585,8 @@ def test_kafka_checkpointing_auto_offset_reset_latest():
 
         stream1 = Stream.from_kafka_batched(TOPIC, ARGS, asynchronous=True)
         out1 = stream1.map(split).gather().sink_to_list()
+        time.sleep(1)  # messages make ttheir way through kafka
+
         stream1.start()
         wait_for(lambda: stream1.upstream.started, 10, period=0.1)
 
