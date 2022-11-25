@@ -1283,7 +1283,7 @@ def test_from_file():
 
             source.start()
 
-            yield await_for(lambda: len(L) == 3, timeout=5)
+            yield await_for(lambda: len(L) == 3, timeout=15)
 
             assert L == [1, 2, 3]
 
@@ -1309,11 +1309,11 @@ def test_from_file_end():
             out = source.sink_to_list()
             source.start()
             assert out == []
-            yield await_for(lambda: source.started, 2, period=0.02)
+            yield await_for(lambda: source.started, 12, period=0.02)
 
             f.write('data2\n')
             f.flush()
-            yield await_for(lambda: out == ['data2\n'], timeout=5, period=0.1)
+            yield await_for(lambda: out == ['data2\n'], timeout=15, period=0.1)
 
 
 @gen_test()
@@ -1754,5 +1754,5 @@ def test_backpressure_connect_empty_stream():
     source.connect(sout)
     source.start()
 
-    wait_for(lambda: L == [0], 0.01)
+    wait_for(lambda: L == [0], 1, period=0.01)
     assert len(source_list) > 0

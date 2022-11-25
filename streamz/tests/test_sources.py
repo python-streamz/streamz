@@ -13,8 +13,8 @@ def test_periodic():
     l = s.sink_to_list()
     assert s.stopped
     s.start()
-    wait_for(lambda: l, 0.3, period=0.01)
-    wait_for(lambda: len(l) > 1, 0.3, period=0.01)
+    wait_for(lambda: l, 1.3, period=0.01)
+    wait_for(lambda: len(l) > 1, 1.3, period=0.01)
     assert all(l)
 
 
@@ -24,7 +24,7 @@ def test_tcp():
     s = Source.from_tcp(port)
     out = s.sink_to_list()
     s.start()
-    wait_for(lambda: s.server is not None, 2, period=0.02)
+    wait_for(lambda: s.server is not None, 12, period=0.02)
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -39,7 +39,7 @@ def test_tcp():
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock2.connect(("localhost", port))
         sock2.send(b'data2\n')
-        wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2,
+        wait_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 12,
                  period=0.01)
     finally:
         s.stop()
@@ -54,7 +54,7 @@ def test_tcp_async():
     s = Source.from_tcp(port)
     out = s.sink_to_list()
     s.start()
-    yield await_for(lambda: s.server is not None, 2, period=0.02)
+    yield await_for(lambda: s.server is not None, 12, period=0.02)
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -69,7 +69,7 @@ def test_tcp_async():
         sock2 = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock2.connect(("localhost", port))
         sock2.send(b'data2\n')
-        yield await_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 2,
+        yield await_for(lambda: out == [b'data\n', b'data\n', b'data2\n'], 12,
                         period=0.01)
     finally:
         s.stop()
@@ -83,14 +83,14 @@ def test_http():
     s = Source.from_http_server(port)
     out = s.sink_to_list()
     s.start()
-    wait_for(lambda: s.server is not None, 2, period=0.02)
+    wait_for(lambda: s.server is not None, 12, period=0.02)
 
     r = requests.post('http://localhost:%i/' % port, data=b'data')
-    wait_for(lambda: out == [b'data'], 2, period=0.01)
+    wait_for(lambda: out == [b'data'], 12, period=0.01)
     assert r.ok
 
     r = requests.post('http://localhost:%i/other' % port, data=b'data2')
-    wait_for(lambda: out == [b'data', b'data2'], 2, period=0.01)
+    wait_for(lambda: out == [b'data', b'data2'], 12, period=0.01)
     assert r.ok
 
     s.stop()
@@ -111,7 +111,7 @@ def test_process():
         watcher.attach_loop(s.loop.asyncio_loop)
     out = s.sink_to_list()
     s.start()
-    yield await_for(lambda: out == [b'0123'], timeout=5)
+    yield await_for(lambda: out == [b'0123'], timeout=15)
     s.stop()
 
 
@@ -127,7 +127,7 @@ def test_process_str():
         watcher.attach_loop(s.loop.asyncio_loop)
     out = s.sink_to_list()
     s.start()
-    yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=5)
+    yield await_for(lambda: out == [b'0\n', b'1\n', b'2\n', b'3\n'], timeout=15)
     s.stop()
 
 
@@ -135,7 +135,7 @@ def test_from_iterable():
     source = Source.from_iterable(range(3))
     L = source.sink_to_list()
     source.start()
-    wait_for(lambda: L == [0, 1, 2], 0.1)
+    wait_for(lambda: L == [0, 1, 2], 1, period=0.1)
 
 
 def test_from_iterable_backpressure():
@@ -144,7 +144,7 @@ def test_from_iterable_backpressure():
     L = source.rate_limit(0.1).sink_to_list()
     source.start()
 
-    wait_for(lambda: L == [0], 1, period=0.01)
+    wait_for(lambda: L == [0], 5, period=0.01)
     assert next(it) == 2  # 1 is in blocked _emit
 
 
@@ -155,9 +155,9 @@ def test_from_iterable_stop():
     L = source.rate_limit(0.01).sink_to_list()
     source.start()
 
-    wait_for(lambda: L == [0], 1)
+    wait_for(lambda: L == [0], 11)
     source.stop()
 
     assert source.stopped
     with pytest.raises(Failed):
-        wait_for(lambda: L == [0, 1, 2], 0.1)
+        wait_for(lambda: L == [0, 1, 2], 1, period=0.1)
