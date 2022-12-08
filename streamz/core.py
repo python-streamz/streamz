@@ -168,7 +168,7 @@ class APIRegisterMixin(object):
     def register_plugin_entry_point(cls, entry_point, modifier=identity):
         if hasattr(cls, entry_point.name):
             raise ValueError(
-                f"Can't add {entry_point.name} from {entry_point.module_name} "
+                f"Can't add {entry_point.name} "
                 f"to {cls.__name__}: duplicate method name."
             )
 
@@ -178,7 +178,6 @@ class APIRegisterMixin(object):
             if not issubclass(node, Stream):
                 raise TypeError(
                     f"Error loading {entry_point.name} "
-                    f"from module {entry_point.module_name}: "
                     f"{node.__class__.__name__} must be a subclass of Stream"
                 )
             if getattr(cls, entry_point.name).__name__ == "stub":

@@ -51,7 +51,7 @@ def stop_docker(name='streamz-kafka', cid=None, let_fail=False):
 
 def launch_kafka():
     stop_docker(let_fail=True)
-    subprocess.call(shlex.split("docker pull spotify/kafka"))
+    subprocess.call(shlex.split("docker pull spotify/kafka"), stderr=subprocess.DEVNULL)
     cmd = ("docker run -d -p 2181:2181 -p 9092:9092 --env "
            "ADVERTISED_HOST=127.0.0.1 --env ADVERTISED_PORT=9092 "
            "--name streamz-kafka spotify/kafka")

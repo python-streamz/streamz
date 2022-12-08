@@ -896,12 +896,15 @@ class from_mqtt(from_q):
     :param client_kwargs:
         Passed to the client's ``connect()`` method
     """
-    def __init__(self, host, port, topic, keepalive=60 , client_kwargs=None, **kwargs):
+    def __init__(self, host, port, topic, keepalive=60 , client_kwargs=None,
+                 user=None, pw=None, **kwargs):
         self.host = host
         self.port = port
         self.keepalive = keepalive
         self.topic = topic
         self.client_kwargs = client_kwargs
+        self.user = user
+        self.pw = pw
         super().__init__(q=queue.Queue(), **kwargs)
 
     def _on_connect(self, client, userdata, flags, rc):
@@ -913,6 +916,8 @@ class from_mqtt(from_q):
     async def run(self):
         import paho.mqtt.client as mqtt
         client = mqtt.Client()
+        if self.user:
+            client.username_pw_set(self.user, self.pw)
         client.on_connect = self._on_connect
         client.on_message = self._on_message
         client.connect(self.host, self.port, self.keepalive, **(self.client_kwargs or {}))
