@@ -14,8 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         CONDA_ENV: [py38, py39, py310]
-    env:
-      STREAMZ_LAUNCH_KAFKA: true
+    # env:
+      # STREAMZ_LAUNCH_KAFKA: true
 
     steps:
       - name: APT

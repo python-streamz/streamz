@@ -161,7 +161,6 @@ def test_to_kafka():
 @flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_from_kafka_thread():
-    pytest.skip()
     j = random.randint(0, 10000)
     ARGS = {'bootstrap.servers': 'localhost:9092',
             'group.id': 'streamz-test%i' % j}
