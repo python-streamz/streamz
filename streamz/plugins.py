@@ -1,6 +1,6 @@
 import warnings
 
-import pkg_resources
+import importlib.metadata
 
 
 def try_register(cls, entry_point, *modifier):
@@ -14,9 +14,10 @@ def try_register(cls, entry_point, *modifier):
 
 
 def load_plugins(cls):
-    for entry_point in pkg_resources.iter_entry_points("streamz.sources"):
+    eps = importlib.metadata.entry_points()
+    for entry_point in eps.get("streamz.sources", []):
         try_register(cls, entry_point, staticmethod)
-    for entry_point in pkg_resources.iter_entry_points("streamz.nodes"):
+    for entry_point in eps.get("streamz.nodes", []):
         try_register(cls, entry_point)
-    for entry_point in pkg_resources.iter_entry_points("streamz.sinks"):
+    for entry_point in eps.get("streamz.sinks", []):
         try_register(cls, entry_point)

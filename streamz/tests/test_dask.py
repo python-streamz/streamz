@@ -72,10 +72,10 @@ async def test_partition_then_scatter_async(c, s, a, b):
     assert L == [1, 2, 3]
 
 
-def test_partition_then_scatter_sync(loop):
+def test_partition_then_scatter_sync():
     # Ensure partition w/ timeout before scatter works correctly for synchronous
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as client:  # noqa: F841
+        with Client(s['address']) as client:  # noqa: F841
             start = time.monotonic()
             source = Stream()
             L = source.partition(2, timeout=.1).scatter().map(
@@ -164,9 +164,9 @@ async def test_accumulate(c, s, a, b):
     assert L[-1][1] == 3
 
 
-def test_sync(loop):  # noqa: F811
+def test_sync():  # noqa: F811
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as client:  # noqa: F841
+        with Client(s['address']) as client:  # noqa: F841
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
@@ -174,14 +174,14 @@ def test_sync(loop):  # noqa: F811
                 for i in range(10):
                     await source.emit(i, asynchronous=True)
 
-            sync(loop, f)
+            sync(client.loop, f)
 
             assert L == list(map(inc, range(10)))
 
 
-def test_sync_2(loop):  # noqa: F811
+def test_sync_2():  # noqa: F811
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop):  # noqa: F841
+        with Client(s['address']):  # noqa: F841
             source = Stream()
             L = source.scatter().map(inc).gather().sink_to_list()
 
@@ -218,9 +218,9 @@ async def test_buffer(c, s, a, b):
     assert source.loop == c.loop
 
 
-def test_buffer_sync(loop):  # noqa: F811
+def test_buffer_sync():  # noqa: F811
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as c:  # noqa: F841
+        with Client(s['address']) as c:  # noqa: F841
             source = Stream()
             buff = source.scatter().map(slowinc, delay=0.5).buffer(5)
             L = buff.gather().sink_to_list()
@@ -241,10 +241,11 @@ def test_buffer_sync(loop):  # noqa: F811
             assert L == list(map(inc, range(10)))
 
 
+@pytest.mark.asyncio
 @pytest.mark.xfail(reason='')
-async def test_stream_shares_client_loop(loop):  # noqa: F811
+async def test_stream_shares_client_loop():  # noqa: F811
     with cluster() as (s, [a, b]):
-        with Client(s['address'], loop=loop) as client:  # noqa: F841
+        with Client(s['address']) as client:  # noqa: F841
             source = Stream()
             d = source.timed_window('20ms').scatter()  # noqa: F841
             assert source.loop is client.loop

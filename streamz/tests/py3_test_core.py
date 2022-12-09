@@ -1,16 +1,16 @@
 # flake8: noqa
+import asyncio
 from time import time
-from distributed.utils_test import loop, inc  # noqa
-from tornado import gen
+from distributed.utils_test import inc  # noqa
 
 from streamz import Stream
 
 
-def test_await_syntax(loop):  # noqa
+def test_await_syntax():  # noqa
     L = []
 
     async def write(x):
-        await gen.sleep(0.1)
+        await asyncio.sleep(0.1)
         L.append(x)
 
     async def f():
@@ -25,4 +25,4 @@ def test_await_syntax(loop):  # noqa
         assert 0.2 < stop - start < 0.4
         assert 2 <= len(L) <= 4
 
-    loop.run_sync(f)
+    asyncio.run(f())
