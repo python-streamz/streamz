@@ -19,7 +19,7 @@ from distributed.utils_test import gen_cluster  # flake8: noqa
 
 KAFKA_FILE = 'kafka_2.11-1.0.0'
 if os.environ.get('STREAMZ_LAUNCH_KAFKA', '') != 'true':
-    pytest.skip("Not doing flaky kafka tests")
+    pytest.skip("Not doing flaky kafka tests", allow_module_level=True)
 ck = pytest.importorskip('confluent_kafka')
 
 
