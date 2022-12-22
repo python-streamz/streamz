@@ -1,6 +1,7 @@
 import asyncio
 from collections import deque, defaultdict
 from datetime import timedelta
+from itertools import chain
 import functools
 import logging
 import six
@@ -1637,15 +1638,20 @@ class flatten(Stream):
     """
     def update(self, x, who=None, metadata=None):
         L = []
-        for i, item in enumerate(x):
-            if i == len(x) - 1:
-                y = self._emit(item, metadata=metadata)
-            else:
-                y = self._emit(item)
+        items = chain(x)
+        item = next(items)
+        for item_next in items:
+            y = self._emit(item)
+            item = item_next
             if type(y) is list:
                 L.extend(y)
             else:
                 L.append(y)
+        y = self._emit(item, metadata=metadata)
+        if type(y) is list:
+            L.extend(y)
+        else:
+            L.append(y)
         return L
 
 

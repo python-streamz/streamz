@@ -800,13 +800,15 @@ def test_frequencies():
     assert L[-1] == {'a': 2, 'b': 1}
 
 
-def test_flatten():
+@pytest.mark.parametrize("iterators",
+                         [[[1, 2, 3], [4, 5], [6, 7, 8]],
+                          [(i for i in range(1, 7)), (i for i in range(7, 9))]])
+def test_flatten(iterators):
     source = Stream()
     L = source.flatten().sink_to_list()
 
-    source.emit([1, 2, 3])
-    source.emit([4, 5])
-    source.emit([6, 7, 8])
+    for iterator in iterators:
+        source.emit(iterator)
 
     assert L == [1, 2, 3, 4, 5, 6, 7, 8]
 
