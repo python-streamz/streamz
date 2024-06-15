@@ -1,8 +1,8 @@
 import asyncio
 from contextlib import contextmanager
+import io
 import logging
 import os
-import six
 import shutil
 import tempfile
 from time import time, sleep
@@ -85,7 +85,7 @@ def captured_logger(logger, level=logging.INFO, propagate=None):
     if propagate is not None:
         orig_propagate = logger.propagate
         logger.propagate = propagate
-    sio = six.StringIO()
+    sio = io.StringIO()
     logger.handlers[:] = [logging.StreamHandler(sio)]
     logger.setLevel(level)
     try:

@@ -1,5 +1,4 @@
 tornado
 toolz
 zict
-six
 setuptools

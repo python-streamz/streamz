@@ -4,8 +4,6 @@ from datetime import timedelta
 from itertools import chain
 import functools
 import logging
-import six
-import sys
 import threading
 from time import time
 from typing import Any, Callable, Hashable, Union
@@ -1947,8 +1945,8 @@ def sync(loop, func, *args, **kwargs):
             if timeout is not None:
                 future = gen.with_timeout(timedelta(seconds=timeout), future)
             result[0] = yield future
-        except Exception:
-            error[0] = sys.exc_info()
+        except Exception as exc:
+            error[0] = exc
         finally:
             thread_state.asynchronous = False
             e.set()
@@ -1960,7 +1958,8 @@ def sync(loop, func, *args, **kwargs):
     else:
         while not e.is_set():
             e.wait(10)
+
     if error[0]:
-        six.reraise(*error[0])
+        raise error[0]
     else:
         return result[0]
