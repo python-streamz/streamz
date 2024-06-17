@@ -1,0 +1,27 @@
+name: test_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pytest
+  - flake8
+  - black
+  - isort
+  - tornado
+  - toolz
+  - librdkafka
+  - dask
+  - distributed
+  - pandas
+  - python-confluent-kafka
+  - codecov
+  - coverage
+  - networkx
+  - graphviz
+  - pytest-asyncio
+  - python-graphviz
+  - bokeh
+  - ipywidgets
+  - flaky
+  - pytest-cov
