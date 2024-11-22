@@ -13,11 +13,18 @@ def try_register(cls, entry_point, *modifier):
         )
 
 
+def get_entry_point(eps, group):
+    if hasattr(eps, "select"):  # Python 3.10+ / importlib_metadata >= 3.9.0
+        return eps.select(group=group)
+    else:
+        return eps.get(group, [])
+
 def load_plugins(cls):
     eps = importlib.metadata.entry_points()
-    for entry_point in eps.get("streamz.sources", []):
+
+    for entry_point in get_entry_point(eps, "streamz.sources"):
         try_register(cls, entry_point, staticmethod)
-    for entry_point in eps.get("streamz.nodes", []):
+    for entry_point in get_entry_point(eps, "streamz.nodes"):
         try_register(cls, entry_point)
-    for entry_point in eps.get("streamz.sinks", []):
+    for entry_point in get_entry_point(eps, "streamz.sinks"):
         try_register(cls, entry_point)

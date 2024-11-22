@@ -3,35 +3,25 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.8
+  - python=3.11
   - pytest
   - flake8
   - black
   - isort
   - tornado
   - toolz
-  - zict
-  - six
-  - librdkafka=1.5.3
+  - librdkafka
   - dask
   - distributed
   - pandas
-  - python-confluent-kafka=1.5.0
-  - numpydoc
-  - sphinx
-  - sphinx_rtd_theme
+  - python-confluent-kafka
   - codecov
   - coverage
   - networkx
   - graphviz
-  - python-graphviz
   - pytest-asyncio
+  - python-graphviz
   - bokeh
-  - ipython
-  - ipykernel
   - ipywidgets
   - flaky
   - pytest-cov
-  - coveralls
-  - paho-mqtt
-  - websockets
