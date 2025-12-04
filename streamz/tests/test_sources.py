@@ -103,7 +103,7 @@ def test_http():
 def test_process():
     cmd = ["python", "-c", "for i in range(4): print(i, end='')"]
     s = Source.from_process(cmd, with_end=True)
-    if sys.platform != "win32":
+    if sys.platform != "win32" and sys.version_info < (3, 14):
         # don't know why - something with pytest and new processes
         policy = asyncio.get_event_loop_policy()
         watcher = asyncio.SafeChildWatcher()
@@ -119,7 +119,7 @@ def test_process():
 def test_process_str():
     cmd = 'python -c "for i in range(4): print(i)"'
     s = Source.from_process(cmd)
-    if sys.platform != "win32":
+    if sys.platform != "win32" and sys.version_info < (3, 14):
         # don't know why - something with pytest and new processes
         policy = asyncio.get_event_loop_policy()
         watcher = asyncio.SafeChildWatcher()
