@@ -26,6 +26,9 @@ class OrderedSet(collections.abc.MutableSet):
     def discard(self, value):
         self._od.pop(value, None)
 
+    def copy(self):
+        return OrderedSet(self._od.copy())
+
 
 class OrderedWeakrefSet(weakref.WeakSet):
     def __init__(self, values=()):
