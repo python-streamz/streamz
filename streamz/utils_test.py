@@ -43,7 +43,7 @@ def double(x):
 
 @contextmanager
 def pristine_loop():
-    loop = IOLoop()
+    loop = IOLoop(make_current=False)
     try:
         yield loop
     finally:

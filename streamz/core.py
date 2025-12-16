@@ -51,7 +51,7 @@ def get_io_loop(asynchronous=None):
             return client.loop
 
     if not _io_loops:
-        loop = IOLoop()
+        loop = IOLoop(make_current=False)
         thread = threading.Thread(target=loop.start)
         thread.daemon = True
         thread.start()
