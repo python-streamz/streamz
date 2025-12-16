@@ -45,7 +45,6 @@ def double(x):
 def pristine_loop():
     IOLoop.clear_current()
     loop = IOLoop()
-    loop.make_current()
     try:
         yield loop
     finally:
