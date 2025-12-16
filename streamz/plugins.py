@@ -19,6 +19,7 @@ def get_entry_point(eps, group):
     else:
         return eps.get(group, [])
 
+
 def load_plugins(cls):
     eps = importlib.metadata.entry_points()
 

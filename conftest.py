@@ -10,6 +10,6 @@ def pytest_runtest_setup(item):
         pytest.skip("need --runslow option to run")
 
 
-def pytest_ignore_collect(path, config):
-    if 'run_test.py' in str(path):
+def pytest_ignore_collect(collection_path, config):
+    if 'run_test.py' in str(collection_path):
         return True
