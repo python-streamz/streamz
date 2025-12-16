@@ -43,7 +43,6 @@ def double(x):
 
 @contextmanager
 def pristine_loop():
-    IOLoop.clear_instance()
     IOLoop.clear_current()
     loop = IOLoop()
     loop.make_current()
@@ -51,7 +50,6 @@ def pristine_loop():
         yield loop
     finally:
         loop.close(all_fds=True)
-        IOLoop.clear_instance()
         IOLoop.clear_current()
 
 
