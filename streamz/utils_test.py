@@ -43,13 +43,11 @@ def double(x):
 
 @contextmanager
 def pristine_loop():
-    IOLoop.clear_current()
     loop = IOLoop()
     try:
         yield loop
     finally:
         loop.close(all_fds=True)
-        IOLoop.clear_current()
 
 
 def gen_test(timeout=10):
