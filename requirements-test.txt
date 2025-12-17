@@ -1,0 +1,11 @@
+# That's a minimal set of packages to satisfy ~1000 test cases
+# of the whole test suite. See also `./ci/*.yml` for full conda
+# environment descriptions.
+
+dask[array,distributed]
+flaky
+ipywidgets
+pandas
+pyarrow
+pytest<9
+requests

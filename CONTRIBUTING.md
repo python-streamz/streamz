@@ -8,3 +8,9 @@ Creating the streamz conda environment can be achieved by simply running ```cond
 
 ### Using Conda Environment
 The streamz conda environment can be activated by running ```conda activate streamz_dev```
+
+### Run Software Tests
+```shell
+pip install --editable=. --requirement=requirements-test.txt
+pytest -vvv
+```
