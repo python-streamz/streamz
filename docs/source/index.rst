@@ -123,3 +123,4 @@ data streaming systems like `Apache Flink <https://flink.apache.org/>`_,
    async.rst
    plotting.rst
    plugins.rst
+   use-cases.rst
