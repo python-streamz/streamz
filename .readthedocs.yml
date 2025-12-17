@@ -18,4 +18,10 @@ sphinx:
 
 python:
   install:
+
+    # Install package.
+    - method: pip
+      path: .
+
+    # Install Sphinx.
     - requirements: docs/requirements-docs.txt
