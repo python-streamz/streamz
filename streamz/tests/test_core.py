@@ -444,7 +444,8 @@ def test_timed_window_metadata():
     ]
 
 
-def test_timed_window_timedelta(clean):  # noqa: F811
+@pytest.mark.asyncio
+async def test_timed_window_timedelta(clean):  # noqa: F811
     pytest.importorskip('pandas')
     source = Stream(asynchronous=True)
     a = source.timed_window('10ms')
