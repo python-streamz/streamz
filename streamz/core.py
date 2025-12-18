@@ -719,6 +719,61 @@ class map(Stream):
 
 
 @Stream.register_api()
+class map_async(Stream):
+    """ Apply an async function to every element in the stream
+
+    Parameters
+    ----------
+    func: async callable
+    *args :
+        The arguments to pass to the function.
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> async def mult(x, factor=1):
+    ...     return factor*x
+    >>> async def run():
+    ...     source = Stream(asynchronous=True)
+    ...     source.map_async(mult, factor=2).sink(print)
+    ...     for i in range(5):
+    ...         await source.emit(i)
+    >>> asyncio.run(run())
+    0
+    2
+    4
+    6
+    8
+
+    """
+    def __init__(self, upstream, func, *args, **kwargs):
+        self.func = func
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+        self.work_queue = asyncio.Queue()
+
+        Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
+        self.cb_task = self.loop.asyncio_loop.create_task(self.cb())
+
+    def update(self, x, who=None, metadata=None):
+        coro = self.func(x, *self.args, **self.kwargs)
+        return self.work_queue.put_nowait((coro, metadata))
+
+    async def cb(self):
+        while True:
+            coro, metadata = await self.work_queue.get()
+            try:
+                result = await coro
+            except Exception as e:
+                logger.exception(e)
+                raise
+            else:
+                return self._emit(result, metadata=metadata)
+
+
+@Stream.register_api()
 class starmap(Stream):
     """ Apply a function to every element in the stream, splayed out
 
