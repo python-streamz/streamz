@@ -133,11 +133,13 @@ def test_map_async_tornado():
         return x + y
 
     async def add_native(x=0, y=0):
+        await asyncio.sleep(0.1)
         return x + y
 
     source = Stream(asynchronous=True)
-    L = source.map_async(add_tor, y=1).map_async(add_native, y=2).sink_to_list()
+    L = source.map_async(add_tor, y=1).map_async(add_native, parallelism=2, y=2).buffer(1).sink_to_list()
 
+    start = time()
     yield source.emit(0)
     yield source.emit(1)
     yield source.emit(2)
@@ -146,6 +148,7 @@ def test_map_async_tornado():
         assert L == [3, 4, 5]
 
     yield await_for(lambda: L == [3, 4, 5], 1, fail_func=fail_func)
+    assert (time() - start) == pytest.approx(0.1, abs=4e-3)
 
 
 @pytest.mark.asyncio
@@ -155,11 +158,13 @@ async def test_map_async():
         return x + y
 
     async def add_native(x=0, y=0):
+        await asyncio.sleep(0.1)
         return x + y
 
     source = Stream(asynchronous=True)
-    L = source.map_async(add_tor, y=1).map_async(add_native, y=2).sink_to_list()
+    L = source.map_async(add_tor, y=1).map_async(add_native, parallelism=2, y=2).sink_to_list()
 
+    start = time()
     await source.emit(0)
     await source.emit(1)
     await source.emit(2)
@@ -168,6 +173,7 @@ async def test_map_async():
         assert L == [3, 4, 5]
 
     await await_for(lambda: L == [3, 4, 5], 1, fail_func=fail_func)
+    assert (time() - start) == pytest.approx(0.1, abs=4e-3)
 
 
 def test_map_args():

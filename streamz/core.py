@@ -720,15 +720,16 @@ class map(Stream):
 
 @Stream.register_api()
 class map_async(Stream):
-    """ Apply an async function to every element in the stream
+    """ Apply an async function to every element in the stream, preserving order
+    even when evaluating multiple inputs in parallel.
 
     Parameters
     ----------
     func: async callable
     *args :
         The arguments to pass to the function.
-    buffer_size:
-        The max size of the input buffer, default value is unlimited
+    parallelism:
+        The maximum number of parallel Tasks for evaluating func, default value is 1
     **kwargs:
         Keyword arguments to pass to func
 
@@ -747,32 +748,31 @@ class map_async(Stream):
     4
     6
     8
-
     """
-    def __init__(self, upstream, func, *args, buffer_size=0, **kwargs):
+    def __init__(self, upstream, func, *args, parallelism=1, **kwargs):
         self.func = func
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
-        self.input_queue = asyncio.Queue(maxsize=buffer_size)
+        self.work_queue = asyncio.Queue(maxsize=parallelism)
 
         Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
-        self.input_task = self._create_task(self.input_callback())
+        self.work_task = self._create_task(self.work_callback())
 
     def update(self, x, who=None, metadata=None):
-        coro = self.func(x, *self.args, **self.kwargs)
-        self._retain_refs(metadata)
-        return self._create_task(self.input_queue.put((coro, metadata)))
+        return self._create_task(self._insert_job(x, metadata))
 
     def _create_task(self, coro):
+        if gen.is_future(coro):
+            return coro
         return self.loop.asyncio_loop.create_task(coro)
 
-    async def input_callback(self):
+    async def work_callback(self):
         while True:
             try:
-                coro, metadata = await self.input_queue.get()
-                self.input_queue.task_done()
-                result = await coro
+                task, metadata = await self.work_queue.get()
+                self.work_queue.task_done()
+                result = await task
             except Exception as e:
                 logger.exception(e)
                 raise
@@ -781,6 +781,21 @@ class map_async(Stream):
                 if results:
                     await asyncio.gather(*results)
                 self._release_refs(metadata)
+
+    async def _wait_for_work_slot(self):
+        while self.work_queue.full():
+            await asyncio.sleep(0)
+
+    async def _insert_job(self, x, metadata):
+        try:
+            await self._wait_for_work_slot()
+            coro = self.func(x, *self.args, **self.kwargs)
+            task = self._create_task(coro)
+            await self.work_queue.put((task, metadata))
+            self._retain_refs(metadata)
+        except Exception as e:
+            logger.exception(e)
+            raise
 
 
 @Stream.register_api()
