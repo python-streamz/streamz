@@ -727,6 +727,8 @@ class map_async(Stream):
     func: async callable
     *args :
         The arguments to pass to the function.
+    buffer_size:
+        The max size of the input buffer, default value is unlimited
     **kwargs:
         Keyword arguments to pass to func
 
@@ -747,19 +749,23 @@ class map_async(Stream):
     8
 
     """
-    def __init__(self, upstream, func, *args, **kwargs):
+    def __init__(self, upstream, func, *args, buffer_size=0, **kwargs):
         self.func = func
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
-        self.input_queue = asyncio.Queue()
+        self.input_queue = asyncio.Queue(maxsize=buffer_size)
 
         Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
-        self.input_task = self.loop.asyncio_loop.create_task(self.input_callback())
+        self.input_task = self._create_task(self.input_callback())
 
     def update(self, x, who=None, metadata=None):
         coro = self.func(x, *self.args, **self.kwargs)
-        self.input_queue.put_nowait((coro, metadata))
+        self._retain_refs(metadata)
+        return self._create_task(self.input_queue.put((coro, metadata)))
+
+    def _create_task(self, coro):
+        return self.loop.asyncio_loop.create_task(coro)
 
     async def input_callback(self):
         while True:
@@ -771,7 +777,10 @@ class map_async(Stream):
                 logger.exception(e)
                 raise
             else:
-                self._emit(result, metadata=metadata)
+                results = self._emit(result, metadata=metadata)
+                if results:
+                    await asyncio.gather(*results)
+                self._release_refs(metadata)
 
 
 @Stream.register_api()
