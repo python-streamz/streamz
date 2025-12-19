@@ -140,8 +140,7 @@ def test_map_async_tornado():
 
     yield source.emit(0)
 
-    yield gen.moment  # Must yield to the event loop to ensure it finished
-    assert L == [3]
+    yield await_for(lambda: L == [3], 1)
 
 
 @pytest.mark.asyncio
@@ -158,8 +157,7 @@ async def test_map_async():
 
     await source.emit(0)
 
-    await asyncio.sleep(0)  # Must yield to the event loop to ensure it finished
-    assert L == [3]
+    await await_for(lambda: L == [3], 1)
 
 
 def test_map_args():
