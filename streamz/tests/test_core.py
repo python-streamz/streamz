@@ -139,8 +139,13 @@ def test_map_async_tornado():
     L = source.map_async(add_tor, y=1).map_async(add_native, y=2).sink_to_list()
 
     yield source.emit(0)
+    yield source.emit(1)
+    yield source.emit(2)
 
-    yield await_for(lambda: L == [3], 1)
+    def fail_func():
+        assert L == [3, 4, 5]
+
+    yield await_for(lambda: L == [3, 4, 5], 1, fail_func=fail_func)
 
 
 @pytest.mark.asyncio
@@ -156,8 +161,13 @@ async def test_map_async():
     L = source.map_async(add_tor, y=1).map_async(add_native, y=2).sink_to_list()
 
     await source.emit(0)
+    await source.emit(1)
+    await source.emit(2)
 
-    await await_for(lambda: L == [3], 1)
+    def fail_func():
+        assert L == [3, 4, 5]
+
+    await await_for(lambda: L == [3, 4, 5], 1, fail_func=fail_func)
 
 
 def test_map_args():

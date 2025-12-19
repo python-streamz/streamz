@@ -752,25 +752,26 @@ class map_async(Stream):
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
-        self.work_queue = asyncio.Queue()
+        self.input_queue = asyncio.Queue()
 
         Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
-        self.cb_task = self.loop.asyncio_loop.create_task(self.cb())
+        self.input_task = self.loop.asyncio_loop.create_task(self.input_callback())
 
     def update(self, x, who=None, metadata=None):
         coro = self.func(x, *self.args, **self.kwargs)
-        return self.work_queue.put_nowait((coro, metadata))
+        self.input_queue.put_nowait((coro, metadata))
 
-    async def cb(self):
+    async def input_callback(self):
         while True:
-            coro, metadata = await self.work_queue.get()
             try:
+                coro, metadata = await self.input_queue.get()
+                self.input_queue.task_done()
                 result = await coro
             except Exception as e:
                 logger.exception(e)
                 raise
             else:
-                return self._emit(result, metadata=metadata)
+                self._emit(result, metadata=metadata)
 
 
 @Stream.register_api()
