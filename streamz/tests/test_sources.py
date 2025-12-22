@@ -48,6 +48,37 @@ def test_tcp():
 
 
 @flaky(max_runs=3, min_passes=1)
+def test_tcp_word_count_example():
+    port = 9999
+    s = Source.from_tcp(port)
+    out = s.map(bytes.split).flatten().frequencies().sink_to_list()
+    s.start()
+    wait_for(lambda: s.server is not None, 2, period=0.02)
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(("localhost", port))
+        sock.send(b'data\n')
+
+    with (socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock,
+          socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock2):
+        sock.connect(("localhost", port))
+        sock2.connect(("localhost", port))
+        sock.send(b'data\n')
+        # regression test a bug in from_tcp where a second packet from
+        # the same socket is dropped due to the socket handler dying
+        sock.send(b'data\n')
+        sock2.send(b'data2\n')
+
+    expected = [{b"data": 1}, {b"data": 2}, {b"data": 3}, {b"data": 3, b"data2": 1}]
+
+    def fail_func():
+        assert out == expected
+
+    wait_for(lambda: out == expected, 2, fail_func=fail_func, period=0.01)
+
+
+
+@flaky(max_runs=3, min_passes=1)
 @gen_test(timeout=60)
 def test_tcp_async():
     port = 9876
