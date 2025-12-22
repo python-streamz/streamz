@@ -1,26 +1,23 @@
-from __future__ import print_function
-
-from time import sleep
 import sys
-
-from BeautifulSoup import BeautifulSoup  # Python 2 only, sorry.
+from urllib.parse import urlparse
 
 import requests
-from streamz import Stream
 import toolz
-import urlparse
+from bs4 import BeautifulSoup
+
+from streamz import Stream, identity
 
 
-
-def links_of_page((content, page)):
-    uri = urlparse.urlparse(page)
+def links_of_page(content_page):
+    (content, page) = content_page
+    uri = urlparse(page)
     domain = '%s://%s' % (uri.scheme, uri.netloc)
     try:
-        soup = BeautifulSoup(content)
+        soup = BeautifulSoup(content, features="html.parser")
     except:
         return []
     else:
-        links = [link.get('href') for link in soup.findAll('a')]
+        links = [link.get('href') for link in soup.find_all('a')]
         return [domain + link
                 for link in links
                 if link
@@ -41,8 +38,9 @@ content = (pages.map(requests.get)
                 .map(lambda x: x.content))
 links = (content.zip(pages)
                 .map(links_of_page)
-                .concat())
-links.sink(source.emit)
+                .filter(identity)
+                .flatten())
+links.connect(source)
 
 """
 from nltk.corpus import stopwords
@@ -60,8 +58,7 @@ top_words.sink(print)
 """
 
 if len(sys.argv) > 1:
-    source.emit(sys.argv[1])
-
-
-
-#
+    try:
+        source.emit(sys.argv[1])
+    except KeyboardInterrupt:
+        pass
