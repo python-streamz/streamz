@@ -4,7 +4,7 @@ import sys
 from flaky import flaky
 import pytest
 from streamz import Source
-from streamz.utils_test import wait_for, await_for, gen_test
+from streamz.utils_test import free_port, wait_for, await_for, gen_test
 import socket
 
 
@@ -49,7 +49,7 @@ def test_tcp():
 
 @flaky(max_runs=3, min_passes=1)
 def test_tcp_word_count_example():
-    port = 9999
+    port = free_port()
     s = Source.from_tcp(port)
     out = s.map(bytes.split).flatten().frequencies().sink_to_list()
     s.start()
