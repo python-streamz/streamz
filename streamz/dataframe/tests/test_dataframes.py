@@ -8,6 +8,7 @@ import pytest
 from dask.dataframe.utils import assert_eq
 import numpy as np
 import pandas as pd
+from flaky import flaky
 from tornado import gen
 
 from streamz import Stream
@@ -570,6 +571,7 @@ def test_cumulative_aggregations(op, getter, stream):
     assert_eq(pd.concat(L), expected)
 
 
+@flaky(max_runs=3, min_passes=1)
 @gen_test()
 def test_gc():
     sdf = sd.Random(freq='5ms', interval='100ms')

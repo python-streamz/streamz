@@ -22,6 +22,7 @@ Stream
    filter
    flatten
    map
+   map_async
    partition
    rate_limit
    scatter
