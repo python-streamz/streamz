@@ -1637,7 +1637,10 @@ class flatten(Stream):
     def update(self, x, who=None, metadata=None):
         L = []
         items = chain(x)
-        item = next(items)
+        try:
+            item = next(items)
+        except StopIteration:
+            return L
         for item_next in items:
             y = self._emit(item)
             item = item_next

@@ -5,7 +5,7 @@ import requests
 import toolz
 from bs4 import BeautifulSoup
 
-from streamz import Stream, identity
+from streamz import Stream
 
 
 def links_of_page(content_page):
@@ -38,7 +38,6 @@ content = (pages.map(requests.get)
                 .map(lambda x: x.content))
 links = (content.zip(pages)
                 .map(links_of_page)
-                .filter(identity)
                 .flatten())
 links.connect(source)
 
