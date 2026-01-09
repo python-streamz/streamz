@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import shutil
+import socket
 import tempfile
 from time import time, sleep
 
@@ -12,6 +13,13 @@ from tornado import gen
 from tornado.ioloop import IOLoop
 
 from .core import _io_loops, Stream
+
+
+def free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('localhost', 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
 
 
 @contextmanager

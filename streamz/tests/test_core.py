@@ -814,6 +814,17 @@ def test_flatten(iterators):
     assert L == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
+def test_flatten_empty():
+    source = Stream()
+    L = source.flatten().sink_to_list()
+
+    source.emit([1, 2])
+    source.emit([])
+    source.emit([3, 4])
+
+    assert L == [1, 2, 3, 4]
+
+
 def test_unique():
     source = Stream()
     L = source.unique().sink_to_list()
