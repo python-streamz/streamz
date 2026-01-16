@@ -730,6 +730,8 @@ class map_async(Stream):
         The arguments to pass to the function.
     parallelism:
         The maximum number of parallel Tasks for evaluating func, default value is 1
+    stop_on_exception:
+         If the mapped func raises an exception, should the stream stop or not. Default value is False.
     **kwargs:
         Keyword arguments to pass to func
 
@@ -749,15 +751,22 @@ class map_async(Stream):
     6
     8
     """
-    def __init__(self, upstream, func, *args, parallelism=1, **kwargs):
+    def __init__(self, upstream, func, *args, parallelism=1, stop_on_exception=False, **kwargs):
         self.func = func
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
+        self.running = True
+        self.stop_on_exception = stop_on_exception
         self.work_queue = asyncio.Queue(maxsize=parallelism)
 
         Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
         self.work_task = self._create_task(self.work_callback())
+
+    def stop(self):
+        if self.running:
+            self.running = False
+            super().stop()
 
     def update(self, x, who=None, metadata=None):
         return self._create_task(self._insert_job(x, metadata))
@@ -768,19 +777,20 @@ class map_async(Stream):
         return self.loop.asyncio_loop.create_task(coro)
 
     async def work_callback(self):
-        while True:
+        while self.running:
+            task, metadata = await self.work_queue.get()
+            self.work_queue.task_done()
             try:
-                task, metadata = await self.work_queue.get()
-                self.work_queue.task_done()
                 result = await task
             except Exception as e:
                 logger.exception(e)
-                raise
+                if self.stop_on_exception:
+                    self.stop()
             else:
                 results = self._emit(result, metadata=metadata)
                 if results:
                     await asyncio.gather(*results)
-                self._release_refs(metadata)
+            self._release_refs(metadata)
 
     async def _wait_for_work_slot(self):
         while self.work_queue.full():
