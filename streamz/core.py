@@ -719,6 +719,86 @@ class map(Stream):
 
 
 @Stream.register_api()
+class map_async(Stream):
+    """ Apply an async function to every element in the stream, preserving order
+    even when evaluating multiple inputs in parallel.
+
+    Parameters
+    ----------
+    func: async callable
+    *args :
+        The arguments to pass to the function.
+    parallelism:
+        The maximum number of parallel Tasks for evaluating func, default value is 1
+    **kwargs:
+        Keyword arguments to pass to func
+
+    Examples
+    --------
+    >>> async def mult(x, factor=1):
+    ...     return factor*x
+    >>> async def run():
+    ...     source = Stream(asynchronous=True)
+    ...     source.map_async(mult, factor=2).sink(print)
+    ...     for i in range(5):
+    ...         await source.emit(i)
+    >>> asyncio.run(run())
+    0
+    2
+    4
+    6
+    8
+    """
+    def __init__(self, upstream, func, *args, parallelism=1, **kwargs):
+        self.func = func
+        stream_name = kwargs.pop('stream_name', None)
+        self.kwargs = kwargs
+        self.args = args
+        self.work_queue = asyncio.Queue(maxsize=parallelism)
+
+        Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
+        self.work_task = self._create_task(self.work_callback())
+
+    def update(self, x, who=None, metadata=None):
+        return self._create_task(self._insert_job(x, metadata))
+
+    def _create_task(self, coro):
+        if gen.is_future(coro):
+            return coro
+        return self.loop.asyncio_loop.create_task(coro)
+
+    async def work_callback(self):
+        while True:
+            try:
+                task, metadata = await self.work_queue.get()
+                self.work_queue.task_done()
+                result = await task
+            except Exception as e:
+                logger.exception(e)
+                raise
+            else:
+                results = self._emit(result, metadata=metadata)
+                if results:
+                    await asyncio.gather(*results)
+                self._release_refs(metadata)
+
+    async def _wait_for_work_slot(self):
+        while self.work_queue.full():
+            await asyncio.sleep(0)
+
+    async def _insert_job(self, x, metadata):
+        try:
+            await self._wait_for_work_slot()
+            coro = self.func(x, *self.args, **self.kwargs)
+            task = self._create_task(coro)
+            await self.work_queue.put((task, metadata))
+            self._retain_refs(metadata)
+        except Exception as e:
+            logger.exception(e)
+            raise
+
+
+@Stream.register_api()
 class starmap(Stream):
     """ Apply a function to every element in the stream, splayed out
 

@@ -72,8 +72,8 @@ This would also work with async-await syntax in Python 3
 
 .. code-block:: python
 
+   import asyncio
    from streamz import Stream
-   from tornado.ioloop import IOLoop
 
    async def f():
        source = Stream(asynchronous=True)  # tell the stream we're working asynchronously
@@ -82,7 +82,28 @@ This would also work with async-await syntax in Python 3
        for x in range(10):
            await source.emit(x)
 
-   IOLoop().run_sync(f)
+   asyncio.run(f())
+
+When working asynchronously, we can also map asynchronous functions.
+
+.. code-block:: python
+
+   async def increment_async(x):
+       """ A "long-running" increment function
+
+       Simulates a function that does real asyncio work.
+       """
+       await asyncio.sleep(0.1)
+       return x + 1
+
+   async def f_inc():
+       source = Stream(asynchronous=True)  # tell the stream we're working asynchronously
+       source.map_async(increment_async).rate_limit(0.500).sink(write)
+
+       for x in range(10):
+           await source.emit(x)
+
+   asyncio.run(f_inc())
 
 
 Event Loop on a Separate Thread
