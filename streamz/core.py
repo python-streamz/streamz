@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 from collections import deque, defaultdict
 from datetime import timedelta
 from itertools import chain
@@ -6,7 +7,7 @@ import functools
 import logging
 import threading
 from time import time
-from typing import Any, Callable, Hashable, Union
+from typing import Any, Callable, Coroutine, Hashable, Tuple, Union, overload
 import weakref
 
 import toolz
@@ -756,28 +757,54 @@ class map_async(Stream):
         stream_name = kwargs.pop('stream_name', None)
         self.kwargs = kwargs
         self.args = args
-        self.running = True
         self.stop_on_exception = stop_on_exception
         self.work_queue = asyncio.Queue(maxsize=parallelism)
 
         Stream.__init__(self, upstream, stream_name=stream_name, ensure_io_loop=True)
-        self.work_task = self._create_task(self.work_callback())
+        self.work_task = None
+
+    def _create_work_task(self) -> Tuple[asyncio.Event, asyncio.Task[None]]:
+        stop_work = asyncio.Event()
+        work_task = self._create_task(self.work_callback(stop_work))
+        return stop_work, work_task
+
+    def start(self):
+        if self.work_task:
+            stop_work, _ = self.work_task
+            stop_work.set()
+        self.work_task = self._create_work_task()
+        super().start()
 
     def stop(self):
-        if self.running:
-            self.running = False
-            super().stop()
+        stop_work, _ = self.work_task
+        stop_work.set()
+        self.work_task = None
+        super().stop()
 
     def update(self, x, who=None, metadata=None):
+        if not self.work_task:
+            self.work_task = self._create_work_task()
         return self._create_task(self._insert_job(x, metadata))
+
+    @overload
+    def _create_task(self, coro: asyncio.Future) -> asyncio.Future:
+        ...
+
+    @overload
+    def _create_task(self, coro: concurrent.futures.Future) -> concurrent.futures.Future:
+        ...
+
+    @overload
+    def _create_task(self, coro: Coroutine) -> asyncio.Task:
+        ...
 
     def _create_task(self, coro):
         if gen.is_future(coro):
             return coro
         return self.loop.asyncio_loop.create_task(coro)
 
-    async def work_callback(self):
-        while self.running:
+    async def work_callback(self, stop_work: asyncio.Event):
+        while not stop_work.is_set():
             task, metadata = await self.work_queue.get()
             self.work_queue.task_done()
             try:

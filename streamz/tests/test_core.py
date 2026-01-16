@@ -152,6 +152,28 @@ def test_map_async_tornado():
 
 
 @pytest.mark.asyncio
+async def test_map_async_restart():
+    async def flake_out(x):
+        if x == 2:
+            raise RuntimeError("I fail on 2.")
+        if x > 4:
+            raise RuntimeError("I fail on > 4.")
+        return x
+
+    source = Stream.from_iterable(itertools.count())
+    mapped = source.map_async(flake_out, stop_on_exception=True)
+    results = mapped.sink_to_list()
+    source.start()
+
+    await await_for(lambda: results == [0, 1], 1)
+    await await_for(lambda: not mapped.work_task, 1)
+
+    source.start()
+
+    await await_for(lambda: results == [0, 1, 3, 4], 1)
+
+
+@pytest.mark.asyncio
 async def test_map_async():
     @gen.coroutine
     def add_tor(x=0, y=0):
