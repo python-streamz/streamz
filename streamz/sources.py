@@ -786,6 +786,8 @@ class from_iterable(Source):
             if self.stopped:
                 break
             await asyncio.gather(*self._emit(x))
+            if self.stopped:
+                break
         self.stopped = True
 
 
