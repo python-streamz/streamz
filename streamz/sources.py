@@ -3,6 +3,8 @@ from glob import glob
 import queue
 import os
 import time
+from inspect import isawaitable
+
 from tornado import gen
 import weakref
 
@@ -252,7 +254,9 @@ class from_tcp(Source):
                 while not self.source.stopped:
                     try:
                         data = await stream.read_until(self.source.delimiter)
-                        await self.source._emit(data)
+                        result = self.source._emit(data)
+                        if isawaitable(result):
+                            await result
                     except StreamClosedError:
                         break
 

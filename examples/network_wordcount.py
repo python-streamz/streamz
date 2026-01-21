@@ -18,4 +18,9 @@ and then start typing content
 )
 
 s.start()
-time.sleep(600)
+
+try:
+    while True:
+        time.sleep(600)
+except KeyboardInterrupt:
+    pass
