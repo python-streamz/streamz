@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        CONDA_ENV: [py39, py310, py311, py312, py313, py314]
+        CONDA_ENV: [py310, py311, py312, py313, py314]
     # env:
       # STREAMZ_LAUNCH_KAFKA: true
 
