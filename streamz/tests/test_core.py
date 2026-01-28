@@ -18,6 +18,7 @@ from tornado import gen
 import streamz as sz
 
 from streamz import RefCounter
+from streamz.core import InvalidDataError
 from streamz.sources import sink_to_file
 from streamz.utils_test import (inc, double, gen_test, tmpfile, captured_logger,   # noqa: F401
         clean, await_for, metadata, wait_for)  # noqa: F401
@@ -1021,7 +1022,7 @@ def test_pluck():
     assert L == [2]
     a.emit([4, 5, 6, 7, 8, 9])
     assert L == [2, 5]
-    with pytest.raises(IndexError):
+    with pytest.raises(InvalidDataError):
         a.emit([1])
 
 
@@ -1033,7 +1034,7 @@ def test_pluck_list():
     assert L == [(1, 3)]
     a.emit([4, 5, 6, 7, 8, 9])
     assert L == [(1, 3), (4, 6)]
-    with pytest.raises(IndexError):
+    with pytest.raises(InvalidDataError):
         a.emit([1])
 
 
@@ -1643,7 +1644,7 @@ def test_map_errors_log():
 def test_map_errors_raises():
     a = Stream()
     b = a.map(lambda x: 1 / x)  # noqa: F841
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(InvalidDataError):
         a.emit(0)
 
 
@@ -1663,7 +1664,7 @@ def test_accumulate_errors_log():
 def test_accumulate_errors_raises():
     a = Stream()
     b = a.accumulate(lambda x, y: x / y, with_state=True)  # noqa: F841
-    with pytest.raises(ZeroDivisionError):
+    with pytest.raises(InvalidDataError):
         a.emit(1)
         a.emit(0)
 
