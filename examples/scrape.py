@@ -14,7 +14,7 @@ def links_of_page(content_page):
     domain = '%s://%s' % (uri.scheme, uri.netloc)
     try:
         soup = BeautifulSoup(content, features="html.parser")
-    except:
+    except Exception:
         return []
     else:
         links = [link.get('href') for link in soup.find_all('a')]

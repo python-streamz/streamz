@@ -2,20 +2,21 @@ import functools
 import random
 import time
 
-import pandas as pd
-
-from streamz import Stream
-import hvplot.streamz
-from streamz.river import RiverTrain
-from river import cluster
 import holoviews as hv
-from panel.pane.holoviews import HoloViews
+import pandas as pd
 import panel as pn
+from hvplot import streamz  # noqa: F401  # this monkeypatches streamz.dataframe
+from panel.pane.holoviews import HoloViews
+from river import cluster
+from streamz import Stream
+from streamz.river import RiverTrain
+
 hv.extension('bokeh')
 
 model = cluster.KMeans(n_clusters=3, sigma=0.1, mu=0.5)
 centres = [[random.random(), random.random()] for _ in range(3)]
 count = [0]
+
 
 def gen(move_chance=0.05):
     centre = int(random.random() * 3)  # 3x faster than random.randint(0, 2)
@@ -101,7 +102,6 @@ def main(viz=True):
 
         def stop(event):
             print(count, "events")
-            global t0
             t_spent = time.time() - t0
             print("frequency", count[0] / t_spent, "Hz")
             print("Current centres", centres)
@@ -127,6 +127,7 @@ def main(viz=True):
         print("Current centres", centres)
         print("Output centres", [list(c.values()) for c in model.centers.values()])
         s.stop()
+
 
 if __name__ == "__main__":
     main(viz=True)

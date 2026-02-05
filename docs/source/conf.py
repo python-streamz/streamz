@@ -163,6 +163,3 @@ texinfo_documents = [
      author, 'Streamz', 'Support for pipelines managing continuous streams of data.',
      'Miscellaneous'),
 ]
-
-
-
