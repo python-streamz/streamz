@@ -28,7 +28,9 @@ async def main(run_flags):
     s_sync.sink(print, sync_source.name)
 
     async_stopping_source = make_counter("async stopping")
-    s_async_stop = async_stopping_source.rate_limit("500ms").map_async(flaky_async, async_stopping_source, stop_on_exception=True)
+    s_async_stop = (async_stopping_source
+                    .rate_limit("500ms")
+                    .map_async(flaky_async, async_stopping_source, stop_on_exception=True))
     s_async_stop.sink(print, async_stopping_source.name)
 
     if run_flags[0]:
