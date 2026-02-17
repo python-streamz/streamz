@@ -254,6 +254,9 @@ class Stream(APIRegisterMixin):
         else:
             self.upstreams = []
 
+        # Lazily loaded exception handler to avoid recursion
+        self._on_exception = None
+
         self._set_asynchronous(asynchronous)
         self._set_loop(loop)
         if ensure_io_loop and not self.loop:
@@ -450,13 +453,16 @@ class Stream(APIRegisterMixin):
 
         result = []
         for downstream in list(self.downstreams):
-            r = downstream.update(x, who=self, metadata=metadata)
+            try:
+                r = downstream.update(x, who=self, metadata=metadata)
+            except Exception as exc:
+                # Push this exception to the on_exception handler on the downstream that raised
+                r = downstream.on_exception().update((x, exc) , who=downstream, metadata=metadata)
 
             if type(r) is list:
                 result.extend(r)
             else:
                 result.append(r)
-
             self._release_refs(metadata)
 
         return [element for element in result if element is not None]
@@ -675,6 +681,36 @@ class Stream(APIRegisterMixin):
             if 'ref' in m:
                 m['ref'].release(n)
 
+    def on_exception(self):
+        """ Returns the exception handler associated with this stream. The exception handler is either lazily loaded
+        at this point or (if alredy loaded) just returned.
+        """
+        self._on_exception = self._on_exception or _on_exception()
+        return self._on_exception
+
+
+class InvalidDataError(Exception):
+    """Generic error that is raised when data passed into a node causes an exception
+    """
+
+
+class _on_exception(Stream):
+    """ Internal exception-handler for Stream-nodes.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.silent = False
+        Stream.__init__(self, *args, **kwargs)
+
+    def update(self, x, who=None, metadata=None):
+        cause, exc = x
+
+        if self.silent or len(self.downstreams) > 0:
+            return self._emit(x, metadata=metadata)
+        else:
+            logger.exception(exc)
+            raise InvalidDataError(cause) from exc
+
 
 @Stream.register_api()
 class map(Stream):
@@ -710,13 +746,8 @@ class map(Stream):
         Stream.__init__(self, upstream, stream_name=stream_name)
 
     def update(self, x, who=None, metadata=None):
-        try:
-            result = self.func(x, *self.args, **self.kwargs)
-        except Exception as e:
-            logger.exception(e)
-            raise
-        else:
-            return self._emit(result, metadata=metadata)
+        result = self.func(x, *self.args, **self.kwargs)
+        return self._emit(result, metadata=metadata)
 
 
 @Stream.register_api()
@@ -1010,11 +1041,7 @@ class accumulate(Stream):
             else:
                 return self._emit(x, metadata=metadata)
         else:
-            try:
-                result = self.func(self.state, x, **self.kwargs)
-            except Exception as e:
-                logger.exception(e)
-                raise
+            result = self.func(self.state, x, **self.kwargs)
             if self.returns_state:
                 state, result = result
             else:
