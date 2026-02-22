@@ -1,10 +1,6 @@
 #!/bin/bash
-
-# Activate the streamz-dev anaconda environment by default
-source activate streamz-dev
-
-# Start Zookeeper
-$KAFKA_HOME/bin/zookeeper-server-start.sh -daemon $KAFKA_HOME/config/zookeeper.properties
+set -euo pipefail
+source ~/.bashrc
 
 # Configure Kafka
 sed -i '/#listeners=PLAINTEXT:\/\/:9092/c\listeners=PLAINTEXT:\/\/localhost:9092' $KAFKA_HOME/config/server.properties
