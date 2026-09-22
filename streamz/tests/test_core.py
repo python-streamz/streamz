@@ -1061,6 +1061,66 @@ def test_collect():
     assert L == [(1, 2), (), (3,)]
 
 
+@pytest.mark.parametrize("triggered", [False, True])
+def test_collect_async_sink(triggered):
+    source = Stream(asynchronous=False)
+    trigger = Stream(asynchronous=False)
+    collector = source.collect()
+    received = []
+
+    async def write(value):
+        await asyncio.sleep(0)
+        received.append(value)
+
+    collector.sink(write)
+    trigger.sink(collector.flush)
+    source.emit(1)
+    source.emit(2)
+    if triggered:
+        trigger.emit(None)
+    else:
+        collector.flush()
+    assert received == [(1, 2)]
+
+
+def test_collect_async_sink_can_collect_more():
+    source = Stream(asynchronous=False)
+    collector = source.collect()
+    received = []
+
+    async def write(value):
+        await asyncio.sleep(0)
+        received.append(value)
+        if value == (1,):
+            await source.emit(2)
+
+    collector.sink(write)
+    source.emit(1)
+    collector.flush()
+    collector.flush()
+    assert received == [(1,), (2,)]
+
+
+def test_collect_await_flush():
+    async def run():
+        source = Stream(asynchronous=True)
+        collector = source.collect()
+        received = []
+
+        async def write(value):
+            await asyncio.sleep(0)
+            received.append(value)
+
+        collector.sink(write)
+        await source.emit(1)
+        await collector.flush()
+        assert received == [(1,)]
+        await collector.flush()
+        assert received == [(1,), ()]
+
+    asyncio.run(run())
+
+
 def test_collect_ref_counts():
     source = Stream()
     collector = source.collect()

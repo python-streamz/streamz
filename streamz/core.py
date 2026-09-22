@@ -1939,10 +1939,13 @@ class collect(Stream):
     def flush(self, _=None):
         out = tuple(self.cache)
         metadata = list(self.metadata_cache)
-        self._emit(out, metadata)
-        self._release_refs(metadata)
+        # Downstream callbacks may collect more values while emit waits.
         self.cache.clear()
         self.metadata_cache.clear()
+        try:
+            return self.emit(out, metadata=metadata)
+        finally:
+            self._release_refs(metadata)
 
 
 @Stream.register_api()
