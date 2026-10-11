@@ -1249,16 +1249,19 @@ class partition_unique(Stream):
             # remove key if already present so that emitted value
             # will reflect elements' actual relative ordering
             self._buffer.pop(y, None)
-            self._metadata_buffer.pop(y, None)
+            self._release_refs(self._metadata_buffer.pop(y, []))
             self._buffer[y] = x
             self._metadata_buffer[y] = metadata
         else:  # self.keep == "first"
             if y not in self._buffer:
                 self._buffer[y] = x
                 self._metadata_buffer[y] = metadata
+            else:
+                self._release_refs(metadata)
         if len(self._buffer) == self.n:
             result, self._buffer = tuple(self._buffer.values()), {}
             metadata_result, self._metadata_buffer = list(self._metadata_buffer.values()), {}
+            metadata_result = [m for ml in metadata_result for m in ml]
             ret = self._emit(result, metadata_result)
             self._release_refs(metadata_result)
             return ret
