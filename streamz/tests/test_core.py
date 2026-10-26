@@ -1880,3 +1880,66 @@ def test_backpressure_connect_empty_stream():
 
     wait_for(lambda: L == [0], 0.01)
     assert len(source_list) > 0
+
+
+@pytest.mark.parametrize("n", [1, 2])
+@pytest.mark.parametrize("timeout", [None, 60])
+@pytest.mark.asyncio
+async def test_partition_releases_completed_keys(n, timeout):
+    source = Stream(asynchronous=True)
+    node = source.partition(n, key=0, timeout=timeout)
+    output = node.sink_to_list()
+    for key in range(8):
+        for value in range(n):
+            await source.emit((key, value))
+    assert output == [tuple((key, value) for value in range(n))
+                      for key in range(8)]
+    assert not node._buffer
+    assert not node._metadata_buffer
+    assert not node._callbacks
+
+
+@pytest.mark.asyncio
+async def test_partition_releases_timed_out_keys():
+    source = Stream(asynchronous=True)
+    node = source.partition(2, key=0, timeout=0.001)
+    output = node.sink_to_list()
+    for key in range(8):
+        await source.emit((key, 0))
+    await await_for(lambda: len(output) == 8, timeout=2)
+    assert sorted(output) == [((key, 0),) for key in range(8)]
+    assert not node._buffer
+    assert not node._metadata_buffer
+    assert not node._callbacks
+
+
+@pytest.mark.asyncio
+async def test_partition_same_key_while_emitting():
+    source = Stream(asynchronous=True)
+    node = source.partition(2, key=0, timeout=60)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    output = []
+
+    async def sink(batch):
+        output.append(batch)
+        if len(output) == 1:
+            entered.set()
+            await release.wait()
+
+    node.sink(sink)
+    await source.emit((1, 0))
+    pending = source.emit((1, 1))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=2)
+        await source.emit((1, 2))
+        assert node._buffer[1] == [(1, 2)]
+        assert 1 in node._callbacks
+    finally:
+        release.set()
+        await asyncio.wait_for(pending, timeout=2)
+    await source.emit((1, 3))
+    assert output == [((1, 0), (1, 1)), ((1, 2), (1, 3))]
+    assert not node._buffer
+    assert not node._metadata_buffer
+    assert not node._callbacks

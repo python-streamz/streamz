@@ -1138,8 +1138,9 @@ class partition(Stream):
 
     @gen.coroutine
     def _flush(self, key):
-        result, self._buffer[key] = self._buffer[key], []
-        metadata_result, self._metadata_buffer[key] = self._metadata_buffer[key], []
+        result = self._buffer.pop(key)
+        metadata_result = self._metadata_buffer.pop(key)
+        self._callbacks.pop(key, None)
         yield self._emit(tuple(result), list(metadata_result))
         self._release_refs(metadata_result)
 
