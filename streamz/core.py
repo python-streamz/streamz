@@ -1356,7 +1356,8 @@ class timed_window(Stream):
             L, self._buffer = self._buffer, []
             metadata, self.metadata_buffer = self.metadata_buffer, []
             m = [m for ml in metadata for m in ml]
-            self.last = self._emit(L, m)
+            # Both this callback and subsequent updates await the same work.
+            self.last = gen.convert_yielded(self._emit(L, m))
             self._release_refs(m)
             yield self.last
             yield gen.sleep(self.interval)
@@ -1475,7 +1476,8 @@ class timed_window_unique(Stream):
             metadata_result, self._metadata_buffer = list(self._metadata_buffer.values()), {}
             # TODO: figure out why metadata_result is handled differently here...
             m = [m for ml in metadata_result for m in ml]
-            self.last = self._emit(result, m)
+            # Both this callback and subsequent updates await the same work.
+            self.last = gen.convert_yielded(self._emit(result, m))
             self._release_refs(m)
             yield self.last
             yield gen.sleep(self.interval)

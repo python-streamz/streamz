@@ -548,6 +548,84 @@ def test_timed_window_backpressure():
     assert stop - start > 0.2
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("window_type, options", [
+    ("timed_window", {}),
+    ("timed_window_unique", {"keep": "first"}),
+    ("timed_window_unique", {"keep": "last"}),
+])
+@pytest.mark.parametrize("sink_type", ["coroutine", "task", "tornado"])
+async def test_timed_window_shared_backpressure(monkeypatch, window_type, options, sink_type):
+    started = asyncio.Queue()
+    intervals = asyncio.Queue()
+    release = asyncio.Event()
+    completed = []
+    synchronous = []
+
+    def wait_for_interval(interval):
+        assert interval == 60
+        future = asyncio.get_running_loop().create_future()
+        intervals.put_nowait(future)
+        return future
+
+    monkeypatch.setattr(gen, "sleep", wait_for_interval)
+
+    async def write(batch):
+        started.put_nowait(tuple(batch))
+        await release.wait()
+        completed.append(tuple(batch))
+
+    if sink_type == "task":
+        def sink(batch):
+            return asyncio.create_task(write(batch))
+    elif sink_type == "tornado":
+        @gen.coroutine
+        def sink(batch):
+            yield write(batch)
+    else:
+        sink = write
+
+    source = Stream(asynchronous=True)
+    window = getattr(source, window_type)(60, **options)
+    asynchronous_sink = window.sink(sink)
+    synchronous_sink = window.sink(lambda batch: synchronous.append(tuple(batch)))
+    try:
+        await source.emit(0)
+        assert await asyncio.wait_for(started.get(), 5) == (0,)
+
+        # Several producers share the in-flight window's backpressure.
+        pending = [source.emit(1), source.emit(2)]
+        await asyncio.sleep(0)
+        assert not any(future.done() for future in pending)
+        assert completed == []
+        release.set()
+        await asyncio.wait_for(asyncio.gather(*pending), 5)
+        interval = await asyncio.wait_for(intervals.get(), 5)
+
+        # Subsequent inputs must also be able to await the completed window.
+        await source.emit(3)
+        await source.emit(4)
+        assert completed == [(0,)]
+        assert synchronous == [(0,)]
+
+        release.clear()
+        interval.set_result(None)
+        assert await asyncio.wait_for(started.get(), 5) == (1, 2, 3, 4)
+        pending = source.emit(5)
+        await asyncio.sleep(0)
+        assert not pending.done()
+        release.set()
+        await asyncio.wait_for(pending, 5)
+        await asyncio.wait_for(intervals.get(), 5)
+        assert completed == [(0,), (1, 2, 3, 4)]
+        assert synchronous == completed
+    finally:
+        release.set()
+        asynchronous_sink.destroy()
+        synchronous_sink.destroy()
+        window.destroy()
+
+
 def test_sink_to_file():
     with tmpfile() as fn:
         source = Stream()
