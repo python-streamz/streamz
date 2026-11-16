@@ -1063,13 +1063,14 @@ class slice(Stream):
         self._check_end()
 
     def update(self, x, who=None, metadata=None):
-        if self.state >= self.star and self.state % self.step == 0:
+        if (self.state >= self.star
+                and (self.state - self.star) % self.step == 0):
             self.emit(x, metadata=metadata)
         self.state += 1
         self._check_end()
 
     def _check_end(self):
-        if self.end and self.state >= self.end:
+        if self.end is not None and self.state >= self.end:
             # we're done
             for upstream in self.upstreams:
                 upstream._remove_downstream(self)

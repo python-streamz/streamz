@@ -1753,7 +1753,9 @@ def test_share_common_ioloop(clean):  # noqa: F811
     [[1, None, None], [1, 2, 3, 4, 5]],
     [[None, 4, None], [0, 1, 2, 3]],
     [[None, 4, 2], [0, 2]],
-    [[3, 1, None], []]
+    [[3, 1, None], []],
+    [[1, None, 2], [1, 3, 5]],
+    [[None, 0, None], []],
 
 ])
 def test_slice(data):
