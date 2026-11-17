@@ -30,11 +30,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@v4
         with:
+          miniforge-version: latest
           auto-update-conda: true
-          auto-activate-base: false
+          auto-activate: false
+          conda-remove-defaults: true
           activate-environment: test_env
           environment-file: ci/environment-${{ matrix.CONDA_ENV }}.yml
 
