@@ -274,6 +274,36 @@ def test_partition_unique(n, key, keep, elements, exp_result):
     assert L == exp_result
 
 
+@pytest.mark.parametrize("keep", ["first", "last"])
+def test_partition_unique_ref_counts(keep):
+    source = Stream()
+    partition = source.partition_unique(2, keep=keep)
+    collected = partition.collect()
+    refs = [RefCounter() for _ in range(3)]
+
+    source.emit(1, metadata=[{'ref': refs[0]}])
+    source.emit(1, metadata=[{'ref': refs[1]}])
+    expected = [1, 0, 0] if keep == "first" else [0, 1, 0]
+    assert [ref.count for ref in refs] == expected
+
+    source.emit(2, metadata=[{'ref': refs[2]}])
+    expected[2] = 1
+    assert [ref.count for ref in refs] == expected
+    collected.flush()
+    assert all(ref.count == 0 for ref in refs)
+
+
+@pytest.mark.parametrize("keep", ["first", "last"])
+def test_partition_unique_metadata(keep):
+    source = Stream()
+    output = metadata(source.partition_unique(2, keep=keep)).sink_to_list()
+    source.emit(1, metadata=[{'v': 0}, {'v': 1}])
+    source.emit(1, metadata=[{'v': 2}])
+    source.emit(2, metadata=[{'v': 3}])
+    retained = [{'v': 0}, {'v': 1}] if keep == "first" else [{'v': 2}]
+    assert output == [retained + [{'v': 3}]]
+
+
 def test_partition_timeout():
     source = Stream()
     L = source.partition(10, timeout=0.01).sink_to_list()
